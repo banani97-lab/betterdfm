@@ -1,0 +1,99 @@
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: betterdfm
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  gerbonara:
+    build:
+      context: ./sidecar/gerbonara
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-betterdfm-uploads}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gerbonara:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:secret@postgres:5432/betterdfm
+      GERBONARA_URL: http://gerbonara:8001
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-betterdfm-uploads}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+      COGNITO_USER_POOL_ID: ${COGNITO_USER_POOL_ID:-}
+      COGNITO_CLIENT_ID: ${COGNITO_CLIENT_ID:-}
+      COGNITO_DOMAIN: ${COGNITO_DOMAIN:-}
+      JWT_ISSUER: ${JWT_ISSUER:-}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  worker:
+    build:
+      context: .
+      dockerfile: workers/dfm-worker/Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+      gerbonara:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://postgres:secret@postgres:5432/betterdfm
+      GERBONARA_URL: http://gerbonara:8001
+      AWS_REGION: ${AWS_REGION:-us-east-1}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      S3_BUCKET: ${S3_BUCKET:-betterdfm-uploads}
+      SQS_QUEUE_URL: ${SQS_QUEUE_URL:-}
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./apps/web
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:8080
+        NEXT_PUBLIC_COGNITO_CLIENT_ID: ${NEXT_PUBLIC_COGNITO_CLIENT_ID:-}
+        NEXT_PUBLIC_COGNITO_REGION: ${AWS_REGION:-us-east-1}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+
+volumes:
+  postgres_data:

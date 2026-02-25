@@ -1,0 +1,203 @@
+package dfmengine
+
+import "math"
+
+// ScoreResult holds the computed manufacturability score and supporting data.
+type ScoreResult struct {
+	Score            int
+	Grade            string
+	Verdict          string
+	ByRule           map[string]float64 // penalty points per ruleId
+	ByRuleCount      map[string]int     // violation count per ruleId
+	AreaCM2          float64
+	ViolationDensity float64
+}
+
+// ruleWeight returns the yield-impact weight for a given rule ID.
+func ruleWeight(id string) float64 {
+	switch id {
+	case "clearance":
+		return 3.0
+	case "trace-width":
+		return 2.5
+	case "annular-ring":
+		return 2.5
+	case "drill-size":
+		return 2.0
+	case "aspect-ratio":
+		return 1.5
+	case "edge-clearance":
+		return 1.5
+	case "solder-mask-dam":
+		return 1.0
+	default:
+		return 1.0
+	}
+}
+
+// severityWeight returns the penalty multiplier for a severity string.
+func severityWeight(sev string) float64 {
+	switch sev {
+	case "ERROR":
+		return 10.0
+	case "WARNING":
+		return 3.0
+	case "INFO":
+		return 0.5
+	default:
+		return 1.0
+	}
+}
+
+// marginMult returns a multiplier based on how far the violation is from the limit.
+func marginMult(v Violation) float64 {
+	if v.Unit == "ratio" {
+		// For ratios, measured > limit is always a violation; use same logic.
+		if v.LimitMM == 0 {
+			return 1.5
+		}
+		ratio := v.MeasuredMM / v.LimitMM
+		if ratio <= 0 {
+			return 1.5
+		}
+		if ratio < 0.5 {
+			return 1.25
+		}
+		return 1.0
+	}
+	if v.MeasuredMM == 0 {
+		return 1.5
+	}
+	if v.LimitMM > 0 && v.MeasuredMM < 0.5*v.LimitMM {
+		return 1.25
+	}
+	return 1.0
+}
+
+// ruleMaxContribution returns the maximum normalized penalty points a single rule
+// can contribute to the score, regardless of violation count. This prevents a
+// dense board hitting the 500-violation cap from scoring 0 automatically.
+//
+// Calibration: if only one rule is maxed, the resulting score is (100 - cap):
+//   clearance alone maxed  → score 65  (grade C  — moderate issues)
+//   trace-width alone      → score 70  (grade C)
+//   all rules maxed        → score  0  (grade F  — truly unmanufacturable)
+func ruleMaxContribution(id string) float64 {
+	switch id {
+	case "clearance":
+		return 35.0
+	case "trace-width":
+		return 30.0
+	case "annular-ring":
+		return 20.0
+	case "drill-size":
+		return 15.0
+	case "aspect-ratio":
+		return 10.0
+	case "edge-clearance":
+		return 10.0
+	case "solder-mask-dam":
+		return 10.0
+	default:
+		return 10.0
+	}
+}
+
+// outlineBBox returns the width and height of the bounding box of outline points in mm.
+func outlineBBox(outline []Point) (w, h float64) {
+	if len(outline) == 0 {
+		return 0, 0
+	}
+	minX, minY := outline[0].X, outline[0].Y
+	maxX, maxY := outline[0].X, outline[0].Y
+	for _, p := range outline[1:] {
+		if p.X < minX {
+			minX = p.X
+		}
+		if p.X > maxX {
+			maxX = p.X
+		}
+		if p.Y < minY {
+			minY = p.Y
+		}
+		if p.Y > maxY {
+			maxY = p.Y
+		}
+	}
+	return maxX - minX, maxY - minY
+}
+
+// scoreGrade returns the letter grade and verdict text for a numeric score.
+func scoreGrade(score int) (string, string) {
+	switch {
+	case score >= 90:
+		return "A", "Production Ready — no significant issues"
+	case score >= 75:
+		return "B", "Minor Issues — review recommended before submission"
+	case score >= 60:
+		return "C", "Moderate Issues — rework required"
+	case score >= 40:
+		return "D", "Significant Issues — major redesign required"
+	default:
+		return "F", "Not Manufacturable — critical failures present"
+	}
+}
+
+// ComputeScore calculates the manufacturability score from violations and board outline.
+//
+// Penalty formula (per violation):
+//   p_i = ruleWeight(ruleId) * severityWeight(severity) * marginMult(v)
+//
+// Per-rule normalization with cap:
+//   raw_norm_r  = sum(p_i for rule r) / areaFactor
+//   capped_r    = min(raw_norm_r, ruleMaxContribution(r))
+//   P_norm      = sum(capped_r across all rules)
+//   score       = clamp(round(100 - P_norm), 0, 100)
+//
+// The per-rule cap ensures that even a rule hitting the 500-violation ceiling
+// (due to dense routing on a complex board) cannot single-handedly force the
+// score to zero. It bounds each rule's maximum score impact to a calibrated
+// value while still producing 0 when multiple rules are severely violated.
+func ComputeScore(violations []Violation, outline []Point) ScoreResult {
+	byRule := make(map[string]float64)
+	byRuleCount := make(map[string]int)
+
+	for _, v := range violations {
+		p := ruleWeight(v.RuleID) * severityWeight(v.Severity) * marginMult(v)
+		byRule[v.RuleID] += p
+		byRuleCount[v.RuleID]++
+	}
+
+	bboxW, bboxH := outlineBBox(outline)
+	areaCM2 := bboxW * bboxH / 100.0
+	areaFactor := math.Sqrt(math.Max(1.0, areaCM2))
+
+	var pNorm float64
+	for ruleID, rawPenalty := range byRule {
+		rawNorm := rawPenalty / areaFactor
+		cap := ruleMaxContribution(ruleID)
+		if rawNorm > cap {
+			rawNorm = cap
+		}
+		pNorm += rawNorm
+	}
+
+	rawScore := 100.0 - pNorm
+	score := int(math.Round(math.Max(0, math.Min(100, rawScore))))
+
+	density := 0.0
+	if areaCM2 > 0 {
+		density = float64(len(violations)) / areaCM2
+	}
+
+	grade, verdict := scoreGrade(score)
+	return ScoreResult{
+		Score:            score,
+		Grade:            grade,
+		Verdict:          verdict,
+		ByRule:           byRule,
+		ByRuleCount:      byRuleCount,
+		AreaCM2:          areaCM2,
+		ViolationDensity: density,
+	}
+}
