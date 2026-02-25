@@ -1,0 +1,16 @@
+{
+  "name": "betterdfm",
+  "private": true,
+  "scripts": {
+    "dev:web": "pnpm --filter web dev",
+    "build:web": "pnpm --filter web build",
+    "dev:api": "cd apps/api && go run ./cmd/server",
+    "dev:worker": "cd workers/dfm-worker && go run ./cmd/worker",
+    "dev:sidecar": "cd sidecar/gerbonara && uvicorn main:app --reload --port 8001",
+    "docker:up": "docker-compose up --build",
+    "docker:down": "docker-compose down"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
+  }
+}

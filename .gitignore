@@ -1,0 +1,43 @@
+# Node
+node_modules/
+.next/
+dist/
+.turbo/
+*.tsbuildinfo
+
+# Go
+*.exe
+*.test
+*.out
+vendor/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.env
+dist/
+*.egg-info/
+.pytest_cache/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# AWS
+.aws/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.log
