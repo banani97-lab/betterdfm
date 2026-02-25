@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
       })
     )
 
+    if (res.ChallengeName === 'NEW_PASSWORD_REQUIRED') {
+      return NextResponse.json({ challenge: 'NEW_PASSWORD_REQUIRED', session: res.Session })
+    }
+
     const token = res.AuthenticationResult?.IdToken
     if (!token) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })
