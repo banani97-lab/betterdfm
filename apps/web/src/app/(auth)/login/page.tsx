@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn, isLoggedIn, isDevMode } from '@/lib/auth'
+import { signIn, completeNewPassword, isLoggedIn, isDevMode } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -13,6 +13,9 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newPasswordSession, setNewPasswordSession] = useState<string | null>(null)
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
 
   useEffect(() => {
     if (isLoggedIn()) router.replace('/dashboard')
@@ -23,10 +26,32 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
     try {
-      await signIn(email, password)
-      router.replace('/dashboard')
+      const result = await signIn(email, password)
+      if (result.kind === 'new_password_required') {
+        setNewPasswordSession(result.session)
+      } else {
+        router.replace('/dashboard')
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (newPassword !== confirmPassword) {
+      setError('Passwords do not match')
+      return
+    }
+    setLoading(true)
+    try {
+      await completeNewPassword(email, newPassword, newPasswordSession!)
+      router.replace('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to set new password')
     } finally {
       setLoading(false)
     }
@@ -49,58 +74,111 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-          <h2 className="text-xl font-semibold text-white mb-1">Welcome back</h2>
-          <p className="text-blue-200 text-sm mb-6">Sign in to your DFM dashboard.</p>
+          {newPasswordSession ? (
+            <>
+              <h2 className="text-xl font-semibold text-white mb-1">Set your password</h2>
+              <p className="text-blue-200 text-sm mb-6">Your account requires a new password before continuing.</p>
 
-          {isDevMode() && (
-            <div className="mb-4 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-400/20 text-yellow-300 text-xs">
-              Dev mode — any credentials accepted
-            </div>
+              {error && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleNewPassword} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="new-password" className="text-blue-100 text-sm">New password</Label>
+                  <Input
+                    id="new-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    required
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="confirm-password" className="text-blue-100 text-sm">Confirm password</Label>
+                  <Input
+                    id="confirm-password"
+                    type="password"
+                    autoComplete="new-password"
+                    placeholder="••••••••"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    required
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1"
+                >
+                  {loading ? 'Setting password…' : 'Set password & continue'}
+                </Button>
+              </form>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-semibold text-white mb-1">Welcome back</h2>
+              <p className="text-blue-200 text-sm mb-6">Sign in to your DFM dashboard.</p>
+
+              {isDevMode() && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-yellow-500/10 border border-yellow-400/20 text-yellow-300 text-xs">
+                  Dev mode — any credentials accepted
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="email" className="text-blue-100 text-sm">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="password" className="text-blue-100 text-sm">Password</Label>
+                  <Input
+                    id="password"
+                    type="password"
+                    autoComplete="current-password"
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1"
+                >
+                  {loading ? 'Signing in…' : 'Sign in'}
+                </Button>
+              </form>
+            </>
           )}
-
-          {error && (
-            <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="email" className="text-blue-100 text-sm">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                autoComplete="email"
-                placeholder="you@example.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor="password" className="text-blue-100 text-sm">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                autoComplete="current-password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
-              />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1"
-            >
-              {loading ? 'Signing in…' : 'Sign in'}
-            </Button>
-          </form>
 
           <p className="text-center text-xs text-blue-300/60 mt-5">
             Secured by AWS Cognito

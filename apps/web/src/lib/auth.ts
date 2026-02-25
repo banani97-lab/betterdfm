@@ -31,10 +31,14 @@ export function isLoggedIn(): boolean {
 // ── Sign in via server-side proxy ─────────────────────────────────────────────
 // Routes through /api/auth/signin to avoid browser CORS issues with Cognito.
 
-export async function signIn(email: string, password: string): Promise<void> {
+export type SignInResult =
+  | { kind: 'ok' }
+  | { kind: 'new_password_required'; session: string }
+
+export async function signIn(email: string, password: string): Promise<SignInResult> {
   if (isDevMode()) {
     setStoredToken('dev-token')
-    return
+    return { kind: 'ok' }
   }
 
   const res = await fetch('/api/auth/signin', {
@@ -47,6 +51,31 @@ export async function signIn(email: string, password: string): Promise<void> {
 
   if (!res.ok) {
     throw new Error(data.error || 'Sign in failed')
+  }
+
+  if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
+    return { kind: 'new_password_required', session: data.session }
+  }
+
+  setStoredToken(data.token)
+  return { kind: 'ok' }
+}
+
+export async function completeNewPassword(
+  email: string,
+  newPassword: string,
+  session: string,
+): Promise<void> {
+  const res = await fetch('/api/auth/new-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, newPassword, session }),
+  })
+
+  const data = await res.json()
+
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to set new password')
   }
 
   setStoredToken(data.token)
