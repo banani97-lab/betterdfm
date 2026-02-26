@@ -76,13 +76,13 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="bg-card border-b px-6 py-4 flex items-center justify-between gap-4">
+      <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
         <BetterDFMLogo />
         <div className="flex items-center gap-4">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
+            <Button variant="ghost" size="lg"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
           </Link>
-          <h1 className="text-lg font-semibold text-foreground">Upload & Analyze</h1>
+          <h1 className="text-xl font-semibold text-foreground">Upload & Analyze</h1>
         </div>
       </header>
 

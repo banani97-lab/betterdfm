@@ -71,18 +71,18 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b px-6 py-4 flex items-center justify-between">
+      <header className="bg-card border-b px-6 py-5 flex items-center justify-between">
         <BetterDFMLogo />
         <div className="flex items-center gap-3">
-          <ThemeToggle />
+          <ThemeToggle className="h-11 w-11" />
           <Link href="/admin/profile">
-            <Button variant="ghost" size="sm">Profile Settings</Button>
+            <Button variant="ghost" size="lg">Profile Settings</Button>
           </Link>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
+          <Button variant="ghost" size="lg" onClick={handleLogout}>
             <LogOut className="h-4 w-4 mr-1" /> Sign out
           </Button>
           <Link href="/upload">
-            <Button size="sm">
+            <Button size="lg">
               <Plus className="h-4 w-4 mr-1" /> Upload
             </Button>
           </Link>

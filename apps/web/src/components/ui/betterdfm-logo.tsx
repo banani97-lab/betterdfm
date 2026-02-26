@@ -14,13 +14,13 @@ export function BetterDFMLogo({ className }: BetterDFMLogoProps) {
       <Image
         src={logoLight}
         alt="BetterDFM"
-        className="block dark:hidden h-10 w-auto"
+        className="block dark:hidden h-16 w-auto"
         priority
       />
       <Image
         src={logoDark}
         alt="BetterDFM"
-        className="hidden dark:block h-10 w-auto"
+        className="hidden dark:block h-16 w-auto"
         priority
       />
     </div>

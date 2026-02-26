@@ -171,14 +171,14 @@ export default function ResultsPage() {
   return (
     <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b px-6 py-3 flex items-center gap-4 flex-shrink-0">
+      <header className="bg-card border-b px-6 py-5 flex items-center gap-4 flex-shrink-0">
         <BetterDFMLogo className="shrink-0" />
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <Link href="/dashboard">
-            <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
+            <Button variant="ghost" size="lg"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
           </Link>
           <div className="min-w-0">
-            <h1 className="text-base font-semibold text-foreground">DFM Results</h1>
+            <h1 className="text-lg font-semibold text-foreground">DFM Results</h1>
             <p className="text-xs text-muted-foreground font-mono truncate">{jobId}</p>
           </div>
         </div>
@@ -205,10 +205,10 @@ export default function ResultsPage() {
             </div>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV} disabled={violations.length === 0}>
+        <Button variant="outline" size="lg" onClick={exportCSV} disabled={violations.length === 0}>
           <Download className="h-4 w-4 mr-1" />CSV
         </Button>
-        <Button variant="outline" size="sm" onClick={downloadPDF}>
+        <Button variant="outline" size="lg" onClick={downloadPDF}>
           <Download className="h-4 w-4 mr-1" />PDF
         </Button>
       </header>
