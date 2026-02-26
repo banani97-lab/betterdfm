@@ -67,12 +67,12 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
+      <header className="bg-card border-b px-6 py-4 flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">BetterDFM</h1>
-          <p className="text-xs text-gray-500">PCB Design-for-Manufacturability</p>
+          <h1 className="text-xl font-bold text-foreground">BetterDFM</h1>
+          <p className="text-xs text-muted-foreground">PCB Design-for-Manufacturability</p>
         </div>
         <div className="flex items-center gap-3">
           <Link href="/admin/profile">
@@ -91,14 +91,14 @@ export default function DashboardPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Submissions</h2>
+          <h2 className="text-lg font-semibold text-foreground">Submissions</h2>
           <Button variant="outline" size="sm" onClick={fetchSubmissions}>
             <RefreshCw className="h-4 w-4 mr-1" /> Refresh
           </Button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
             {error}
           </div>
         )}
@@ -108,32 +108,32 @@ export default function DashboardPage() {
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
         ) : submissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-lg">
-            <Upload className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-700">No submissions yet</h3>
-            <p className="text-sm text-gray-500 mb-4">Upload a Gerber or ODB++ file to get started</p>
+          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-lg">
+            <Upload className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
             <Link href="/upload">
               <Button><Plus className="h-4 w-4 mr-1" /> Upload your first file</Button>
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border overflow-hidden">
+          <div className="bg-card rounded-lg border overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
+              <thead className="bg-muted/40 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Filename</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Score</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Filename</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Score</th>
+                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Created</th>
+                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {submissions.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
+                  <tr key={s.id} className="hover:bg-muted/40">
                     <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">{s.filename}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.fileType}</td>
+                    <td className="px-4 py-3 text-muted-foreground">{s.fileType}</td>
                     <td className="px-4 py-3">
                       <Badge variant={statusVariant[s.status] ?? 'gray'}>
                         {s.status === 'ANALYZING' && (
@@ -151,10 +151,10 @@ export default function DashboardPage() {
                           {s.mfgScore} <span className="opacity-80">{s.mfgGrade}</span>
                         </div>
                       ) : (
-                        <span className="text-gray-400">—</span>
+                        <span className="text-muted-foreground">—</span>
                       )}
                     </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{s.createdAt ? formatDate(s.createdAt) : '—'}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs">{s.createdAt ? formatDate(s.createdAt) : '—'}</td>
                     <td className="px-4 py-3 text-right">
                       {s.status === 'DONE' && s.latestJobId && (
                         <Link href={`/results/${s.latestJobId}`}>

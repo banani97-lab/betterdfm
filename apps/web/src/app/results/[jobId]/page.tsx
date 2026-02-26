@@ -161,22 +161,22 @@ export default function ResultsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <AlertCircle className="h-12 w-12 text-red-400" />
-        <p className="text-gray-600">{error}</p>
+        <p className="text-muted-foreground">{error}</p>
         <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center gap-4 flex-shrink-0">
+      <header className="bg-card border-b px-6 py-3 flex items-center gap-4 flex-shrink-0">
         <Link href="/dashboard">
           <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
         </Link>
         <div className="flex-1">
-          <h1 className="text-base font-semibold text-gray-900">DFM Results</h1>
-          <p className="text-xs text-gray-500 font-mono">{jobId}</p>
+          <h1 className="text-base font-semibold text-foreground">DFM Results</h1>
+          <p className="text-xs text-muted-foreground font-mono">{jobId}</p>
         </div>
         {/* Summary badges */}
         <div className="flex items-center gap-2">
@@ -212,7 +212,7 @@ export default function ResultsPage() {
       {/* Body: split panel */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: violation list */}
-        <div className="w-96 flex-shrink-0 border-r bg-white overflow-hidden flex flex-col">
+        <div className="w-96 flex-shrink-0 border-r bg-card overflow-hidden flex flex-col">
           <ViolationList
             violations={visibleViolations}
             allViolations={layerFiltered}

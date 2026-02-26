@@ -125,43 +125,43 @@ export default function AdminProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b px-6 py-4 flex items-center gap-4">
         <Link href="/dashboard">
           <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
         </Link>
-        <h1 className="text-lg font-semibold text-gray-900">Capability Profiles</h1>
+        <h1 className="text-lg font-semibold text-foreground">Capability Profiles</h1>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">
         {/* Profile list */}
         <div className="col-span-1">
-          <div className="bg-white rounded-lg border p-4">
-            <h2 className="font-semibold text-gray-900 mb-3">Profiles</h2>
+          <div className="bg-card rounded-lg border p-4">
+            <h2 className="font-semibold text-foreground mb-3">Profiles</h2>
             <div className="space-y-1">
               {profiles.map((p) => (
                 <div
                   key={p.id}
-                  className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer text-sm ${selected?.id === p.id ? 'bg-blue-50 text-blue-700 font-medium' : 'hover:bg-gray-50 text-gray-700'}`}
+                  className={`flex items-center justify-between px-3 py-2 rounded cursor-pointer text-sm ${selected?.id === p.id ? 'bg-primary/15 text-primary font-medium' : 'hover:bg-muted/40 text-muted-foreground'}`}
                   onClick={() => selectProfile(p)}
                 >
                   <span className="truncate">{p.name}{p.isDefault ? ' ★' : ''}</span>
                   <button
                     onClick={(e) => { e.stopPropagation(); handleDelete(p.id) }}
-                    className="text-gray-400 hover:text-red-500 ml-2 flex-shrink-0"
+                    className="text-muted-foreground hover:text-destructive ml-2 flex-shrink-0"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
                 </div>
               ))}
               {profiles.length === 0 && (
-                <p className="text-xs text-gray-400 py-2">No profiles yet</p>
+                <p className="text-xs text-muted-foreground py-2">No profiles yet</p>
               )}
             </div>
 
             {/* Create new */}
             <div className="mt-4 pt-4 border-t">
-              <p className="text-xs font-medium text-gray-600 mb-2">New Profile</p>
+              <p className="text-xs font-medium text-muted-foreground mb-2">New Profile</p>
               <Input
                 placeholder="Profile name"
                 value={newName}
@@ -179,7 +179,7 @@ export default function AdminProfilePage() {
         {/* Rule editor */}
         <div className="col-span-2">
           {selected ? (
-            <div className="bg-white rounded-lg border p-6">
+            <div className="bg-card rounded-lg border p-6">
               <div className="flex items-start justify-between mb-6">
                 <div className="flex-1 mr-4">
                   <Label className="mb-1 block">Profile Name</Label>
@@ -192,11 +192,11 @@ export default function AdminProfilePage() {
                     onChange={(e) => setIsDefault(e.target.checked)}
                     className="w-4 h-4"
                   />
-                  <span className="text-sm text-gray-700">Default</span>
+                  <span className="text-sm text-foreground">Default</span>
                 </label>
               </div>
 
-              <h3 className="font-semibold text-gray-800 mb-4">Manufacturing Rules</h3>
+              <h3 className="font-semibold text-foreground mb-4">Manufacturing Rules</h3>
               <div className="grid grid-cols-2 gap-4">
                 {RULE_FIELDS.map(({ key, label, unit, step }) => (
                   <div key={key}>
@@ -210,7 +210,7 @@ export default function AdminProfilePage() {
                         onChange={(e) => setRuleValue(key, e.target.value)}
                         className="flex-1"
                       />
-                      <span className="text-xs text-gray-500 w-8 flex-shrink-0">{unit}</span>
+                      <span className="text-xs text-muted-foreground w-8 flex-shrink-0">{unit}</span>
                     </div>
                   </div>
                 ))}
@@ -230,7 +230,7 @@ export default function AdminProfilePage() {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-64 bg-white rounded-lg border text-gray-400">
+            <div className="flex items-center justify-center h-64 bg-card rounded-lg border text-muted-foreground">
               Select or create a profile
             </div>
           )}
