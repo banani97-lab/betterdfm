@@ -9,6 +9,7 @@ import { isLoggedIn, clearToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 
 const statusVariant: Record<string, 'gray' | 'info' | 'success' | 'destructive'> = {
   UPLOADED: 'gray',
@@ -71,10 +72,7 @@ export default function DashboardPage() {
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-foreground">BetterDFM</h1>
-          <p className="text-xs text-muted-foreground">PCB Design-for-Manufacturability</p>
-        </div>
+        <BetterDFMLogo />
         <div className="flex items-center gap-3">
           <ThemeToggle />
           <Link href="/admin/profile">
