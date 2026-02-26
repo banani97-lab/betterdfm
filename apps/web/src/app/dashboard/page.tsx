@@ -8,6 +8,7 @@ import { getSubmissions, type Submission } from '@/lib/api'
 import { isLoggedIn, clearToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
 
 const statusVariant: Record<string, 'gray' | 'info' | 'success' | 'destructive'> = {
   UPLOADED: 'gray',
@@ -75,6 +76,7 @@ export default function DashboardPage() {
           <p className="text-xs text-muted-foreground">PCB Design-for-Manufacturability</p>
         </div>
         <div className="flex items-center gap-3">
+          <ThemeToggle />
           <Link href="/admin/profile">
             <Button variant="ghost" size="sm">Profile Settings</Button>
           </Link>
