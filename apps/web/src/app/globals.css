@@ -63,8 +63,8 @@
   html[data-ui-bg='grid'] body {
     background-color: hsl(var(--background));
     background-image:
-      linear-gradient(to right, hsl(var(--border) / 0.5) 1.25px, transparent 1.25px),
-      linear-gradient(to bottom, hsl(var(--border) / 0.5) 1.25px, transparent 1.25px),
+      linear-gradient(to right, hsl(var(--border) / 0.65) 1.25px, transparent 1.25px),
+      linear-gradient(to bottom, hsl(var(--border) / 0.65) 1.25px, transparent 1.25px),
       radial-gradient(circle at 1px 1px, hsl(var(--primary) / 0.24) 1.2px, transparent 1.2px),
       linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
     background-size: 30px 30px, 30px 30px, 30px 30px, cover;
