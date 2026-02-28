@@ -129,8 +129,12 @@ export default function DashboardPage() {
   }
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
+  const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
   const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
+  const tableCols = isCompact
+    ? 'grid-cols-[minmax(0,1.25fr)_112px_210px]'
+    : 'grid-cols-[minmax(0,1.6fr)_150px_260px]'
 
   return (
     <div className="min-h-screen bg-background/70">
@@ -189,7 +193,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4' : 'max-w-7xl px-6')}>
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Submissions</h1>
@@ -224,20 +228,22 @@ export default function DashboardPage() {
         ) : (
           <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/80 backdrop-blur shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
-            <div className="relative px-6 py-4 border-b border-border/70">
-              <div className="grid grid-cols-[minmax(0,1.6fr)_150px_260px] gap-4">
+            <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
+              <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Score</p>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground text-right">Actions</p>
               </div>
             </div>
 
-            <ul className="relative p-4 space-y-3">
+            <ul className={cn('relative', isCompact ? 'p-3 space-y-2' : 'p-4 space-y-3')}>
               {submissions.map((s) => (
                 <li
                   key={s.id}
                   className={cn(
-                    'grid grid-cols-[minmax(0,1.6fr)_150px_260px] gap-4 items-center rounded-2xl border border-border/70 bg-background/70 px-4 transition-all duration-200 hover:bg-muted/35 hover:-translate-y-0.5 hover:shadow-lg',
+                    'grid items-center rounded-2xl border border-border/70 bg-background/70 transition-all duration-200 hover:bg-muted/35 hover:-translate-y-0.5 hover:shadow-lg',
+                    tableCols,
+                    isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
                     rowPadding
                   )}
                 >
@@ -263,25 +269,25 @@ export default function DashboardPage() {
                     <Button
                       variant="outline"
                       size="icon"
-                      className="h-11 w-11"
+                      className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
                       onClick={() => setInfoSubmissionId(s.id)}
                       aria-label={`Show details for ${s.filename}`}
                       title={`Show details for ${s.filename}`}
                     >
-                      <Info className="h-5 w-5" />
+                      <Info className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
                     </Button>
                     {s.status === 'DONE' && s.latestJobId && (
                       <Link href={`/results/${s.latestJobId}`}>
-                        <Button variant="outline" className="h-11 px-5 text-sm">View Results</Button>
+                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
                       </Link>
                     )}
                     {s.status === 'UPLOADED' && (
                       <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
-                        <Button variant="outline" className="h-11 px-5 text-sm">Analyze</Button>
+                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
                       </Link>
                     )}
                     {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
-                      <Badge variant="info" className="text-sm px-3 py-1.5">{s.status}</Badge>
+                      <Badge variant="info" className={isCompact ? 'text-xs px-2.5 py-1' : 'text-sm px-3 py-1.5'}>{s.status}</Badge>
                     )}
                   </div>
                 </li>
