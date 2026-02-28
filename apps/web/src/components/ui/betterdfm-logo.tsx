@@ -1,6 +1,7 @@
 'use client'
 
 import Image from 'next/image'
+import Link from 'next/link'
 import logoLight from '@/app/dashboard/BetterDFM Logo Light Mode.png'
 import logoDark from '@/app/dashboard/BetterDFM Logo Dark Mode.png'
 
@@ -10,7 +11,12 @@ interface BetterDFMLogoProps {
 
 export function BetterDFMLogo({ className }: BetterDFMLogoProps) {
   return (
-    <div className={className}>
+    <Link
+      href="/dashboard"
+      className={className}
+      aria-label="Go to dashboard"
+      title="Go to dashboard"
+    >
       <Image
         src={logoLight}
         alt="BetterDFM"
@@ -23,6 +29,6 @@ export function BetterDFMLogo({ className }: BetterDFMLogoProps) {
         className="hidden dark:block h-16 w-auto"
         priority
       />
-    </div>
+    </Link>
   )
 }

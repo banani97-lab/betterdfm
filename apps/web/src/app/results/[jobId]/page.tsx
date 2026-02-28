@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, AlertCircle, AlertTriangle, Info } from 'lucide-react'
+import { Download, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, patchViolation, ignoreLayerViolations, type AnalysisJob, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
@@ -174,9 +174,6 @@ export default function ResultsPage() {
       <header className="bg-card border-b px-6 py-5 flex items-center gap-4 flex-shrink-0">
         <BetterDFMLogo className="shrink-0" />
         <div className="flex items-center gap-4 flex-1 min-w-0">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="lg"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
-          </Link>
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-foreground">DFM Results</h1>
             <p className="text-xs text-muted-foreground font-mono truncate">{jobId}</p>

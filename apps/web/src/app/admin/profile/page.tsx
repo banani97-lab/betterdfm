@@ -2,8 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, Save, Plus, Trash2 } from 'lucide-react'
+import { Save, Plus, Trash2 } from 'lucide-react'
 import {
   getProfiles,
   createProfile,
@@ -129,12 +128,7 @@ export default function AdminProfilePage() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
         <BetterDFMLogo />
-        <div className="flex items-center gap-4">
-          <Link href="/dashboard">
-            <Button variant="ghost" size="lg"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
-          </Link>
-          <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
-        </div>
+        <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">

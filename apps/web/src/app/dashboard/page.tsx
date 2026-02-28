@@ -1,22 +1,15 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { Fragment, useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Upload, RefreshCw, LogOut } from 'lucide-react'
+import { Plus, Upload, RefreshCw, LogOut, Info } from 'lucide-react'
 import { getSubmissions, type Submission } from '@/lib/api'
 import { isLoggedIn, clearToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
-
-const statusVariant: Record<string, 'gray' | 'info' | 'success' | 'destructive'> = {
-  UPLOADED: 'gray',
-  ANALYZING: 'info',
-  DONE: 'success',
-  FAILED: 'destructive',
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString()
@@ -32,6 +25,7 @@ function scoreColor(n: number): string {
 export default function DashboardPage() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [expandedInfoId, setExpandedInfoId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -117,57 +111,83 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <div className="bg-card rounded-lg border overflow-hidden">
+          <div className="bg-card rounded-lg border">
             <table className="w-full text-sm">
               <thead className="bg-muted/40 border-b">
                 <tr>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Filename</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Score</th>
-                  <th className="text-left px-4 py-3 font-medium text-muted-foreground">Created</th>
-                  <th className="text-right px-4 py-3 font-medium text-muted-foreground">Actions</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Filename</th>
+                  <th className="text-left px-3 py-2.5 font-medium text-muted-foreground">Score</th>
+                  <th className="text-right px-3 py-2.5 font-medium text-muted-foreground">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
                 {submissions.map((s) => (
-                  <tr key={s.id} className="hover:bg-muted/40">
-                    <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">{s.filename}</td>
-                    <td className="px-4 py-3 text-muted-foreground">{s.fileType}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant[s.status] ?? 'gray'}>
-                        {s.status === 'ANALYZING' && (
-                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1" />
+                  <Fragment key={s.id}>
+                    <tr className="hover:bg-muted/30">
+                      <td className="px-3 py-2.5">
+                        <p className="font-mono text-xs truncate max-w-sm">{s.filename}</p>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        {s.status === 'DONE' && s.mfgScore > 0 ? (
+                          <div
+                            className="inline-block px-2 py-0.5 rounded font-mono text-xs font-bold text-white"
+                            style={{ background: scoreColor(s.mfgScore) }}
+                          >
+                            {s.mfgScore} <span className="opacity-80">{s.mfgGrade}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
                         )}
-                        {s.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {s.status === 'DONE' && s.mfgScore > 0 ? (
-                        <div
-                          className="inline-block px-2 py-0.5 rounded font-mono text-xs font-bold text-white"
-                          style={{ background: scoreColor(s.mfgScore) }}
-                        >
-                          {s.mfgScore} <span className="opacity-80">{s.mfgGrade}</span>
+                      </td>
+                      <td className="px-3 py-2.5">
+                        <div className="flex justify-end items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => setExpandedInfoId(expandedInfoId === s.id ? null : s.id)}
+                            aria-label={`Show details for ${s.filename}`}
+                            title={`Show details for ${s.filename}`}
+                          >
+                            <Info className="h-4 w-4" />
+                          </Button>
+                          {s.status === 'DONE' && s.latestJobId && (
+                            <Link href={`/results/${s.latestJobId}`}>
+                              <Button variant="outline" size="sm">View Results</Button>
+                            </Link>
+                          )}
+                          {s.status === 'UPLOADED' && (
+                            <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
+                              <Button variant="outline" size="sm">Analyze</Button>
+                            </Link>
+                          )}
+                          {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
+                            <Badge variant="info">{s.status}</Badge>
+                          )}
                         </div>
-                      ) : (
-                        <span className="text-muted-foreground">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground text-xs">{s.createdAt ? formatDate(s.createdAt) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      {s.status === 'DONE' && s.latestJobId && (
-                        <Link href={`/results/${s.latestJobId}`}>
-                          <Button variant="outline" size="sm">View Results</Button>
-                        </Link>
-                      )}
-                      {s.status === 'UPLOADED' && (
-                        <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
-                          <Button variant="outline" size="sm">Analyze</Button>
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                    </tr>
+                    {expandedInfoId === s.id && (
+                      <tr className="bg-muted/20">
+                        <td colSpan={3} className="px-3 py-3">
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">File Type</p>
+                              <p className="text-sm font-medium text-foreground">{s.fileType}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Created</p>
+                              <p className="text-sm text-foreground">{s.createdAt ? formatDate(s.createdAt) : '-'}</p>
+                            </div>
+                            <div>
+                              <p className="text-[11px] uppercase tracking-wide text-muted-foreground">Overview</p>
+                              <p className="text-sm text-muted-foreground">Coming soon - add summary content here.</p>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
