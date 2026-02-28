@@ -29,9 +29,9 @@ export default function RootLayout({
     const background = uiSettings?.background;
     const normalized = background === 'default' ? 'spotlight' : background;
     const valid = normalized === 'spotlight' || normalized === 'studio' || normalized === 'grid' || normalized === 'aurora';
-    document.documentElement.setAttribute('data-ui-bg', valid ? normalized : 'spotlight');
+    document.documentElement.setAttribute('data-ui-bg', valid ? normalized : 'studio');
   } catch {
-    document.documentElement.setAttribute('data-ui-bg', 'spotlight');
+    document.documentElement.setAttribute('data-ui-bg', 'studio');
   }
 })();`,
           }}

@@ -26,7 +26,7 @@ interface UiSettings {
 const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
 
 const DEFAULT_UI_SETTINGS: UiSettings = {
-  background: 'spotlight',
+  background: 'studio',
   tableDensity: 'comfortable',
   showGrade: true,
   autoRefresh: true,
@@ -389,8 +389,8 @@ export default function DashboardPage() {
                 <h3 className="font-medium text-foreground mb-3">Background Style</h3>
                 <div className="grid grid-cols-4 gap-3">
                   {[
-                    { id: 'spotlight', label: 'Spotlight' },
                     { id: 'studio', label: 'Studio' },
+                    { id: 'spotlight', label: 'Spotlight' },
                     { id: 'grid', label: 'Grid' },
                     { id: 'aurora', label: 'Aurora' },
                   ].map((bg) => (
