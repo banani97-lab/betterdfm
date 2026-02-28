@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { cn } from '@/lib/utils'
 
-type BackgroundStyle = 'default' | 'grid' | 'aurora'
+type BackgroundStyle = 'spotlight' | 'studio' | 'grid' | 'aurora'
 type TableDensity = 'comfortable' | 'compact'
 
 interface UiSettings {
@@ -26,7 +26,7 @@ interface UiSettings {
 const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
 
 const DEFAULT_UI_SETTINGS: UiSettings = {
-  background: 'default',
+  background: 'spotlight',
   tableDensity: 'comfortable',
   showGrade: true,
   autoRefresh: true,
@@ -92,11 +92,18 @@ export default function DashboardPage() {
         return
       }
       const parsed = JSON.parse(raw) as Partial<UiSettings>
+      const parsedBackground = parsed.background
       const next: UiSettings = {
-        background:
-          parsed.background === 'default' || parsed.background === 'grid' || parsed.background === 'aurora'
-            ? parsed.background
-            : DEFAULT_UI_SETTINGS.background,
+        background: (
+          parsedBackground === 'spotlight' ||
+          parsedBackground === 'studio' ||
+          parsedBackground === 'grid' ||
+          parsedBackground === 'aurora'
+            ? parsedBackground
+            : parsedBackground === 'default'
+              ? 'spotlight'
+              : DEFAULT_UI_SETTINGS.background
+        ),
         tableDensity: parsed.tableDensity === 'compact' ? 'compact' : 'comfortable',
         showGrade: parsed.showGrade ?? DEFAULT_UI_SETTINGS.showGrade,
         autoRefresh: parsed.autoRefresh ?? DEFAULT_UI_SETTINGS.autoRefresh,
@@ -380,9 +387,10 @@ export default function DashboardPage() {
             <div className="space-y-6">
               <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
                 <h3 className="font-medium text-foreground mb-3">Background Style</h3>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-4 gap-3">
                   {[
-                    { id: 'default', label: 'Studio' },
+                    { id: 'spotlight', label: 'Spotlight' },
+                    { id: 'studio', label: 'Studio' },
                     { id: 'grid', label: 'Grid' },
                     { id: 'aurora', label: 'Aurora' },
                   ].map((bg) => (

@@ -27,10 +27,11 @@ export default function RootLayout({
     const uiSettingsRaw = localStorage.getItem(uiSettingsKey);
     const uiSettings = uiSettingsRaw ? JSON.parse(uiSettingsRaw) : null;
     const background = uiSettings?.background;
-    const valid = background === 'default' || background === 'grid' || background === 'aurora';
-    document.documentElement.setAttribute('data-ui-bg', valid ? background : 'default');
+    const normalized = background === 'default' ? 'spotlight' : background;
+    const valid = normalized === 'spotlight' || normalized === 'studio' || normalized === 'grid' || normalized === 'aurora';
+    document.documentElement.setAttribute('data-ui-bg', valid ? normalized : 'spotlight');
   } catch {
-    document.documentElement.setAttribute('data-ui-bg', 'default');
+    document.documentElement.setAttribute('data-ui-bg', 'spotlight');
   }
 })();`,
           }}
