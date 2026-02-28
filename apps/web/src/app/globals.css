@@ -31,9 +31,9 @@
     --card-foreground: 210 40% 98%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 236 100% 72%;
-    --primary: 236 100% 66%;
-    --primary-foreground: 230 42% 10%;
+    --ring: 182 75% 58%;
+    --primary: 182 66% 48%;
+    --primary-foreground: 216 35% 11%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
     --muted: 217.2 32.6% 17.5%;
@@ -49,5 +49,31 @@
   }
   body {
     @apply bg-background text-foreground;
+    background-attachment: fixed;
+    background-size: cover;
+  }
+
+  html[data-ui-bg='default'] body {
+    background-image:
+      radial-gradient(circle at 12% 18%, hsl(var(--primary) / 0.22), transparent 38%),
+      radial-gradient(circle at 84% 10%, hsl(222 70% 55% / 0.15), transparent 36%),
+      linear-gradient(135deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+  }
+
+  html[data-ui-bg='grid'] body {
+    background-image:
+      linear-gradient(hsl(var(--border) / 0.2) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--border) / 0.2) 1px, transparent 1px),
+      radial-gradient(circle at 85% 15%, hsl(var(--primary) / 0.16), transparent 42%),
+      linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
+    background-size: 26px 26px, 26px 26px, cover, cover;
+  }
+
+  html[data-ui-bg='aurora'] body {
+    background-image:
+      radial-gradient(70% 58% at 8% 15%, hsl(182 78% 56% / 0.24), transparent 62%),
+      radial-gradient(60% 52% at 90% 8%, hsl(272 74% 65% / 0.2), transparent 60%),
+      radial-gradient(66% 60% at 52% 112%, hsl(212 82% 58% / 0.16), transparent 64%),
+      linear-gradient(160deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%);
   }
 }

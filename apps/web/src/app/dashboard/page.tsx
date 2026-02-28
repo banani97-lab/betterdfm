@@ -1,18 +1,47 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Upload, RefreshCw, LogOut, Info, X } from 'lucide-react'
+import { Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, type Submission } from '@/lib/api'
-import { isLoggedIn, clearToken } from '@/lib/auth'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { clearToken, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { cn } from '@/lib/utils'
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleString()
+type BackgroundStyle = 'default' | 'grid' | 'aurora'
+type TableDensity = 'comfortable' | 'compact'
+
+interface UiSettings {
+  background: BackgroundStyle
+  tableDensity: TableDensity
+  showGrade: boolean
+  autoRefresh: boolean
+  use24hTime: boolean
+}
+
+const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
+
+const DEFAULT_UI_SETTINGS: UiSettings = {
+  background: 'default',
+  tableDensity: 'comfortable',
+  showGrade: true,
+  autoRefresh: true,
+  use24hTime: false,
+}
+
+function formatDate(iso: string, use24hTime: boolean) {
+  return new Date(iso).toLocaleString([], {
+    hour12: !use24hTime,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function scoreColor(n: number): string {
@@ -22,9 +51,15 @@ function scoreColor(n: number): string {
   return '#dc2626'
 }
 
+function applyBackground(background: BackgroundStyle) {
+  document.documentElement.setAttribute('data-ui-bg', background)
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -49,13 +84,44 @@ export default function DashboardPage() {
     fetchSubmissions()
   }, [router, fetchSubmissions])
 
-  // Auto-refresh when any submission is ANALYZING
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem(UI_SETTINGS_KEY)
+      if (!raw) {
+        applyBackground(DEFAULT_UI_SETTINGS.background)
+        return
+      }
+      const parsed = JSON.parse(raw) as Partial<UiSettings>
+      const next: UiSettings = {
+        background:
+          parsed.background === 'default' || parsed.background === 'grid' || parsed.background === 'aurora'
+            ? parsed.background
+            : DEFAULT_UI_SETTINGS.background,
+        tableDensity: parsed.tableDensity === 'compact' ? 'compact' : 'comfortable',
+        showGrade: parsed.showGrade ?? DEFAULT_UI_SETTINGS.showGrade,
+        autoRefresh: parsed.autoRefresh ?? DEFAULT_UI_SETTINGS.autoRefresh,
+        use24hTime: parsed.use24hTime ?? DEFAULT_UI_SETTINGS.use24hTime,
+      }
+      setSettings(next)
+      applyBackground(next.background)
+    } catch {
+      applyBackground(DEFAULT_UI_SETTINGS.background)
+    }
+  }, [])
+
+  useEffect(() => {
+    applyBackground(settings.background)
+    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(settings))
+  }, [settings])
+
+  // Auto-refresh when enabled and any submission is ANALYZING
+  useEffect(() => {
+    if (!settings.autoRefresh) return
     const hasAnalyzing = submissions.some((s) => s.status === 'ANALYZING')
     if (!hasAnalyzing) return
     const t = setInterval(fetchSubmissions, 5000)
     return () => clearInterval(t)
-  }, [submissions, fetchSubmissions])
+  }, [settings.autoRefresh, submissions, fetchSubmissions])
 
   const handleLogout = () => {
     clearToken()
@@ -63,38 +129,76 @@ export default function DashboardPage() {
   }
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
+  const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
+  const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-card border-b px-6 py-5 flex items-center justify-between">
-        <BetterDFMLogo />
-        <div className="flex items-center gap-3">
+    <div className="min-h-screen bg-background/70">
+      <header className="group/taskbar bg-card/90 backdrop-blur border-b px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
+        <BetterDFMLogo className="shrink-0" />
+        <div className="flex items-center gap-2">
           <ThemeToggle className="h-11 w-11" />
-          <Link href="/admin/profile">
-            <Button variant="ghost" size="lg">Profile Settings</Button>
-          </Link>
-          <Button variant="ghost" size="lg" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-1" /> Sign out
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Open settings"
+            title="Open settings"
+          >
+            <span className="flex items-center justify-center w-full">
+              <Cog className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                Settings
+              </span>
+            </span>
           </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            onClick={handleLogout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <span className="flex items-center justify-center w-full">
+              <LogOut className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                Sign out
+              </span>
+            </span>
+          </Button>
+
           <Link href="/upload">
-            <Button size="lg">
-              <Plus className="h-4 w-4 mr-1" /> Upload
+            <Button
+              size="icon"
+              className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+              aria-label="Upload"
+              title="Upload"
+            >
+              <span className="flex items-center justify-center w-full">
+                <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+                <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                  Upload
+                </span>
+              </span>
             </Button>
           </Link>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
-            <h1 className="text-3xl font-semibold tracking-tight text-foreground">Submissions</h1>
-            <p className="text-sm text-muted-foreground mt-1">
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Submissions</h1>
+            <p className="text-sm text-muted-foreground mt-2">
               {submissions.length} file{submissions.length === 1 ? '' : 's'} in your workspace
             </p>
           </div>
           <Button variant="outline" size="lg" onClick={fetchSubmissions}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
         </div>
 
@@ -109,74 +213,81 @@ export default function DashboardPage() {
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
         ) : submissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-lg">
+          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/70">
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
             <Link href="/upload">
-              <Button><Plus className="h-4 w-4 mr-1" /> Upload your first file</Button>
+              <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
             </Link>
           </div>
         ) : (
-          <div className="bg-card rounded-xl border border-border/70 shadow-sm overflow-hidden">
-            <table className="w-full">
-              <thead className="bg-muted/50 border-b">
-                <tr>
-                  <th className="text-left px-6 py-4 text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground">Filename</th>
-                  <th className="text-left px-6 py-4 text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground">Score</th>
-                  <th className="text-right px-6 py-4 text-xs uppercase tracking-[0.12em] font-semibold text-muted-foreground">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/70">
-                {submissions.map((s) => (
-                  <tr key={s.id} className="hover:bg-muted/30">
-                    <td className="px-6 py-5">
-                      <p className="font-mono text-sm md:text-base truncate max-w-xl font-medium">{s.filename}</p>
-                    </td>
-                    <td className="px-6 py-5">
-                      {s.status === 'DONE' && s.mfgScore > 0 ? (
-                        <div
-                          className="inline-block px-3 py-1 rounded-md font-mono text-sm font-bold text-white"
-                          style={{ background: scoreColor(s.mfgScore) }}
-                        >
-                          {s.mfgScore} <span className="opacity-80">{s.mfgGrade}</span>
-                        </div>
-                      ) : (
-                        <span className="text-base text-muted-foreground">-</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-5">
-                      <div className="flex justify-end items-center gap-3">
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          className="h-10 w-10"
-                          onClick={() => setInfoSubmissionId(s.id)}
-                          aria-label={`Show details for ${s.filename}`}
-                          title={`Show details for ${s.filename}`}
-                        >
-                          <Info className="h-5 w-5" />
-                        </Button>
-                        {s.status === 'DONE' && s.latestJobId && (
-                          <Link href={`/results/${s.latestJobId}`}>
-                            <Button variant="outline" className="h-10 px-4 text-sm">View Results</Button>
-                          </Link>
-                        )}
-                        {s.status === 'UPLOADED' && (
-                          <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
-                            <Button variant="outline" className="h-10 px-4 text-sm">Analyze</Button>
-                          </Link>
-                        )}
-                        {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
-                          <Badge variant="info" className="text-sm px-3 py-1">{s.status}</Badge>
-                        )}
+          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/80 backdrop-blur shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
+            <div className="relative px-6 py-4 border-b border-border/70">
+              <div className="grid grid-cols-[minmax(0,1.6fr)_150px_260px] gap-4">
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Score</p>
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground text-right">Actions</p>
+              </div>
+            </div>
+
+            <ul className="relative p-4 space-y-3">
+              {submissions.map((s) => (
+                <li
+                  key={s.id}
+                  className={cn(
+                    'grid grid-cols-[minmax(0,1.6fr)_150px_260px] gap-4 items-center rounded-2xl border border-border/70 bg-background/70 px-4 transition-all duration-200 hover:bg-muted/35 hover:-translate-y-0.5 hover:shadow-lg',
+                    rowPadding
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn('font-mono truncate font-medium text-foreground', filenameSize)}>{s.filename}</p>
+                  </div>
+
+                  <div>
+                    {s.status === 'DONE' && s.mfgScore > 0 ? (
+                      <div
+                        className="inline-flex items-center rounded-md px-3 py-1.5 font-mono text-sm font-bold text-white"
+                        style={{ background: scoreColor(s.mfgScore) }}
+                      >
+                        {s.mfgScore}
+                        {settings.showGrade && <span className="ml-1 opacity-85">{s.mfgGrade}</span>}
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    ) : (
+                      <span className="text-base text-muted-foreground">-</span>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11"
+                      onClick={() => setInfoSubmissionId(s.id)}
+                      aria-label={`Show details for ${s.filename}`}
+                      title={`Show details for ${s.filename}`}
+                    >
+                      <Info className="h-5 w-5" />
+                    </Button>
+                    {s.status === 'DONE' && s.latestJobId && (
+                      <Link href={`/results/${s.latestJobId}`}>
+                        <Button variant="outline" className="h-11 px-5 text-sm">View Results</Button>
+                      </Link>
+                    )}
+                    {s.status === 'UPLOADED' && (
+                      <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
+                        <Button variant="outline" className="h-11 px-5 text-sm">Analyze</Button>
+                      </Link>
+                    )}
+                    {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
+                      <Badge variant="info" className="text-sm px-3 py-1.5">{s.status}</Badge>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </main>
 
@@ -217,12 +328,135 @@ export default function DashboardPage() {
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Created</p>
-                <p className="text-base text-foreground">{infoSubmission.createdAt ? formatDate(infoSubmission.createdAt) : '-'}</p>
+                <p className="text-base text-foreground">
+                  {infoSubmission.createdAt ? formatDate(infoSubmission.createdAt, settings.use24hTime) : '-'}
+                </p>
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Overview</p>
                 <p className="text-base text-muted-foreground">Placeholder for summary by you and your coworker.</p>
               </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setSettingsOpen(false)}
+            aria-label="Close settings"
+          />
+          <aside
+            className="absolute right-0 top-0 h-full w-full max-w-lg bg-card border-l border-border shadow-2xl p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+          >
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">General Settings</p>
+                <h2 className="text-2xl font-semibold text-foreground">Workspace Preferences</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close settings panel"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Background Style</h3>
+                <div className="grid grid-cols-3 gap-3">
+                  {[
+                    { id: 'default', label: 'Studio' },
+                    { id: 'grid', label: 'Grid' },
+                    { id: 'aurora', label: 'Aurora' },
+                  ].map((bg) => (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition-colors',
+                        settings.background === bg.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
+                      )}
+                      onClick={() => setSettings((prev) => ({ ...prev, background: bg.id as BackgroundStyle }))}
+                    >
+                      <p className="text-sm font-medium text-foreground">{bg.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Submissions Layout</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'comfortable', label: 'Comfortable' },
+                    { id: 'compact', label: 'Compact' },
+                  ].map((density) => (
+                    <button
+                      key={density.id}
+                      type="button"
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition-colors',
+                        settings.tableDensity === density.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
+                      )}
+                      onClick={() => setSettings((prev) => ({ ...prev, tableDensity: density.id as TableDensity }))}
+                    >
+                      <p className="text-sm font-medium text-foreground">{density.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-4">
+                <h3 className="font-medium text-foreground">Display Options</h3>
+
+                <label className="flex items-center justify-between gap-4 cursor-pointer">
+                  <span className="text-sm text-foreground">Show score grade letters</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.showGrade}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, showGrade: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-4 cursor-pointer">
+                  <span className="text-sm text-foreground">Auto-refresh analyzing jobs</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.autoRefresh}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, autoRefresh: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                </label>
+
+                <label className="flex items-center justify-between gap-4 cursor-pointer">
+                  <span className="text-sm text-foreground">Use 24-hour timestamps</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.use24hTime}
+                    onChange={(e) => setSettings((prev) => ({ ...prev, use24hTime: e.target.checked }))}
+                    className="h-4 w-4"
+                  />
+                </label>
+              </section>
+
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Quick Access</h3>
+                <Link href="/admin/profile" onClick={() => setSettingsOpen(false)}>
+                  <Button variant="outline" className="w-full justify-start">Capability Profiles</Button>
+                </Link>
+              </section>
             </div>
           </aside>
         </div>
