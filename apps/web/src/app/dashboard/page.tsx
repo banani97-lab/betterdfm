@@ -137,8 +137,8 @@ export default function DashboardPage() {
     : 'grid-cols-[minmax(0,1.6fr)_150px_260px]'
 
   return (
-    <div className="min-h-screen bg-background/70">
-      <header className="group/taskbar bg-card/90 backdrop-blur border-b px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
+    <div className="min-h-screen">
+      <header className="group/taskbar bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
         <BetterDFMLogo className="shrink-0" />
         <div className="flex items-center gap-2">
           <ThemeToggle className="h-11 w-11" />
@@ -217,7 +217,7 @@ export default function DashboardPage() {
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
         ) : submissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/70">
+          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/45">
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
@@ -226,7 +226,7 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/80 backdrop-blur shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
+          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
             <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
               <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                 <li
                   key={s.id}
                   className={cn(
-                    'grid items-center rounded-2xl border border-border/70 bg-background/70 transition-all duration-200 hover:bg-muted/35 hover:-translate-y-0.5 hover:shadow-lg',
+                    'grid items-center rounded-2xl border border-border/70 bg-background/45 transition-all duration-200 hover:bg-muted/30 hover:-translate-y-0.5 hover:shadow-lg',
                     tableCols,
                     isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
                     rowPadding

@@ -125,8 +125,8 @@ export default function AdminProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="bg-card/90 backdrop-blur border-b px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
+    <div className="min-h-screen">
+      <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
         <BetterDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
       </header>
