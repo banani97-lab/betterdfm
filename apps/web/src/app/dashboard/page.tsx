@@ -136,7 +136,7 @@ export default function DashboardPage() {
     ? 'bg-background/30 hover:bg-muted/25'
     : 'bg-background/12 hover:bg-background/18'
   const submissionsTableGlow =
-    'radial-gradient(60% 120% at -6% 48%, hsl(var(--primary) / 0.13), transparent 64%), radial-gradient(60% 120% at 106% 48%, hsl(var(--primary) / 0.13), transparent 64%), linear-gradient(180deg, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0.12) 55%, hsl(var(--primary) / 0.08) 100%)'
+    'radial-gradient(52% 120% at -24% 48%, hsl(var(--primary) / 0.12), transparent 62%), radial-gradient(52% 120% at 124% 48%, hsl(var(--primary) / 0.12), transparent 62%), linear-gradient(180deg, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0.12) 55%, hsl(var(--primary) / 0.08) 100%)'
 
   return (
     <div className="min-h-screen">
