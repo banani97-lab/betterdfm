@@ -223,8 +223,13 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
-            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/22 via-primary/10 to-primary/5" />
+          <section
+            className="relative overflow-hidden rounded-3xl border border-border/70 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]"
+            style={{
+              backgroundImage:
+                'linear-gradient(180deg, hsl(var(--primary) / 0.26) 0%, hsl(var(--primary) / 0.14) 52%, hsl(var(--primary) / 0.08) 100%)',
+            }}
+          >
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
               <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
@@ -238,7 +243,7 @@ export default function DashboardPage() {
                 <li
                   key={s.id}
                   className={cn(
-                    'grid items-center rounded-2xl border border-border/70 bg-background/45 transition-all duration-200 hover:bg-muted/30 hover:-translate-y-0.5 hover:shadow-lg',
+                    'grid items-center rounded-2xl border border-border/70 bg-background/30 transition-all duration-200 hover:bg-muted/25 hover:-translate-y-0.5 hover:shadow-lg',
                     tableCols,
                     isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
                     rowPadding
