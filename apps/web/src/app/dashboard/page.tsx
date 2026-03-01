@@ -135,8 +135,6 @@ export default function DashboardPage() {
   const rowSurfaceClass = isCompact
     ? 'bg-background/30 hover:bg-muted/25'
     : 'bg-background/12 hover:bg-background/18'
-  const submissionsTableGlow =
-    'radial-gradient(52% 120% at -24% 48%, hsl(var(--primary) / 0.12), transparent 62%), radial-gradient(52% 120% at 124% 48%, hsl(var(--primary) / 0.12), transparent 62%), linear-gradient(180deg, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0.12) 55%, hsl(var(--primary) / 0.08) 100%)'
 
   return (
     <div className="min-h-screen">
@@ -228,12 +226,8 @@ export default function DashboardPage() {
             </Link>
           </div>
         ) : (
-          <section
-            className="relative overflow-hidden rounded-3xl border border-border/70 shadow-[0_24px_72px_-40px_rgba(0,0,0,0.45)]"
-            style={{
-              backgroundImage: submissionsTableGlow,
-            }}
-          >
+          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
               <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
