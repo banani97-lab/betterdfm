@@ -91,6 +91,8 @@ services:
         NEXT_PUBLIC_COGNITO_REGION: ${AWS_REGION:-us-east-1}
     ports:
       - "3000:3000"
+    environment:
+      INTERNAL_API_URL: http://api:8080
     depends_on:
       api:
         condition: service_healthy

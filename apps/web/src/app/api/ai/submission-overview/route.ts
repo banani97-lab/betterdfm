@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/+$/, '')
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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'
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
 const OPENAI_MODEL = process.env.OPENAI_OVERVIEW_MODEL || 'gpt-4o-mini'
 
 interface JobResponse {
@@ -24,6 +23,34 @@ interface OverviewCounts {
   errors: number
   warnings: number
   infos: number
+}
+
+function cleanBase(url: string): string {
+  return url.replace(/\/+$/, '')
+}
+
+function resolveApiBases(): string[] {
+  const explicitInternal =
+    process.env.INTERNAL_API_URL ||
+    process.env.API_INTERNAL_URL ||
+    process.env.API_URL_INTERNAL ||
+    process.env.API_URL
+
+  const publicBase = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+  const raw = [explicitInternal, publicBase].filter((x): x is string => !!x)
+
+  const bases: string[] = []
+  for (const item of raw) {
+    const base = cleanBase(item)
+    bases.push(base)
+
+    // Docker-friendly fallback: localhost from web container can't reach api container.
+    if (base.includes('localhost:8080') || base.includes('127.0.0.1:8080')) {
+      bases.push(base.replace('localhost', 'api').replace('127.0.0.1', 'api'))
+    }
+  }
+
+  return Array.from(new Set(bases))
 }
 
 function computeCounts(violations: ViolationResponse[]): OverviewCounts {
@@ -93,20 +120,31 @@ function fallbackOverview(job: JobResponse, counts: OverviewCounts, topIssues: s
 }
 
 async function fetchApiJson<T>(path: string, authHeader: string | null): Promise<T> {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...(authHeader ? { Authorization: authHeader } : {}),
-    },
-    cache: 'no-store',
-  })
+  const bases = resolveApiBases()
+  const errors: string[] = []
 
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${path}: ${res.status} ${text}`)
+  for (const base of bases) {
+    try {
+      const res = await fetch(`${base}${path}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          ...(authHeader ? { Authorization: authHeader } : {}),
+        },
+        cache: 'no-store',
+      })
+
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText)
+        throw new Error(`API ${path} via ${base}: ${res.status} ${text}`)
+      }
+
+      return res.json() as Promise<T>
+    } catch (err) {
+      errors.push(`${base} -> ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
-  return res.json() as Promise<T>
+  throw new Error(`Fetch failed for ${path}. Tried: ${errors.join(' | ')}`)
 }
 
 async function generateOverviewWithAI(args: {
@@ -201,4 +239,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: message }, { status: 500 })
   }
 }
-
