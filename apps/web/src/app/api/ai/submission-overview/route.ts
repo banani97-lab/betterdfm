@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/+$/, '')
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || ''
+const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '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'
 const OPENAI_MODEL = process.env.OPENAI_OVERVIEW_MODEL || 'gpt-4o-mini'
 
 interface JobResponse {
