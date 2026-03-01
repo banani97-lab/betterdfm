@@ -132,6 +132,9 @@ export default function DashboardPage() {
   const tableCols = isCompact
     ? 'grid-cols-[minmax(0,1.25fr)_112px_210px]'
     : 'grid-cols-[minmax(0,1.6fr)_150px_260px]'
+  const rowSurfaceClass = isCompact
+    ? 'bg-background/30 hover:bg-muted/25'
+    : 'bg-background/12 hover:bg-background/18'
 
   return (
     <div className="min-h-screen">
@@ -227,7 +230,7 @@ export default function DashboardPage() {
             className="relative overflow-hidden rounded-3xl border border-border/70 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]"
             style={{
               backgroundImage:
-                'linear-gradient(180deg, hsl(var(--primary) / 0.26) 0%, hsl(var(--primary) / 0.14) 52%, hsl(var(--primary) / 0.08) 100%)',
+                'radial-gradient(120% 70% at 50% -18%, hsl(var(--primary) / 0.30), transparent 58%), linear-gradient(180deg, hsl(var(--primary) / 0.24) 0%, hsl(var(--primary) / 0.15) 54%, hsl(var(--primary) / 0.10) 100%)',
             }}
           >
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
@@ -243,7 +246,8 @@ export default function DashboardPage() {
                 <li
                   key={s.id}
                   className={cn(
-                    'grid items-center rounded-2xl border border-border/70 bg-background/30 transition-all duration-200 hover:bg-muted/25 hover:-translate-y-0.5 hover:shadow-lg',
+                    'grid items-center rounded-2xl border border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+                    rowSurfaceClass,
                     tableCols,
                     isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
                     rowPadding
