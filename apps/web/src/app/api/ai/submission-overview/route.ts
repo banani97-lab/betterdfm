@@ -25,6 +25,12 @@ interface OverviewCounts {
   infos: number
 }
 
+interface CauseCluster {
+  label: string
+  count: number
+  example: string
+}
+
 function cleanBase(url: string): string {
   return url.replace(/\/+$/, '')
 }
@@ -66,6 +72,39 @@ function computeCounts(violations: ViolationResponse[]): OverviewCounts {
   )
 }
 
+function inferCauseLabel(message: string): string {
+  const m = message.toLowerCase()
+  if (/clearance|spacing|gap|distance/.test(m)) return 'insufficient spacing / clearance'
+  if (/trace width|narrow trace|minimum width|line width|width/.test(m)) return 'trace width below process capability'
+  if (/drill|hole|via|annular|ring/.test(m)) return 'drill/via geometry outside fab limits'
+  if (/solder mask|mask dam/.test(m)) return 'solder mask opening/dam constraints'
+  if (/edge|board edge|outline/.test(m)) return 'features too close to board outline'
+  if (/aspect ratio/.test(m)) return 'hole aspect ratio constraint'
+  return 'rule-specific geometry mismatch'
+}
+
+function dominantCauseLines(violations: ViolationResponse[], limit = 4): string[] {
+  const buckets = new Map<string, CauseCluster>()
+
+  for (const v of violations) {
+    if (v.ignored) continue
+    if (v.severity !== 'ERROR' && v.severity !== 'WARNING') continue
+    const message = (v.message || 'Rule violation detected').trim()
+    const label = inferCauseLabel(message)
+    const existing = buckets.get(label)
+    if (existing) {
+      existing.count += 1
+    } else {
+      buckets.set(label, { label, count: 1, example: message })
+    }
+  }
+
+  return Array.from(buckets.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, limit)
+    .map((c, i) => `${i + 1}. ${c.label} (observed ${c.count} times). Example: ${c.example}`)
+}
+
 function topIssueLines(violations: ViolationResponse[], limit = 5): string[] {
   const bucket = new Map<string, { count: number; severity: string; message: string; suggestion: string }>()
 
@@ -102,21 +141,34 @@ function topIssueLines(violations: ViolationResponse[], limit = 5): string[] {
     })
 }
 
-function fallbackOverview(job: JobResponse, counts: OverviewCounts, topIssues: string[]): string {
-  const risk =
-    counts.errors > 0 ? 'high' :
-    counts.warnings > 0 ? 'moderate' :
-    'low'
+function fallbackOverview(
+  _job: JobResponse,
+  counts: OverviewCounts,
+  topIssues: string[],
+  dominantCauses: string[]
+): string {
+  if (counts.errors === 0 && counts.warnings === 0) {
+    return 'No active manufacturing-critical issues are currently flagged. Remaining findings are informational; keep focus on design-for-yield checks before release.'
+  }
 
-  const firstIssue = topIssues[0]
+  const primaryCause = dominantCauses[0]
+    ? dominantCauses[0].replace(/^\d+\.\s*/, '').split('Example:')[0].trim()
+    : 'rule-specific geometry mismatches'
+  const secondaryCause = dominantCauses[1]
+    ? dominantCauses[1].replace(/^\d+\.\s*/, '').split('Example:')[0].trim()
+    : ''
+  const priorityIssue = topIssues[0]
     ? topIssues[0].replace(/^\d+\.\s*/, '').split('Suggestion:')[0].trim()
-    : 'No major issues are currently flagged.'
+    : 'No single dominant violation is available yet.'
 
   return [
-    `This submission is currently ${risk} risk with an MFG score of ${job.mfgScore} (${job.mfgGrade}).`,
-    `Active findings include ${counts.errors} errors and ${counts.warnings} warnings.`,
-    `Top priority: ${firstIssue}`,
-  ].join(' ')
+    `Most blocking findings appear to stem from ${primaryCause}.`,
+    secondaryCause ? `A secondary contributor is ${secondaryCause}.` : '',
+    `Highest-impact issue pattern: ${priorityIssue}`,
+    'Recommended next pass is to address the dominant geometry constraints first, then re-run analysis to confirm that warning-level checks collapse as a side effect.',
+  ]
+    .filter(Boolean)
+    .join(' ')
 }
 
 async function fetchApiJson<T>(path: string, authHeader: string | null): Promise<T> {
@@ -151,15 +203,20 @@ async function generateOverviewWithAI(args: {
   job: JobResponse
   counts: OverviewCounts
   topIssues: string[]
+  dominantCauses: string[]
 }): Promise<string> {
-  const { job, counts, topIssues } = args
+  const { job, counts, topIssues, dominantCauses } = args
 
   const prompt = [
-    'Write a concise DFM overview for a non-expert PCB engineer.',
+    'Write a technical DFM overview for a PCB engineer.',
     'Use plain English and no markdown.',
-    'Keep it to 2-4 sentences, focusing on manufacturing risk and top fix priorities.',
-    `Job status: ${job.status}. MFG score: ${job.mfgScore}. Grade: ${job.mfgGrade}.`,
-    `Active counts: errors=${counts.errors}, warnings=${counts.warnings}, infos=${counts.infos}.`,
+    'Length: 4-8 sentences (roughly up to ~2x longer than a short summary).',
+    'Focus on root causes driving most errors and warnings, and what to fix first.',
+    'Do NOT mention the exact MFG score, grade, or exact counts of errors/warnings because those are already shown elsewhere in the UI.',
+    `Job status: ${job.status}.`,
+    `Active finding profile: errors=${counts.errors}, warnings=${counts.warnings}, infos=${counts.infos}.`,
+    'Dominant cause clusters:',
+    ...dominantCauses,
     'Top issues:',
     ...topIssues,
   ].join('\n')
@@ -173,12 +230,12 @@ async function generateOverviewWithAI(args: {
     body: JSON.stringify({
       model: OPENAI_MODEL,
       temperature: 0.3,
-      max_tokens: 220,
+      max_tokens: 420,
       messages: [
         {
           role: 'system',
           content:
-            'You summarize PCB design-for-manufacturability analysis results for engineers. Be concise, direct, and practical.',
+            'You summarize PCB design-for-manufacturability analysis results for engineers. Be technical, direct, and practical.',
         },
         { role: 'user', content: prompt },
       ],
@@ -215,13 +272,14 @@ export async function POST(req: NextRequest) {
 
     const counts = computeCounts(violations ?? [])
     const topIssues = topIssueLines(violations ?? [])
+    const dominantCauses = dominantCauseLines(violations ?? [])
 
-    let overview = fallbackOverview(job, counts, topIssues)
+    let overview = fallbackOverview(job, counts, topIssues, dominantCauses)
     let generatedWith: 'ai' | 'fallback' = 'fallback'
 
     if (OPENAI_API_KEY) {
       try {
-        overview = await generateOverviewWithAI({ job, counts, topIssues })
+        overview = await generateOverviewWithAI({ job, counts, topIssues, dominantCauses })
         generatedWith = 'ai'
       } catch (err) {
         console.error('[ai/submission-overview] AI generation failed, using fallback:', err)
