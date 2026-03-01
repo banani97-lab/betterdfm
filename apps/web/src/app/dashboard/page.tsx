@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
-import { getSubmissions, getViolations, type Submission } from '@/lib/api'
+import { Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { getSubmissions, type Submission } from '@/lib/api'
 import { clearToken, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
@@ -55,8 +55,6 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
-  const [issueCountsByJobId, setIssueCountsByJobId] = useState<Record<string, { errors: number; warnings: number }>>({})
-  const [issueCountsLoadingJobId, setIssueCountsLoadingJobId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -128,41 +126,6 @@ export default function DashboardPage() {
   }
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
-  const infoJobId = infoSubmission?.latestJobId ?? null
-  const infoIssueCounts = infoJobId ? issueCountsByJobId[infoJobId] : undefined
-  const infoIssueCountsLoading = infoJobId ? issueCountsLoadingJobId === infoJobId : false
-
-  useEffect(() => {
-    if (!infoJobId || infoSubmission?.status !== 'DONE') return
-    if (issueCountsByJobId[infoJobId] || issueCountsLoadingJobId === infoJobId) return
-
-    let cancelled = false
-    setIssueCountsLoadingJobId(infoJobId)
-
-    getViolations(infoJobId)
-      .then((violations) => {
-        if (cancelled) return
-        const counts = (violations ?? []).reduce(
-          (acc, v) => {
-            if (v.ignored) return acc
-            if (v.severity === 'ERROR') acc.errors += 1
-            if (v.severity === 'WARNING') acc.warnings += 1
-            return acc
-          },
-          { errors: 0, warnings: 0 }
-        )
-        setIssueCountsByJobId((prev) => ({ ...prev, [infoJobId]: counts }))
-      })
-      .catch(() => {})
-      .finally(() => {
-        setIssueCountsLoadingJobId((current) => (current === infoJobId ? null : current))
-      })
-
-    return () => {
-      cancelled = true
-    }
-  }, [infoJobId, infoSubmission?.status, issueCountsByJobId, issueCountsLoadingJobId])
-
   const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
   const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
@@ -382,27 +345,8 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
-                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Issue Counts</p>
-                <div className="flex items-center gap-4">
-                  <div className="inline-flex items-center gap-2">
-                    <AlertCircle className="h-4 w-4 text-red-500" />
-                    <span className="text-sm font-medium text-foreground">
-                      {infoIssueCounts ? infoIssueCounts.errors : infoIssueCountsLoading ? '...' : '-'}
-                    </span>
-                    <span className="text-sm text-muted-foreground">Errors</span>
-                  </div>
-                  <div className="inline-flex items-center gap-2">
-                    <AlertTriangle className="h-4 w-4 text-amber-500" />
-                    <span className="text-sm font-medium text-foreground">
-                      {infoIssueCounts ? infoIssueCounts.warnings : infoIssueCountsLoading ? '...' : '-'}
-                    </span>
-                    <span className="text-sm text-muted-foreground">Warnings</span>
-                  </div>
-                </div>
-              </div>
-              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
-                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Overview</p>
-                <div className="min-h-20 rounded-md border border-border/60 bg-background/30" />
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Overview</p>
+                <p className="text-base text-muted-foreground">Placeholder for summary by you and your coworker.</p>
               </div>
             </div>
           </aside>
