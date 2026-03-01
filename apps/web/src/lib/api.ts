@@ -86,6 +86,16 @@ export interface CapabilityProfile {
   updatedAt: string
 }
 
+export interface SubmissionOverview {
+  overview: string
+  counts: {
+    errors: number
+    warnings: number
+    infos: number
+  }
+  generatedWith: 'ai' | 'fallback'
+}
+
 // ── Fetch helper ─────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -173,6 +183,24 @@ export async function getViolations(jobId: string): Promise<Violation[]> {
 
 export async function getBoardData(jobId: string): Promise<BoardData> {
   return apiFetch<BoardData>(`/jobs/${jobId}/board`)
+}
+
+export async function getSubmissionOverview(jobId: string): Promise<SubmissionOverview> {
+  const token = getStoredToken()
+  const res = await fetch('/api/ai/submission-overview', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({ jobId }),
+  })
+
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to generate overview')
+  }
+  return data as SubmissionOverview
 }
 
 export async function ignoreLayerViolations(

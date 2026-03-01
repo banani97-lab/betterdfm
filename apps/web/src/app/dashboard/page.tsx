@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
-import { getSubmissions, type Submission } from '@/lib/api'
+import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Sparkles, Upload, X } from 'lucide-react'
+import { getSubmissionOverview, getSubmissions, type Submission, type SubmissionOverview } from '@/lib/api'
 import { clearToken, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +55,9 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
+  const [overviewByJobId, setOverviewByJobId] = useState<Record<string, SubmissionOverview>>({})
+  const [overviewLoadingJobId, setOverviewLoadingJobId] = useState<string | null>(null)
+  const [overviewErrorByJobId, setOverviewErrorByJobId] = useState<Record<string, string>>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -126,6 +129,45 @@ export default function DashboardPage() {
   }
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
+  const infoJobId = infoSubmission?.latestJobId ?? null
+  const infoOverview = infoJobId ? overviewByJobId[infoJobId] : undefined
+  const infoOverviewError = infoJobId ? overviewErrorByJobId[infoJobId] : undefined
+  const infoOverviewLoading = infoJobId ? overviewLoadingJobId === infoJobId : false
+
+  useEffect(() => {
+    if (!infoJobId || infoSubmission?.status !== 'DONE') return
+    if (overviewByJobId[infoJobId] || overviewLoadingJobId === infoJobId) return
+
+    let cancelled = false
+    setOverviewLoadingJobId(infoJobId)
+    setOverviewErrorByJobId((prev) => {
+      if (!prev[infoJobId]) return prev
+      const next = { ...prev }
+      delete next[infoJobId]
+      return next
+    })
+
+    getSubmissionOverview(infoJobId)
+      .then((data) => {
+        if (cancelled) return
+        setOverviewByJobId((prev) => ({ ...prev, [infoJobId]: data }))
+      })
+      .catch((e: unknown) => {
+        if (cancelled) return
+        const message = e instanceof Error ? e.message : 'Failed to generate overview'
+        setOverviewErrorByJobId((prev) => ({ ...prev, [infoJobId]: message }))
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setOverviewLoadingJobId((current) => (current === infoJobId ? null : current))
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [infoJobId, infoSubmission?.status, overviewByJobId, overviewLoadingJobId])
+
   const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
   const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
@@ -345,8 +387,47 @@ export default function DashboardPage() {
                 </p>
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
-                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Overview</p>
-                <p className="text-base text-muted-foreground">Placeholder for summary by you and your coworker.</p>
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Issue Counts</p>
+                <div className="flex items-center gap-4">
+                  <div className="inline-flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                    <span className="text-sm font-medium text-foreground">
+                      {infoOverview ? infoOverview.counts.errors : infoOverviewLoading ? '...' : '-'}
+                    </span>
+                    <span className="text-sm text-muted-foreground">Errors</span>
+                  </div>
+                  <div className="inline-flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <span className="text-sm font-medium text-foreground">
+                      {infoOverview ? infoOverview.counts.warnings : infoOverviewLoading ? '...' : '-'}
+                    </span>
+                    <span className="text-sm text-muted-foreground">Warnings</span>
+                  </div>
+                </div>
+              </div>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                <div className="flex items-center justify-between gap-3 mb-1">
+                  <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    Overview
+                  </p>
+                  {infoOverview && (
+                    <span className="text-[11px] text-muted-foreground">
+                      {infoOverview.generatedWith === 'ai' ? 'AI generated' : 'Auto summary'}
+                    </span>
+                  )}
+                </div>
+                {!infoJobId || infoSubmission.status !== 'DONE' ? (
+                  <p className="text-sm text-muted-foreground">AI overview will appear once analysis is complete.</p>
+                ) : infoOverviewLoading ? (
+                  <p className="text-sm text-muted-foreground">Generating AI overview...</p>
+                ) : infoOverviewError ? (
+                  <p className="text-sm text-destructive">{infoOverviewError}</p>
+                ) : (
+                  <p className="text-sm text-foreground leading-relaxed">
+                    {infoOverview?.overview ?? 'No overview available yet.'}
+                  </p>
+                )}
               </div>
             </div>
           </aside>
