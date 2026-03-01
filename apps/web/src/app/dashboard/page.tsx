@@ -18,9 +18,6 @@ type TableDensity = 'comfortable' | 'compact'
 interface UiSettings {
   background: BackgroundStyle
   tableDensity: TableDensity
-  showGrade: boolean
-  autoRefresh: boolean
-  use24hTime: boolean
 }
 
 const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
@@ -28,14 +25,11 @@ const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
 const DEFAULT_UI_SETTINGS: UiSettings = {
   background: 'studio',
   tableDensity: 'comfortable',
-  showGrade: true,
-  autoRefresh: true,
-  use24hTime: false,
 }
 
-function formatDate(iso: string, use24hTime: boolean) {
+function formatDate(iso: string) {
   return new Date(iso).toLocaleString([], {
-    hour12: !use24hTime,
+    hour12: true,
     month: 'short',
     day: 'numeric',
     year: 'numeric',
@@ -105,9 +99,6 @@ export default function DashboardPage() {
               : DEFAULT_UI_SETTINGS.background
         ),
         tableDensity: parsed.tableDensity === 'compact' ? 'compact' : 'comfortable',
-        showGrade: parsed.showGrade ?? DEFAULT_UI_SETTINGS.showGrade,
-        autoRefresh: parsed.autoRefresh ?? DEFAULT_UI_SETTINGS.autoRefresh,
-        use24hTime: parsed.use24hTime ?? DEFAULT_UI_SETTINGS.use24hTime,
       }
       setSettings(next)
       applyBackground(next.background)
@@ -121,14 +112,13 @@ export default function DashboardPage() {
     localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(settings))
   }, [settings])
 
-  // Auto-refresh when enabled and any submission is ANALYZING
+  // Auto-refresh when any submission is ANALYZING
   useEffect(() => {
-    if (!settings.autoRefresh) return
     const hasAnalyzing = submissions.some((s) => s.status === 'ANALYZING')
     if (!hasAnalyzing) return
     const t = setInterval(fetchSubmissions, 5000)
     return () => clearInterval(t)
-  }, [settings.autoRefresh, submissions, fetchSubmissions])
+  }, [submissions, fetchSubmissions])
 
   const handleLogout = () => {
     clearToken()
@@ -234,7 +224,7 @@ export default function DashboardPage() {
           </div>
         ) : (
           <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-primary/18 via-primary/8 to-primary/14" />
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
               <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
@@ -265,7 +255,7 @@ export default function DashboardPage() {
                         style={{ background: scoreColor(s.mfgScore) }}
                       >
                         {s.mfgScore}
-                        {settings.showGrade && <span className="ml-1 opacity-85">{s.mfgGrade}</span>}
+                        <span className="ml-1 opacity-85">{s.mfgGrade}</span>
                       </div>
                     ) : (
                       <span className="text-base text-muted-foreground">-</span>
@@ -342,7 +332,7 @@ export default function DashboardPage() {
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
                 <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Created</p>
                 <p className="text-base text-foreground">
-                  {infoSubmission.createdAt ? formatDate(infoSubmission.createdAt, settings.use24hTime) : '-'}
+                  {infoSubmission.createdAt ? formatDate(infoSubmission.createdAt) : '-'}
                 </p>
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
@@ -429,40 +419,6 @@ export default function DashboardPage() {
                     </button>
                   ))}
                 </div>
-              </section>
-
-              <section className="rounded-xl border border-border/80 bg-muted/20 p-4 space-y-4">
-                <h3 className="font-medium text-foreground">Display Options</h3>
-
-                <label className="flex items-center justify-between gap-4 cursor-pointer">
-                  <span className="text-sm text-foreground">Show score grade letters</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.showGrade}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, showGrade: e.target.checked }))}
-                    className="h-4 w-4"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between gap-4 cursor-pointer">
-                  <span className="text-sm text-foreground">Auto-refresh analyzing jobs</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.autoRefresh}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, autoRefresh: e.target.checked }))}
-                    className="h-4 w-4"
-                  />
-                </label>
-
-                <label className="flex items-center justify-between gap-4 cursor-pointer">
-                  <span className="text-sm text-foreground">Use 24-hour timestamps</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.use24hTime}
-                    onChange={(e) => setSettings((prev) => ({ ...prev, use24hTime: e.target.checked }))}
-                    className="h-4 w-4"
-                  />
-                </label>
               </section>
 
               <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
