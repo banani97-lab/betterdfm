@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Sparkles, Upload, X } from 'lucide-react'
-import { getSubmissionOverview, getSubmissions, type Submission, type SubmissionOverview } from '@/lib/api'
+import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { getSubmissions, getViolations, type Submission } from '@/lib/api'
 import { clearToken, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
@@ -55,9 +55,8 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
-  const [overviewByJobId, setOverviewByJobId] = useState<Record<string, SubmissionOverview>>({})
-  const [overviewLoadingJobId, setOverviewLoadingJobId] = useState<string | null>(null)
-  const [overviewErrorByJobId, setOverviewErrorByJobId] = useState<Record<string, string>>({})
+  const [issueCountsByJobId, setIssueCountsByJobId] = useState<Record<string, { errors: number; warnings: number }>>({})
+  const [issueCountsLoadingJobId, setIssueCountsLoadingJobId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -130,43 +129,39 @@ export default function DashboardPage() {
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
   const infoJobId = infoSubmission?.latestJobId ?? null
-  const infoOverview = infoJobId ? overviewByJobId[infoJobId] : undefined
-  const infoOverviewError = infoJobId ? overviewErrorByJobId[infoJobId] : undefined
-  const infoOverviewLoading = infoJobId ? overviewLoadingJobId === infoJobId : false
+  const infoIssueCounts = infoJobId ? issueCountsByJobId[infoJobId] : undefined
+  const infoIssueCountsLoading = infoJobId ? issueCountsLoadingJobId === infoJobId : false
 
   useEffect(() => {
     if (!infoJobId || infoSubmission?.status !== 'DONE') return
-    if (overviewByJobId[infoJobId] || overviewLoadingJobId === infoJobId) return
+    if (issueCountsByJobId[infoJobId] || issueCountsLoadingJobId === infoJobId) return
 
     let cancelled = false
-    setOverviewLoadingJobId(infoJobId)
-    setOverviewErrorByJobId((prev) => {
-      if (!prev[infoJobId]) return prev
-      const next = { ...prev }
-      delete next[infoJobId]
-      return next
-    })
+    setIssueCountsLoadingJobId(infoJobId)
 
-    getSubmissionOverview(infoJobId)
-      .then((data) => {
+    getViolations(infoJobId)
+      .then((violations) => {
         if (cancelled) return
-        setOverviewByJobId((prev) => ({ ...prev, [infoJobId]: data }))
+        const counts = (violations ?? []).reduce(
+          (acc, v) => {
+            if (v.ignored) return acc
+            if (v.severity === 'ERROR') acc.errors += 1
+            if (v.severity === 'WARNING') acc.warnings += 1
+            return acc
+          },
+          { errors: 0, warnings: 0 }
+        )
+        setIssueCountsByJobId((prev) => ({ ...prev, [infoJobId]: counts }))
       })
-      .catch((e: unknown) => {
-        if (cancelled) return
-        const message = e instanceof Error ? e.message : 'Failed to generate overview'
-        setOverviewErrorByJobId((prev) => ({ ...prev, [infoJobId]: message }))
-      })
+      .catch(() => {})
       .finally(() => {
-        // Always clear loading for this job id, even if this effect was cleaned up.
-        // Otherwise the drawer can get stuck showing "Generating AI overview...".
-        setOverviewLoadingJobId((current) => (current === infoJobId ? null : current))
+        setIssueCountsLoadingJobId((current) => (current === infoJobId ? null : current))
       })
 
     return () => {
       cancelled = true
     }
-  }, [infoJobId, infoSubmission?.status])
+  }, [infoJobId, infoSubmission?.status, issueCountsByJobId, issueCountsLoadingJobId])
 
   const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
@@ -392,42 +387,22 @@ export default function DashboardPage() {
                   <div className="inline-flex items-center gap-2">
                     <AlertCircle className="h-4 w-4 text-red-500" />
                     <span className="text-sm font-medium text-foreground">
-                      {infoOverview ? infoOverview.counts.errors : infoOverviewLoading ? '...' : '-'}
+                      {infoIssueCounts ? infoIssueCounts.errors : infoIssueCountsLoading ? '...' : '-'}
                     </span>
                     <span className="text-sm text-muted-foreground">Errors</span>
                   </div>
                   <div className="inline-flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 text-amber-500" />
                     <span className="text-sm font-medium text-foreground">
-                      {infoOverview ? infoOverview.counts.warnings : infoOverviewLoading ? '...' : '-'}
+                      {infoIssueCounts ? infoIssueCounts.warnings : infoIssueCountsLoading ? '...' : '-'}
                     </span>
                     <span className="text-sm text-muted-foreground">Warnings</span>
                   </div>
                 </div>
               </div>
               <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
-                <div className="flex items-center justify-between gap-3 mb-1">
-                  <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-primary" />
-                    Overview
-                  </p>
-                  {infoOverview && (
-                    <span className="text-[11px] text-muted-foreground">
-                      {infoOverview.generatedWith === 'ai' ? 'AI generated' : 'Auto summary'}
-                    </span>
-                  )}
-                </div>
-                {!infoJobId || infoSubmission.status !== 'DONE' ? (
-                  <p className="text-sm text-muted-foreground">AI overview will appear once analysis is complete.</p>
-                ) : infoOverviewLoading ? (
-                  <p className="text-sm text-muted-foreground">Generating AI overview...</p>
-                ) : infoOverviewError ? (
-                  <p className="text-sm text-destructive">{infoOverviewError}</p>
-                ) : (
-                  <p className="text-sm text-foreground leading-relaxed">
-                    {infoOverview?.overview ?? 'No overview available yet.'}
-                  </p>
-                )}
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Overview</p>
+                <div className="min-h-20 rounded-md border border-border/60 bg-background/30" />
               </div>
             </div>
           </aside>
