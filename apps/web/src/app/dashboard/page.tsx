@@ -135,6 +135,8 @@ export default function DashboardPage() {
   const rowSurfaceClass = isCompact
     ? 'bg-background/30 hover:bg-muted/25'
     : 'bg-background/12 hover:bg-background/18'
+  const submissionsTableGlow =
+    'radial-gradient(60% 120% at -6% 48%, hsl(var(--primary) / 0.13), transparent 64%), radial-gradient(60% 120% at 106% 48%, hsl(var(--primary) / 0.13), transparent 64%), linear-gradient(180deg, hsl(var(--primary) / 0.18) 0%, hsl(var(--primary) / 0.12) 55%, hsl(var(--primary) / 0.08) 100%)'
 
   return (
     <div className="min-h-screen">
@@ -227,10 +229,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <section
-            className="relative overflow-hidden rounded-3xl border border-border/70 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]"
+            className="relative overflow-hidden rounded-3xl border border-border/70 shadow-[0_24px_72px_-40px_rgba(0,0,0,0.45)]"
             style={{
-              backgroundImage:
-                'radial-gradient(120% 70% at 50% -18%, hsl(var(--primary) / 0.30), transparent 58%), linear-gradient(180deg, hsl(var(--primary) / 0.24) 0%, hsl(var(--primary) / 0.15) 54%, hsl(var(--primary) / 0.10) 100%)',
+              backgroundImage: submissionsTableGlow,
             }}
           >
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
