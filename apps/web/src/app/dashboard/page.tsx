@@ -158,15 +158,15 @@ export default function DashboardPage() {
         setOverviewErrorByJobId((prev) => ({ ...prev, [infoJobId]: message }))
       })
       .finally(() => {
-        if (!cancelled) {
-          setOverviewLoadingJobId((current) => (current === infoJobId ? null : current))
-        }
+        // Always clear loading for this job id, even if this effect was cleaned up.
+        // Otherwise the drawer can get stuck showing "Generating AI overview...".
+        setOverviewLoadingJobId((current) => (current === infoJobId ? null : current))
       })
 
     return () => {
       cancelled = true
     }
-  }, [infoJobId, infoSubmission?.status, overviewByJobId, overviewLoadingJobId])
+  }, [infoJobId, infoSubmission?.status])
 
   const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
