@@ -1,4 +1,4 @@
-import { getStoredToken } from './auth'
+import { getStoredToken, clearToken } from './auth'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -108,6 +108,11 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
       ...(init?.headers ?? {}),
     },
   })
+  if (res.status === 401) {
+    clearToken()
+    window.location.replace('/login')
+    return undefined as T
+  }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
     throw new Error(`API ${path}: ${res.status} ${text}`)
