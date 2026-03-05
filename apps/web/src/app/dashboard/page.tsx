@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
-import { getSubmissions, type Submission } from '@/lib/api'
+import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { getSubmissions, getViolations, startAnalysis, type Submission } from '@/lib/api'
 import { clearToken, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
@@ -38,6 +38,31 @@ function formatDate(iso: string) {
   })
 }
 
+interface ViolationCounts { errors: number; warnings: number; infos: number }
+interface OverviewEntry { counts: ViolationCounts; loading: boolean }
+
+function generateBlurb(counts: ViolationCounts, score: number): string {
+  const { errors, warnings, infos } = counts
+  if (errors === 0 && warnings === 0) {
+    if (infos === 0) return 'No manufacturing issues detected. This design appears ready for fabrication against the active capability profile.'
+    return `No critical or warning-level issues found. ${infos} informational ${infos === 1 ? 'note' : 'notes'} flagged — review before release but these are not blockers.`
+  }
+  const parts: string[] = []
+  if (errors > 0) {
+    parts.push(score < 60
+      ? `${errors} ${errors === 1 ? 'error' : 'errors'} detected that will likely cause fabrication rejection.`
+      : `${errors} ${errors === 1 ? 'error' : 'errors'} require attention before this design can be manufactured.`)
+  }
+  if (warnings > 0) {
+    parts.push(`${warnings} ${warnings === 1 ? 'warning' : 'warnings'} flagged that may affect yield or require negotiation with the fab.`)
+  }
+  if (infos > 0) parts.push(`${infos} informational ${infos === 1 ? 'note' : 'notes'} also present.`)
+  if (score >= 75) parts.push('Most issues appear addressable with minor layout adjustments.')
+  else if (score >= 60) parts.push('Address errors before submitting to your fab.')
+  else parts.push('Significant rework recommended before fabrication.')
+  return parts.join(' ')
+}
+
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
   if (n >= 75) return '#ca8a04'
@@ -55,6 +80,8 @@ export default function DashboardPage() {
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
+  const [overviewCache, setOverviewCache] = useState<Record<string, OverviewEntry>>({})
+  const [retrying, setRetrying] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -119,6 +146,44 @@ export default function DashboardPage() {
     const t = setInterval(fetchSubmissions, 5000)
     return () => clearInterval(t)
   }, [submissions, fetchSubmissions])
+
+  // Fetch violations when info panel opens for a completed submission
+  useEffect(() => {
+    if (!infoSubmissionId) return
+    if (overviewCache[infoSubmissionId]) return
+    const sub = submissions.find((s) => s.id === infoSubmissionId)
+    if (!sub?.latestJobId || sub.status !== 'DONE') return
+    setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts: { errors: 0, warnings: 0, infos: 0 }, loading: true } }))
+    getViolations(sub.latestJobId)
+      .then((violations) => {
+        const counts = (violations ?? []).reduce<ViolationCounts>(
+          (acc, v) => {
+            if (v.ignored) return acc
+            if (v.severity === 'ERROR') acc.errors++
+            else if (v.severity === 'WARNING') acc.warnings++
+            else if (v.severity === 'INFO') acc.infos++
+            return acc
+          },
+          { errors: 0, warnings: 0, infos: 0 }
+        )
+        setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts, loading: false } }))
+      })
+      .catch(() => {
+        setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts: { errors: 0, warnings: 0, infos: 0 }, loading: false } }))
+      })
+  }, [infoSubmissionId, submissions, overviewCache])
+
+  const handleRetry = async (submissionId: string) => {
+    setRetrying((prev) => new Set(prev).add(submissionId))
+    try {
+      await startAnalysis(submissionId)
+      await fetchSubmissions()
+    } catch {
+      // swallow — submission list will reflect state on next refresh
+    } finally {
+      setRetrying((prev) => { const n = new Set(prev); n.delete(submissionId); return n })
+    }
+  }
 
   const handleLogout = () => {
     clearToken()
@@ -273,10 +338,23 @@ export default function DashboardPage() {
                       className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
                       onClick={() => setInfoSubmissionId(s.id)}
                       aria-label={`Show details for ${s.filename}`}
-                      title={`Show details for ${s.filename}`}
+                      title="Show details"
                     >
                       <Info className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
                     </Button>
+                    {s.status === 'DONE' && (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
+                        onClick={() => handleRetry(s.id)}
+                        disabled={retrying.has(s.id)}
+                        aria-label="Retry analysis"
+                        title="Retry analysis with latest capability profile"
+                      >
+                        <RefreshCw className={cn(isCompact ? 'h-4 w-4' : 'h-5 w-5', retrying.has(s.id) && 'animate-spin')} />
+                      </Button>
+                    )}
                     {s.status === 'DONE' && s.latestJobId && (
                       <Link href={`/results/${s.latestJobId}`}>
                         <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
@@ -339,10 +417,48 @@ export default function DashboardPage() {
                   {infoSubmission.createdAt ? formatDate(infoSubmission.createdAt) : '-'}
                 </p>
               </div>
-              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
-                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Overview</p>
-                <p className="text-base text-muted-foreground">Placeholder for summary by you and your coworker.</p>
-              </div>
+              {infoSubmission.status === 'DONE' && (() => {
+                const entry = overviewCache[infoSubmission.id]
+                return (
+                  <>
+                    <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                      <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-3">Findings</p>
+                      {entry?.loading ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <div className="animate-spin h-4 w-4 border-2 border-muted-foreground border-t-transparent rounded-full" />
+                          Loading…
+                        </div>
+                      ) : entry ? (
+                        <div className="flex items-center gap-4">
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-red-500">
+                            <AlertCircle className="h-4 w-4" />{entry.counts.errors}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-yellow-500">
+                            <AlertTriangle className="h-4 w-4" />{entry.counts.warnings}
+                          </span>
+                          <span className="flex items-center gap-1.5 text-sm font-medium text-blue-500">
+                            <Info className="h-4 w-4" />{entry.counts.infos}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      )}
+                    </div>
+                    <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                      <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Overview</p>
+                      {entry?.loading ? (
+                        <div className="animate-pulse h-4 bg-muted rounded w-3/4" />
+                      ) : entry ? (
+                        <p className="text-sm text-foreground leading-relaxed">
+                          {generateBlurb(entry.counts, infoSubmission.mfgScore)}
+                        </p>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      )}
+                    </div>
+                  </>
+                )
+              })()}
             </div>
           </aside>
         </div>
