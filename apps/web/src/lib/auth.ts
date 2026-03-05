@@ -23,6 +23,18 @@ export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY)
 }
 
+export function isTokenValid(): boolean {
+  if (isDevMode()) return true
+  const token = getStoredToken()
+  if (!token) return false
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
+  } catch {
+    return false
+  }
+}
+
 export function isLoggedIn(): boolean {
   if (isDevMode()) return true
   return !!getStoredToken()
