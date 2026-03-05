@@ -1,23 +1,41 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Plus, Upload, RefreshCw, LogOut } from 'lucide-react'
+import { Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, type Submission } from '@/lib/api'
-import { isLoggedIn, clearToken } from '@/lib/auth'
-import { Button } from '@/components/ui/button'
+import { clearToken, isLoggedIn } from '@/lib/auth'
+import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { cn } from '@/lib/utils'
 
-const statusVariant: Record<string, 'gray' | 'info' | 'success' | 'destructive'> = {
-  UPLOADED: 'gray',
-  ANALYZING: 'info',
-  DONE: 'success',
-  FAILED: 'destructive',
+type BackgroundStyle = 'spotlight' | 'studio' | 'grid' | 'aurora'
+type TableDensity = 'comfortable' | 'compact'
+
+interface UiSettings {
+  background: BackgroundStyle
+  tableDensity: TableDensity
+}
+
+const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
+
+const DEFAULT_UI_SETTINGS: UiSettings = {
+  background: 'studio',
+  tableDensity: 'comfortable',
 }
 
 function formatDate(iso: string) {
-  return new Date(iso).toLocaleString()
+  return new Date(iso).toLocaleString([], {
+    hour12: true,
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 function scoreColor(n: number): string {
@@ -27,9 +45,16 @@ function scoreColor(n: number): string {
   return '#dc2626'
 }
 
+function applyBackground(background: BackgroundStyle) {
+  document.documentElement.setAttribute('data-ui-bg', background)
+}
+
 export default function DashboardPage() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,6 +78,40 @@ export default function DashboardPage() {
     fetchSubmissions()
   }, [router, fetchSubmissions])
 
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(UI_SETTINGS_KEY)
+      if (!raw) {
+        applyBackground(DEFAULT_UI_SETTINGS.background)
+        return
+      }
+      const parsed = JSON.parse(raw) as Partial<UiSettings>
+      const parsedBackground = parsed.background
+      const next: UiSettings = {
+        background: (
+          parsedBackground === 'spotlight' ||
+          parsedBackground === 'studio' ||
+          parsedBackground === 'grid' ||
+          parsedBackground === 'aurora'
+            ? parsedBackground
+            : parsedBackground === 'default'
+              ? 'spotlight'
+              : DEFAULT_UI_SETTINGS.background
+        ),
+        tableDensity: parsed.tableDensity === 'compact' ? 'compact' : 'comfortable',
+      }
+      setSettings(next)
+      applyBackground(next.background)
+    } catch {
+      applyBackground(DEFAULT_UI_SETTINGS.background)
+    }
+  }, [])
+
+  useEffect(() => {
+    applyBackground(settings.background)
+    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(settings))
+  }, [settings])
+
   // Auto-refresh when any submission is ANALYZING
   useEffect(() => {
     const hasAnalyzing = submissions.some((s) => s.status === 'ANALYZING')
@@ -66,39 +125,89 @@ export default function DashboardPage() {
     router.replace('/login')
   }
 
+  const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
+  const isCompact = settings.tableDensity === 'compact'
+  const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
+  const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
+  const tableCols = isCompact
+    ? 'grid-cols-[minmax(0,1.25fr)_112px_210px]'
+    : 'grid-cols-[minmax(0,1.6fr)_150px_260px]'
+  const rowSurfaceClass = isCompact
+    ? 'bg-background/30 hover:bg-muted/25'
+    : 'bg-background/12 hover:bg-background/18'
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white border-b px-6 py-4 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-gray-900">BetterDFM</h1>
-          <p className="text-xs text-gray-500">PCB Design-for-Manufacturability</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/admin/profile">
-            <Button variant="ghost" size="sm">Profile Settings</Button>
-          </Link>
-          <Button variant="ghost" size="sm" onClick={handleLogout}>
-            <LogOut className="h-4 w-4 mr-1" /> Sign out
+    <div className="min-h-screen">
+      <header className="group/taskbar bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
+        <BetterDFMLogo className="shrink-0" />
+        <div className="flex items-center gap-2">
+          <ThemeToggle className="h-11 w-11" />
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            onClick={() => setSettingsOpen(true)}
+            aria-label="Open settings"
+            title="Open settings"
+          >
+            <span className="flex items-center justify-center w-full">
+              <Cog className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                Settings
+              </span>
+            </span>
           </Button>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            onClick={handleLogout}
+            aria-label="Sign out"
+            title="Sign out"
+          >
+            <span className="flex items-center justify-center w-full">
+              <LogOut className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                Sign out
+              </span>
+            </span>
+          </Button>
+
           <Link href="/upload">
-            <Button size="sm">
-              <Plus className="h-4 w-4 mr-1" /> Upload
+            <Button
+              size="icon"
+              className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+              aria-label="Upload"
+              title="Upload"
+            >
+              <span className="flex items-center justify-center w-full">
+                <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
+                <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                  Upload
+                </span>
+              </span>
             </Button>
           </Link>
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-semibold text-gray-900">Submissions</h2>
-          <Button variant="outline" size="sm" onClick={fetchSubmissions}>
-            <RefreshCw className="h-4 w-4 mr-1" /> Refresh
+      <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4' : 'max-w-7xl px-6')}>
+        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Submissions</h1>
+            <p className="text-sm text-muted-foreground mt-2">
+              {submissions.length} file{submissions.length === 1 ? '' : 's'} in your workspace
+            </p>
+          </div>
+          <Button variant="outline" size="lg" onClick={fetchSubmissions}>
+            <RefreshCw className="h-4 w-4 mr-2" /> Refresh
           </Button>
         </div>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-sm text-red-700">
+          <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
             {error}
           </div>
         )}
@@ -108,72 +217,224 @@ export default function DashboardPage() {
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
         ) : submissions.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-gray-200 rounded-lg">
-            <Upload className="h-12 w-12 text-gray-300 mb-4" />
-            <h3 className="text-lg font-medium text-gray-700">No submissions yet</h3>
-            <p className="text-sm text-gray-500 mb-4">Upload a Gerber or ODB++ file to get started</p>
+          <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/45">
+            <Upload className="h-12 w-12 text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
+            <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
             <Link href="/upload">
-              <Button><Plus className="h-4 w-4 mr-1" /> Upload your first file</Button>
+              <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
             </Link>
           </div>
         ) : (
-          <div className="bg-white rounded-lg border overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b">
-                <tr>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Filename</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Type</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Score</th>
-                  <th className="text-left px-4 py-3 font-medium text-gray-600">Created</th>
-                  <th className="text-right px-4 py-3 font-medium text-gray-600">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {submissions.map((s) => (
-                  <tr key={s.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 font-mono text-xs truncate max-w-xs">{s.filename}</td>
-                    <td className="px-4 py-3 text-gray-500">{s.fileType}</td>
-                    <td className="px-4 py-3">
-                      <Badge variant={statusVariant[s.status] ?? 'gray'}>
-                        {s.status === 'ANALYZING' && (
-                          <span className="inline-block w-2 h-2 bg-blue-500 rounded-full animate-pulse mr-1" />
-                        )}
-                        {s.status}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      {s.status === 'DONE' && s.mfgScore > 0 ? (
-                        <div
-                          className="inline-block px-2 py-0.5 rounded font-mono text-xs font-bold text-white"
-                          style={{ background: scoreColor(s.mfgScore) }}
-                        >
-                          {s.mfgScore} <span className="opacity-80">{s.mfgGrade}</span>
-                        </div>
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-gray-500 text-xs">{s.createdAt ? formatDate(s.createdAt) : '—'}</td>
-                    <td className="px-4 py-3 text-right">
-                      {s.status === 'DONE' && s.latestJobId && (
-                        <Link href={`/results/${s.latestJobId}`}>
-                          <Button variant="outline" size="sm">View Results</Button>
-                        </Link>
-                      )}
-                      {s.status === 'UPLOADED' && (
-                        <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
-                          <Button variant="outline" size="sm">Analyze</Button>
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
+            <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
+            <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
+              <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Score</p>
+                <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground text-right">Actions</p>
+              </div>
+            </div>
+
+            <ul className={cn('relative', isCompact ? 'p-3 space-y-2' : 'p-4 space-y-3')}>
+              {submissions.map((s) => (
+                <li
+                  key={s.id}
+                  className={cn(
+                    'grid items-center rounded-2xl border border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+                    rowSurfaceClass,
+                    tableCols,
+                    isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
+                    rowPadding
+                  )}
+                >
+                  <div className="min-w-0">
+                    <p className={cn('font-mono truncate font-medium text-foreground', filenameSize)}>{s.filename}</p>
+                  </div>
+
+                  <div>
+                    {s.status === 'DONE' && s.mfgScore > 0 ? (
+                      <div
+                        className="inline-flex items-center rounded-md px-3 py-1.5 font-mono text-sm font-bold text-white"
+                        style={{ background: scoreColor(s.mfgScore) }}
+                      >
+                        {s.mfgScore}
+                        <span className="ml-1 opacity-85">{s.mfgGrade}</span>
+                      </div>
+                    ) : (
+                      <span className="text-base text-muted-foreground">-</span>
+                    )}
+                  </div>
+
+                  <div className="flex justify-end items-center gap-3">
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
+                      onClick={() => setInfoSubmissionId(s.id)}
+                      aria-label={`Show details for ${s.filename}`}
+                      title={`Show details for ${s.filename}`}
+                    >
+                      <Info className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
+                    </Button>
+                    {s.status === 'DONE' && s.latestJobId && (
+                      <Link href={`/results/${s.latestJobId}`}>
+                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
+                      </Link>
+                    )}
+                    {s.status === 'UPLOADED' && (
+                      <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
+                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
+                      </Link>
+                    )}
+                    {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
+                      <Badge variant="info" className={isCompact ? 'text-xs px-2.5 py-1' : 'text-sm px-3 py-1.5'}>{s.status}</Badge>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </section>
         )}
       </main>
+
+      {infoSubmission && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setInfoSubmissionId(null)}
+            aria-label="Close submission details"
+          />
+          <aside
+            className="absolute right-0 top-0 h-full w-full max-w-md bg-card border-l border-border shadow-2xl p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Submission details"
+          >
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">Submission Details</p>
+                <h2 className="text-xl font-semibold text-foreground truncate">{infoSubmission.filename}</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => setInfoSubmissionId(null)}
+                aria-label="Close details panel"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-5">
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">File Type</p>
+                <p className="text-base font-medium text-foreground">{infoSubmission.fileType}</p>
+              </div>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Created</p>
+                <p className="text-base text-foreground">
+                  {infoSubmission.createdAt ? formatDate(infoSubmission.createdAt) : '-'}
+                </p>
+              </div>
+              <div className="rounded-lg border border-border/80 bg-muted/20 p-4">
+                <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-1">Overview</p>
+                <p className="text-base text-muted-foreground">Placeholder for summary by you and your coworker.</p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="fixed inset-0 z-50">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45"
+            onClick={() => setSettingsOpen(false)}
+            aria-label="Close settings"
+          />
+          <aside
+            className="absolute right-0 top-0 h-full w-full max-w-lg bg-card border-l border-border shadow-2xl p-6 overflow-y-auto"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Settings"
+          >
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">General Settings</p>
+                <h2 className="text-2xl font-semibold text-foreground">Workspace Preferences</h2>
+              </div>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-10 w-10"
+                onClick={() => setSettingsOpen(false)}
+                aria-label="Close settings panel"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            <div className="space-y-6">
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Background Style</h3>
+                <div className="grid grid-cols-4 gap-3">
+                  {[
+                    { id: 'studio', label: 'Studio' },
+                    { id: 'spotlight', label: 'Spotlight' },
+                    { id: 'grid', label: 'Grid' },
+                    { id: 'aurora', label: 'Aurora' },
+                  ].map((bg) => (
+                    <button
+                      key={bg.id}
+                      type="button"
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition-colors',
+                        settings.background === bg.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
+                      )}
+                      onClick={() => setSettings((prev) => ({ ...prev, background: bg.id as BackgroundStyle }))}
+                    >
+                      <p className="text-sm font-medium text-foreground">{bg.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Submissions Layout</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[
+                    { id: 'comfortable', label: 'Comfortable' },
+                    { id: 'compact', label: 'Compact' },
+                  ].map((density) => (
+                    <button
+                      key={density.id}
+                      type="button"
+                      className={cn(
+                        'rounded-lg border p-3 text-left transition-colors',
+                        settings.tableDensity === density.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
+                      )}
+                      onClick={() => setSettings((prev) => ({ ...prev, tableDensity: density.id as TableDensity }))}
+                    >
+                      <p className="text-sm font-medium text-foreground">{density.label}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
+                <h3 className="font-medium text-foreground mb-3">Quick Access</h3>
+                <Link href="/admin/profile" onClick={() => setSettingsOpen(false)}>
+                  <Button variant="outline" className="w-full justify-start">Capability Profiles</Button>
+                </Link>
+              </section>
+            </div>
+          </aside>
+        </div>
+      )}
     </div>
   )
 }

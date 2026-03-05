@@ -49,7 +49,7 @@ export function FileUploader({ accept, onFile, disabled }: FileUploaderProps) {
       onDrop={onDrop}
       className={cn(
         'relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
-        dragging ? 'border-primary bg-primary/5' : 'border-gray-300 hover:border-gray-400 bg-gray-50',
+        dragging ? 'border-primary bg-primary/5' : 'border-border hover:border-ring bg-muted/40',
         disabled && 'pointer-events-none opacity-50'
       )}
     >
@@ -64,12 +64,12 @@ export function FileUploader({ accept, onFile, disabled }: FileUploaderProps) {
         <div className="flex items-center gap-3 px-4">
           <File className="h-8 w-8 text-primary flex-shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-gray-900 truncate">{selectedFile.name}</p>
-            <p className="text-xs text-gray-500">{(selectedFile.size / 1024).toFixed(1)} KB</p>
+            <p className="text-sm font-medium text-foreground truncate">{selectedFile.name}</p>
+            <p className="text-xs text-muted-foreground">{(selectedFile.size / 1024).toFixed(1)} KB</p>
           </div>
           <button
             onClick={clearFile}
-            className="p-1 rounded hover:bg-gray-200 text-gray-500"
+            className="p-1 rounded hover:bg-muted text-muted-foreground"
             type="button"
           >
             <X className="h-4 w-4" />
@@ -77,10 +77,10 @@ export function FileUploader({ accept, onFile, disabled }: FileUploaderProps) {
         </div>
       ) : (
         <div className="flex flex-col items-center gap-2 text-center px-4">
-          <Upload className="h-10 w-10 text-gray-400" />
+          <Upload className="h-10 w-10 text-muted-foreground" />
           <div>
-            <p className="text-sm font-medium text-gray-700">Drop your Gerber or ODB++ file here</p>
-            <p className="text-xs text-gray-500 mt-1">or click to browse — .zip, .gbr, .ger accepted</p>
+            <p className="text-sm font-medium text-foreground">Drop your Gerber or ODB++ file here</p>
+            <p className="text-xs text-muted-foreground mt-1">or click to browse — .zip, .gbr, .ger accepted</p>
           </div>
         </div>
       )}

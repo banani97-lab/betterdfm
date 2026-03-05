@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, CheckCircle, XCircle } from 'lucide-react'
+import { CheckCircle, XCircle } from 'lucide-react'
 import {
   createSubmission,
   uploadToS3,
@@ -16,6 +16,7 @@ import {
 import { isLoggedIn } from '@/lib/auth'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { Button } from '@/components/ui/button'
+import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { cn } from '@/lib/utils'
 
 type Step = 'select' | 'uploading' | 'analyzing' | 'done' | 'error'
@@ -74,12 +75,10 @@ export default function UploadPage() {
   const stepIndex = STEPS.indexOf(step === 'error' ? 'done' : step)
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b px-6 py-4 flex items-center gap-4">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
-        </Link>
-        <h1 className="text-lg font-semibold text-gray-900">Upload & Analyze</h1>
+    <div className="min-h-screen bg-background">
+      <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
+        <BetterDFMLogo />
+        <h1 className="text-xl font-semibold text-foreground">Upload & Analyze</h1>
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
@@ -91,15 +90,15 @@ export default function UploadPage() {
                 'flex items-center justify-center w-8 h-8 rounded-full text-xs font-bold border-2 transition-colors',
                 i < stepIndex ? 'bg-green-500 border-green-500 text-white' :
                 i === stepIndex ? 'bg-blue-600 border-blue-600 text-white' :
-                'bg-white border-gray-300 text-gray-400'
+                'bg-card border-border text-muted-foreground'
               )}>
                 {i < stepIndex ? '✓' : i + 1}
               </div>
               <span className={cn(
                 'ml-2 text-xs font-medium',
-                i <= stepIndex ? 'text-gray-900' : 'text-gray-400'
+                i <= stepIndex ? 'text-foreground' : 'text-muted-foreground'
               )}>{label}</span>
-              {i < 3 && <div className={cn('w-12 h-0.5 mx-3', i < stepIndex ? 'bg-green-400' : 'bg-gray-200')} />}
+              {i < 3 && <div className={cn('w-12 h-0.5 mx-3', i < stepIndex ? 'bg-green-400' : 'bg-muted')} />}
             </div>
           ))}
         </div>
@@ -111,11 +110,11 @@ export default function UploadPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">File Type</label>
+                <label className="block text-sm font-medium text-foreground mb-1">File Type</label>
                 <select
                   value={fileType}
                   onChange={(e) => setFileType(e.target.value as 'GERBER' | 'ODB_PLUS_PLUS')}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="GERBER">Gerber</option>
                   <option value="ODB_PLUS_PLUS">ODB++</option>
@@ -123,11 +122,11 @@ export default function UploadPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Capability Profile</label>
+                <label className="block text-sm font-medium text-foreground mb-1">Capability Profile</label>
                 <select
                   value={profileId}
                   onChange={(e) => setProfileId(e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                 >
                   <option value="">Default</option>
                   {profiles.map((p) => (
@@ -147,11 +146,11 @@ export default function UploadPage() {
         {step === 'uploading' && (
           <div className="text-center space-y-4">
             <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full mx-auto" />
-            <p className="font-medium text-gray-700">Uploading to S3…</p>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <p className="font-medium text-foreground">Uploading to S3…</p>
+            <div className="w-full bg-muted rounded-full h-2">
               <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
             </div>
-            <p className="text-sm text-gray-500">{progress}%</p>
+            <p className="text-sm text-muted-foreground">{progress}%</p>
           </div>
         )}
 
@@ -159,11 +158,11 @@ export default function UploadPage() {
         {step === 'analyzing' && (
           <div className="text-center space-y-4">
             <div className="animate-spin h-10 w-10 border-4 border-purple-600 border-t-transparent rounded-full mx-auto" />
-            <p className="font-medium text-gray-700">Running DFM analysis…</p>
-            <p className="text-sm text-gray-500">
+            <p className="font-medium text-foreground">Running DFM analysis…</p>
+            <p className="text-sm text-muted-foreground">
               Status: <span className="font-mono">{job?.status ?? 'PENDING'}</span>
             </p>
-            <p className="text-xs text-gray-400">This typically takes 10–60 seconds</p>
+            <p className="text-xs text-muted-foreground">This typically takes 10–60 seconds</p>
           </div>
         )}
 
@@ -171,8 +170,8 @@ export default function UploadPage() {
         {step === 'done' && job && (
           <div className="text-center space-y-4">
             <CheckCircle className="h-14 w-14 text-green-500 mx-auto" />
-            <h2 className="text-xl font-bold text-gray-900">Analysis Complete</h2>
-            <p className="text-gray-500">Your board has been analyzed successfully.</p>
+            <h2 className="text-xl font-bold text-foreground">Analysis Complete</h2>
+            <p className="text-muted-foreground">Your board has been analyzed successfully.</p>
             <Button onClick={() => router.push(`/results/${job.id}`)} className="w-full">
               View Results
             </Button>
@@ -186,8 +185,8 @@ export default function UploadPage() {
         {step === 'error' && (
           <div className="text-center space-y-4">
             <XCircle className="h-14 w-14 text-red-500 mx-auto" />
-            <h2 className="text-xl font-bold text-gray-900">Something went wrong</h2>
-            <p className="text-sm text-gray-600">{errorMsg}</p>
+            <h2 className="text-xl font-bold text-foreground">Something went wrong</h2>
+            <p className="text-sm text-muted-foreground">{errorMsg}</p>
             <Button onClick={() => setStep('select')} variant="outline" className="w-full">Try again</Button>
           </div>
         )}

@@ -3,13 +3,14 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Download, AlertCircle, AlertTriangle, Info } from 'lucide-react'
+import { Download, AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, patchViolation, ignoreLayerViolations, type AnalysisJob, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
 import { BoardViewer } from '@/components/ui/BoardViewer'
+import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -161,22 +162,22 @@ export default function ResultsPage() {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <AlertCircle className="h-12 w-12 text-red-400" />
-        <p className="text-gray-600">{error}</p>
+        <p className="text-muted-foreground">{error}</p>
         <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50">
+    <div className="flex flex-col h-screen bg-background">
       {/* Header */}
-      <header className="bg-white border-b px-6 py-3 flex items-center gap-4 flex-shrink-0">
-        <Link href="/dashboard">
-          <Button variant="ghost" size="sm"><ArrowLeft className="h-4 w-4 mr-1" />Dashboard</Button>
-        </Link>
-        <div className="flex-1">
-          <h1 className="text-base font-semibold text-gray-900">DFM Results</h1>
-          <p className="text-xs text-gray-500 font-mono">{jobId}</p>
+      <header className="bg-card border-b px-6 py-5 flex items-center gap-4 flex-shrink-0">
+        <BetterDFMLogo className="shrink-0" />
+        <div className="flex items-center gap-4 flex-1 min-w-0">
+          <div className="min-w-0">
+            <h1 className="text-lg font-semibold text-foreground">DFM Results</h1>
+            <p className="text-xs text-muted-foreground font-mono truncate">{jobId}</p>
+          </div>
         </div>
         {/* Summary badges */}
         <div className="flex items-center gap-2">
@@ -201,10 +202,10 @@ export default function ResultsPage() {
             </div>
           )}
         </div>
-        <Button variant="outline" size="sm" onClick={exportCSV} disabled={violations.length === 0}>
+        <Button variant="outline" size="lg" onClick={exportCSV} disabled={violations.length === 0}>
           <Download className="h-4 w-4 mr-1" />CSV
         </Button>
-        <Button variant="outline" size="sm" onClick={downloadPDF}>
+        <Button variant="outline" size="lg" onClick={downloadPDF}>
           <Download className="h-4 w-4 mr-1" />PDF
         </Button>
       </header>
@@ -212,7 +213,7 @@ export default function ResultsPage() {
       {/* Body: split panel */}
       <div className="flex flex-1 overflow-hidden">
         {/* Left: violation list */}
-        <div className="w-96 flex-shrink-0 border-r bg-white overflow-hidden flex flex-col">
+        <div className="w-96 flex-shrink-0 border-r bg-card overflow-hidden flex flex-col">
           <ViolationList
             violations={visibleViolations}
             allViolations={layerFiltered}

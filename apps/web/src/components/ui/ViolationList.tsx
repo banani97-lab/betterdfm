@@ -55,7 +55,7 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
   return (
     <div className="flex flex-col h-full">
       {/* Filter tabs */}
-      <div className="flex gap-1 p-2 border-b bg-gray-50 flex-shrink-0 flex-wrap">
+      <div className="flex gap-1 p-2 border-b bg-muted/40 flex-shrink-0 flex-wrap">
         {(['ERROR', 'WARNING', 'INFO', 'NONE'] as SeverityFilter[]).map((f) => (
           <button
             key={f}
@@ -63,20 +63,20 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
             className={cn(
               'px-3 py-1 rounded text-xs font-medium transition-colors',
               filter === f
-                ? 'bg-white shadow-sm text-gray-900 border'
-                : 'text-gray-600 hover:text-gray-900'
+                ? 'bg-card shadow-sm text-foreground border'
+                : 'text-muted-foreground hover:text-foreground'
             )}
           >
             {f}
             {(f === 'ERROR' || f === 'WARNING' || f === 'INFO') && (
-              <span className="ml-1 text-gray-400">({counts[f]})</span>
+              <span className="ml-1 text-muted-foreground">({counts[f]})</span>
             )}
           </button>
         ))}
         {ignoredCount > 0 && (
           <button
             onClick={() => setShowIgnored((s) => !s)}
-            className="ml-auto px-2 py-1 rounded text-xs text-gray-400 hover:text-gray-600 transition-colors"
+            className="ml-auto px-2 py-1 rounded text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             {showIgnored ? `Hide ignored ▴` : `Show ${ignoredCount} ignored ▾`}
           </button>
@@ -86,12 +86,12 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
       {/* List */}
       <div ref={listRef} className="flex-1 overflow-y-auto divide-y">
         {filter === 'NONE' ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
             <Info className="h-8 w-8 mb-2" />
             <p className="text-sm">Violations hidden</p>
           </div>
         ) : displayViolations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
             <Info className="h-8 w-8 mb-2" />
             <p className="text-sm">No violations found</p>
           </div>
@@ -102,8 +102,8 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
               data-violation-id={v.id}
               onClick={() => onSelect?.(v)}
               className={cn(
-                'group w-full text-left p-3 hover:bg-gray-50 transition-colors',
-                selectedId === v.id && 'bg-blue-50 border-l-2 border-blue-500',
+                'group w-full text-left p-3 hover:bg-muted/40 transition-colors',
+                selectedId === v.id && 'bg-primary/15 border-l-2 border-primary',
                 v.ignored && 'opacity-50'
               )}
             >
@@ -116,20 +116,20 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                     <Badge variant={severityBadgeVariant[v.severity] ?? 'default'} className="text-xs">
                       {v.severity}
                     </Badge>
-                    <span className="text-xs font-mono text-gray-500">{v.ruleId}</span>
+                    <span className="text-xs font-mono text-muted-foreground">{v.ruleId}</span>
                     {v.ignored && (
-                      <span className="text-xs text-gray-400 italic">ignored</span>
+                      <span className="text-xs text-muted-foreground italic">ignored</span>
                     )}
                   </div>
-                  <p className={cn('text-sm text-gray-900 leading-snug', v.ignored && 'line-through')}>{v.message}</p>
+                  <p className={cn('text-sm text-foreground leading-snug', v.ignored && 'line-through')}>{v.message}</p>
                   {v.suggestion && !v.ignored && (
-                    <p className="text-xs text-gray-500 mt-1 leading-snug">{v.suggestion}</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">{v.suggestion}</p>
                   )}
                   {v.measuredMM !== 0 && !v.ignored && (
-                    <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs font-mono text-gray-500">
+                    <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs font-mono text-muted-foreground">
                       <span>
                         Measured&nbsp;
-                        <span className="text-gray-700">
+                        <span className="text-foreground">
                           {v.unit === 'ratio'
                             ? v.measuredMM.toFixed(2)
                             : `${v.measuredMM.toFixed(3)} mm`}
@@ -137,21 +137,21 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                       </span>
                       <span>
                         Limit&nbsp;
-                        <span className="text-gray-700">
+                        <span className="text-foreground">
                           {v.unit === 'ratio'
                             ? v.limitMM.toFixed(2)
                             : `${v.limitMM.toFixed(3)} mm`}
                         </span>
                       </span>
                       {v.netName && (
-                        <span>Net&nbsp;<span className="text-gray-700">{v.netName}</span></span>
+                        <span>Net&nbsp;<span className="text-foreground">{v.netName}</span></span>
                       )}
                       {v.refDes && (
-                        <span>Ref&nbsp;<span className="text-gray-700">{v.refDes}</span></span>
+                        <span>Ref&nbsp;<span className="text-foreground">{v.refDes}</span></span>
                       )}
                     </div>
                   )}
-                  <p className="text-xs text-gray-400 mt-1 font-mono">
+                  <p className="text-xs text-muted-foreground mt-1 font-mono">
                     layer: {v.layer || '—'} | x: {v.x.toFixed(2)} y: {v.y.toFixed(2)}
                   </p>
                 </div>
@@ -159,7 +159,7 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                   <button
                     onClick={(e) => { e.stopPropagation(); onIgnore(v, !v.ignored) }}
                     title={v.ignored ? 'Restore violation' : 'Ignore / waive this violation'}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-gray-400 hover:text-gray-700 px-1 py-0.5 rounded hover:bg-gray-100"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground hover:text-foreground px-1 py-0.5 rounded hover:bg-muted"
                   >
                     {v.ignored ? 'restore' : 'ignore'}
                   </button>
