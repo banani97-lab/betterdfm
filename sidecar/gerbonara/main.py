@@ -469,6 +469,10 @@ def _matrix_type_to_ltype(mtype: str) -> str | None:
         return "SOLDER_MASK"
     if m == "SILK_SCREEN":
         return "SILK"
+    if m == "MIXED":
+        return "COPPER"
+    if m == "DRILL":
+        return "DRILL"
     return None
 
 
@@ -514,6 +518,7 @@ def _parse_features(
     vias: list,
     net_points: list | None = None,
     components: list | None = None,
+    drills: list | None = None,
 ) -> None:
     """Parse ODB++ features file and append geometry to traces/pads/vias."""
     net_points = net_points or []
@@ -532,10 +537,18 @@ def _parse_features(
     surface_pts: list[tuple[float, float]] = []
 
     def _flush_island() -> None:
-        # Surface island contours are copper pour / solder-mask opening boundaries.
-        # Emitting them as thin traces causes false trace-width violations, so we
-        # skip them entirely. Copper pour fill is not a routed trace.
-        return
+        if ltype != "POWER_GROUND" or len(surface_pts) < 2:
+            return
+        for i in range(len(surface_pts) - 1):
+            x1, y1 = surface_pts[i]
+            x2, y2 = surface_pts[i + 1]
+            traces.append(Trace(layer=layer_name, widthMM=0.05,
+                                startX=x1, startY=y1, endX=x2, endY=y2))
+        # Close polygon
+        x1, y1 = surface_pts[-1]
+        x2, y2 = surface_pts[0]
+        traces.append(Trace(layer=layer_name, widthMM=0.05,
+                            startX=x1, startY=y1, endX=x2, endY=y2))
 
     for line in lines:
         raw = line.strip()
@@ -597,9 +610,8 @@ def _parse_features(
 
         # ── Line record ─────────────────────────────────────────────────────
         if rec == "L":
-            # Only emit routed traces from copper layers; solder mask / silk
-            # line records are opening/legend geometry, not DFM-relevant traces.
-            if ltype != "COPPER":
+            # Emit routed traces from copper, silk (outlines/legends), and rout layers.
+            if ltype not in ("COPPER", "SILK", "ROUT"):
                 continue
             # L x1 y1 x2 y2 [extra] P|N sym_num
             # Polarity may be at index 5 or 6 depending on tool
@@ -633,7 +645,10 @@ def _parse_features(
                                                    "shape": "CIRCLE", "inner": 0.0})
                 net = _attr_net(raw) or _net_lookup(x, y, net_points)
                 ref = _refdes_lookup(x, y, components)
-                if sym["shape"] == "DONUT":
+                if ltype == "DRILL" and drills is not None:
+                    plated = "non" not in layer_name and "npth" not in layer_name
+                    drills.append(Drill(x=x, y=y, diamMM=max(0.01, sym["w"]), plated=plated))
+                elif sym["shape"] == "DONUT":
                     vias.append(Via(x=x, y=y,
                                    outerDiamMM=sym["w"], drillDiamMM=sym["inner"],
                                    netName=net))
@@ -648,7 +663,7 @@ def _parse_features(
 
         # ── Arc record ──────────────────────────────────────────────────────
         elif rec == "A":
-            if ltype != "COPPER":
+            if ltype not in ("COPPER", "SILK"):
                 continue
             # A x1 y1 xe ye xc yc cw [extra] P|N sym_num
             # Approximate as straight line from start to end
@@ -907,14 +922,16 @@ def parse_odb(file_path: str) -> BoardData:
                 layers.append(Layer(name=layer_name, type=ltype))
                 before = len(traces) + len(pads) + len(vias)
                 _parse_features(feat, layer_name, ltype, units, traces, pads, vias,
-                                 net_points=net_points, components=components)
+                                 net_points=net_points, components=components, drills=drills)
                 after = len(traces) + len(pads) + len(vias)
                 logger.info("ODB++ %s (%s): %d features", layer_name, ltype, after - before)
 
             rout_feat = layers_dir / "rout" / "features"
             if rout_feat.exists():
-                layers.append(Layer(name="rout", type="DRILL"))
+                layers.append(Layer(name="rout", type="OUTLINE"))
                 _parse_rout(rout_feat, units, drills)
+                _parse_features(rout_feat, "rout", "ROUT", units, traces, pads, vias,
+                                net_points=net_points, components=components)
                 logger.info("ODB++ rout: %d drills", len(drills))
 
     except Exception as e:

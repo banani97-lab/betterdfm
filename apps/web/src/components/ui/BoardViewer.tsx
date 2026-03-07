@@ -38,14 +38,16 @@ const SEV_COLOR: Record<string, string> = {
 // ── Layer classification ──────────────────────────────────────────────────────
 
 function isSilkLayer(n: string): boolean {
-  return n.includes('silk') || n.includes('legend') || n.includes('gto') || n.includes('gbo')
+  return n.includes('silk') || n.includes('legend') || n.includes('gto') ||
+         n.includes('gbo') || n.includes('overlay')
 }
 function isMaskLayer(n: string): boolean {
   return n.includes('mask') || n.includes('covertop') || n.includes('coverbottom') ||
          n.includes('cover') || n.includes('gts') || n.includes('gbs')
 }
 function isOutlineLayer(n: string): boolean {
-  return n.includes('outline') || n.includes('gko') || n.includes('edge') || n.includes('board')
+  return n.includes('outline') || n.includes('gko') || n.includes('edge') ||
+         n.includes('board') || n === 'rout'
 }
 function isCopperLayer(n: string): boolean {
   return !isSilkLayer(n) && !isMaskLayer(n) && !isOutlineLayer(n)

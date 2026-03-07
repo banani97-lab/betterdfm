@@ -38,6 +38,10 @@ func (w *Worker) Poll(ctx context.Context) {
 			var payload sqsMessage
 			if err := json.Unmarshal([]byte(aws.ToString(msg.Body)), &payload); err != nil {
 				log.Printf("failed to unmarshal SQS message: %v", err)
+				w.sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
+					QueueUrl:      aws.String(w.sqsQueueURL),
+					ReceiptHandle: msg.ReceiptHandle,
+				})
 				continue
 			}
 			log.Printf("processing job %s", payload.JobID)

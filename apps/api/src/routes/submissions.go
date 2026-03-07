@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+	"log"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -199,7 +200,9 @@ func (h *SubmissionsHandler) StartAnalysis(c echo.Context) error {
 	// Enqueue SQS message
 	if err := h.aws.EnqueueJob(c.Request().Context(), job.ID); err != nil {
 		// Don't fail the request if SQS is unavailable in dev
-		c.Logger().Warnf("SQS enqueue failed: %v", err)
+		log.Printf("ERROR: SQS enqueue failed for job %s: %v", job.ID, err)
+	} else {
+		log.Printf("SQS enqueue succeeded for job %s", job.ID)
 	}
 
 	return c.JSON(http.StatusCreated, job)
