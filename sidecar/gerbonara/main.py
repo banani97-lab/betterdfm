@@ -648,6 +648,8 @@ def _parse_features(
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name and "npth" not in layer_name
                     drills.append(Drill(x=x, y=y, diamMM=max(0.01, sym["w"]), plated=plated))
+                elif ltype == "POWER_GROUND" and sym["shape"] == "DONUT":
+                    pass  # anti-pads in copper planes are not real vias — skip
                 elif sym["shape"] == "DONUT":
                     vias.append(Via(x=x, y=y,
                                    outerDiamMM=sym["w"], drillDiamMM=sym["inner"],
