@@ -378,29 +378,47 @@ def _read_units(path: Path) -> str:
     return "INCH"
 
 
+_MAX_SYM_MM = 20.0  # any symbol dimension larger than this is treated as microns
+
+
+def _fix_units(v: float, raw: float) -> float:
+    """If a mils-converted value is unreasonably large, re-interpret raw as microns."""
+    if v > _MAX_SYM_MM:
+        return min(raw * 0.001, _MAX_SYM_MM)
+    return v
+
+
 def _parse_sym(sym: str) -> dict:
-    """Parse ODB++ symbol name into shape dict. Dims are in mils."""
+    """Parse ODB++ symbol name into shape dict. Dims are in mils (or microns for metric tools)."""
     s = sym.lower()
     try:
         if s.startswith("donut_r"):
             rest = s[7:]
             parts = rest.split("x", 1)
-            outer = _mils_to_mm(float(parts[0]))
-            inner = _mils_to_mm(float(parts[1])) if len(parts) > 1 else outer * 0.5
+            raw_outer = float(parts[0])
+            raw_inner = float(parts[1]) if len(parts) > 1 else raw_outer * 0.5
+            outer = _fix_units(_mils_to_mm(raw_outer), raw_outer)
+            inner = _fix_units(_mils_to_mm(raw_inner), raw_inner)
+            inner = min(inner, outer * 0.85)
             return {"shape": "DONUT", "w": outer, "h": outer, "inner": inner}
         if s.startswith("rect"):
             dims = s[4:].split("x")
-            w = _mils_to_mm(float(dims[0]))
+            raw_w = float(dims[0])
             h_raw = dims[1] if len(dims) > 1 else dims[0]
-            h = _mils_to_mm(float(h_raw.lstrip("r").split("x")[0]))
+            raw_h = float(h_raw.lstrip("r").split("x")[0])
+            w = _fix_units(_mils_to_mm(raw_w), raw_w)
+            h = _fix_units(_mils_to_mm(raw_h), raw_h)
             return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
         if s.startswith("oval"):
             parts = s[4:].split("x")
-            w = _mils_to_mm(float(parts[0]))
-            h = _mils_to_mm(float(parts[1])) if len(parts) > 1 else w
+            raw_w = float(parts[0])
+            raw_h = float(parts[1]) if len(parts) > 1 else raw_w
+            w = _fix_units(_mils_to_mm(raw_w), raw_w)
+            h = _fix_units(_mils_to_mm(raw_h), raw_h)
             return {"shape": "OVAL", "w": w, "h": h, "inner": 0.0}
         if s.startswith("r") and len(s) > 1 and (s[1].isdigit() or s[1] == "."):
-            d = _mils_to_mm(float(s[1:].split("x")[0]))
+            raw_d = float(s[1:].split("x")[0])
+            d = _fix_units(_mils_to_mm(raw_d), raw_d)
             return {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0}
     except (ValueError, IndexError):
         pass
@@ -537,7 +555,7 @@ def _parse_features(
     surface_pts: list[tuple[float, float]] = []
 
     def _flush_island() -> None:
-        if ltype != "POWER_GROUND" or len(surface_pts) < 2:
+        if ltype not in ("POWER_GROUND", "COPPER") or len(surface_pts) < 2:
             return
         for i in range(len(surface_pts) - 1):
             x1, y1 = surface_pts[i]

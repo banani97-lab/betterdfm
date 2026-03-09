@@ -193,11 +193,12 @@ function drawCopper(
   if (!anyLayerVisible) return
 
   // Vias
+  const MAX_VIA_MM = 15  // cap to guard against parser unit artifacts
   for (const v of boardData?.vias ?? []) {
     const cx = tx(v.x), cy = ty(v.y)
     if (!ok(cx) || !ok(cy)) continue
-    const outerR = Math.max(2, (v.outerDiamMM / 2) * s)
-    const innerR = Math.max(0.8, (v.drillDiamMM / 2) * s)
+    const outerR = Math.max(2, Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s))
+    const innerR = Math.max(0.8, Math.min((v.drillDiamMM / 2) * s, outerR * 0.85))
     ctx.fillStyle = '#d4a840'
     ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI * 2); ctx.fill()
     ctx.fillStyle = '#060606'
@@ -208,7 +209,7 @@ function drawCopper(
   for (const d of boardData?.drills ?? []) {
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
-    const r = Math.max(0.8, (d.diamMM / 2) * s)
+    const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
     ctx.fillStyle = d.plated ? '#d4a840' : '#3a3a3a'
     ctx.globalAlpha = 0.7
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill()
