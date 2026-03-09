@@ -11,6 +11,11 @@ import (
 )
 
 func (w *Worker) Poll(ctx context.Context) {
+	// Recovery sweep: re-enqueue PENDING jobs that fell through SQS delivery.
+	if w.sqsQueueURL != "" {
+		go w.recoverStuckJobs(ctx)
+	}
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -59,6 +64,47 @@ func (w *Worker) Poll(ctx context.Context) {
 			if delErr != nil {
 				log.Printf("failed to delete SQS message: %v", delErr)
 			}
+		}
+	}
+}
+
+// recoverStuckJobs snapshots PENDING job IDs at startup, then re-enqueues any that
+// are still PENDING after 5 minutes — recovering from silent SQS delivery failures.
+func (w *Worker) recoverStuckJobs(ctx context.Context) {
+	// Snapshot jobs that were already PENDING when this worker started.
+	var initial []AnalysisJob
+	if err := w.db.Where("status = ?", "PENDING").Find(&initial).Error; err != nil {
+		log.Printf("[recovery] startup snapshot error: %v", err)
+		return
+	}
+	if len(initial) == 0 {
+		return
+	}
+	ids := make([]string, len(initial))
+	for i, j := range initial {
+		ids[i] = j.ID
+	}
+	log.Printf("[recovery] watching %d pre-existing PENDING jobs", len(ids))
+
+	select {
+	case <-ctx.Done():
+		return
+	case <-time.After(5 * time.Minute):
+	}
+
+	var stuck []AnalysisJob
+	if err := w.db.Where("status = ? AND id IN ?", "PENDING", ids).Find(&stuck).Error; err != nil {
+		log.Printf("[recovery] sweep query error: %v", err)
+		return
+	}
+	for _, job := range stuck {
+		log.Printf("[recovery] re-enqueuing stuck job %s", job.ID)
+		body := `{"jobId":"` + job.ID + `"}`
+		if _, err := w.sqsClient.SendMessage(ctx, &sqs.SendMessageInput{
+			QueueUrl:    aws.String(w.sqsQueueURL),
+			MessageBody: aws.String(body),
+		}); err != nil {
+			log.Printf("[recovery] re-enqueue failed for job %s: %v", job.ID, err)
 		}
 	}
 }

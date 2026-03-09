@@ -1,0 +1,159 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REGISTRY: 578381014577.dkr.ecr.us-east-1.amazonaws.com
+  ECS_CLUSTER: betterdfm
+  ECS_SERVICE: betterdfm-worker
+  APPRUNNER_SERVICE_ARN: arn:aws:apprunner:us-east-1:578381014577:service/betterdfm-api/ab309c6d7b0042e29f0cb6f9e34b8ce2
+
+jobs:
+  # Detect which services have changed so we only rebuild what's needed.
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      worker: ${{ steps.filter.outputs.worker }}
+      api: ${{ steps.filter.outputs.api }}
+      gerbonara: ${{ steps.filter.outputs.gerbonara }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            worker:
+              - 'workers/dfm-worker/**'
+              - 'engine/dfm-engine/**'
+            api:
+              - 'apps/api/**'
+            gerbonara:
+              - 'sidecar/gerbonara/**'
+
+  deploy-worker:
+    needs: changes
+    if: needs.changes.outputs.worker == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push worker
+        run: |
+          docker build \
+            -f workers/dfm-worker/Dockerfile \
+            -t $ECR_REGISTRY/betterdfm-worker:latest \
+            -t $ECR_REGISTRY/betterdfm-worker:${{ github.sha }} \
+            .
+          docker push $ECR_REGISTRY/betterdfm-worker:latest
+          docker push $ECR_REGISTRY/betterdfm-worker:${{ github.sha }}
+
+      - name: Force new ECS deployment
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --region $AWS_REGION
+
+      - name: Wait for ECS to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --region $AWS_REGION
+
+  deploy-api:
+    needs: changes
+    if: needs.changes.outputs.api == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push API
+        working-directory: apps/api
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/betterdfm-api:latest \
+            -t $ECR_REGISTRY/betterdfm-api:${{ github.sha }} \
+            .
+          docker push $ECR_REGISTRY/betterdfm-api:latest
+          docker push $ECR_REGISTRY/betterdfm-api:${{ github.sha }}
+
+      - name: Deploy App Runner
+        run: |
+          aws apprunner start-deployment \
+            --service-arn $APPRUNNER_SERVICE_ARN \
+            --region $AWS_REGION
+
+      - name: Wait for App Runner deployment
+        run: |
+          for i in $(seq 1 24); do
+            STATUS=$(aws apprunner describe-service \
+              --service-arn $APPRUNNER_SERVICE_ARN \
+              --region $AWS_REGION \
+              --query "Service.Status" --output text)
+            echo "App Runner status: $STATUS"
+            [ "$STATUS" = "RUNNING" ] && exit 0
+            sleep 15
+          done
+          echo "App Runner did not stabilize in time" && exit 1
+
+  deploy-gerbonara:
+    needs: changes
+    if: needs.changes.outputs.gerbonara == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push gerbonara
+        working-directory: sidecar/gerbonara
+        run: |
+          docker build \
+            -t $ECR_REGISTRY/betterdfm-gerbonara:latest \
+            -t $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }} \
+            .
+          docker push $ECR_REGISTRY/betterdfm-gerbonara:latest
+          docker push $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}
+
+      - name: Force new ECS deployment
+        # Gerbonara runs as a sidecar in the worker task — same service
+        run: |
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service $ECS_SERVICE \
+            --force-new-deployment \
+            --region $AWS_REGION
+
+      - name: Wait for ECS to stabilize
+        run: |
+          aws ecs wait services-stable \
+            --cluster $ECS_CLUSTER \
+            --services $ECS_SERVICE \
+            --region $AWS_REGION
