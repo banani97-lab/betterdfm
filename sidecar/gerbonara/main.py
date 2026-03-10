@@ -526,6 +526,46 @@ def _parse_profile(profile_path: Path, units: str) -> list[Point]:
     return outline
 
 
+def _arc_segments(
+    x1: float, y1: float, xe: float, ye: float,
+    xc: float, yc: float, cw: bool, n: int = 8,
+) -> list[tuple[float, float, float, float]]:
+    """Approximate an ODB++ arc as up to n line segments.
+
+    Returns a list of (x1, y1, x2, y2) tuples.  For a full circle (start ≈ end)
+    the segments span 360°; for a partial arc they span the actual sweep angle.
+    """
+    import math
+
+    r = math.sqrt((x1 - xc) ** 2 + (y1 - yc) ** 2)
+    if r < 1e-9:
+        return []
+
+    a_start = math.atan2(y1 - yc, x1 - xc)
+    a_end   = math.atan2(ye - yc, xe - xc)
+
+    is_full_circle = abs(x1 - xe) < 1e-6 and abs(y1 - ye) < 1e-6
+    if is_full_circle:
+        sweep = -2 * math.pi if cw else 2 * math.pi
+    else:
+        sweep = a_end - a_start
+        if cw:
+            if sweep > 0:
+                sweep -= 2 * math.pi
+        else:
+            if sweep < 0:
+                sweep += 2 * math.pi
+
+    steps = max(2, min(n, int(abs(sweep) / (math.pi / 4)) + 1))
+    pts = [
+        (xc + r * math.cos(a_start + sweep * i / steps),
+         yc + r * math.sin(a_start + sweep * i / steps))
+        for i in range(steps + 1)
+    ]
+    return [(pts[i][0], pts[i][1], pts[i + 1][0], pts[i + 1][1])
+            for i in range(steps)]
+
+
 def _parse_features(
     features_path: Path,
     layer_name: str,
@@ -686,8 +726,9 @@ def _parse_features(
             if ltype not in ("COPPER", "SILK"):
                 continue
             # A x1 y1 xe ye xc yc cw [extra] P|N sym_num
-            # Approximate as straight line from start to end
-            pol_idx = next((i for i in (7, 8, 9) if i < len(parts)
+            # parts[7]=cw ('Y'/'N'), polarity is at index 8 or 9 (skip 7 to avoid
+            # confusing cw='N' with negative polarity).
+            pol_idx = next((i for i in (8, 9, 10) if i < len(parts)
                             and parts[i] in ("P", "N")), None)
             if pol_idx is None or parts[pol_idx] != "P" or pol_idx + 1 >= len(parts):
                 continue
@@ -696,13 +737,20 @@ def _parse_features(
                 y1 = _coord_to_mm(float(parts[2]), units)
                 xe = _coord_to_mm(float(parts[3]), units)
                 ye = _coord_to_mm(float(parts[4]), units)
+                xc = _coord_to_mm(float(parts[5]), units)
+                yc = _coord_to_mm(float(parts[6]), units)
+                cw = parts[7].upper() == "Y"
                 sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
-                mid_x = (x1 + xe) / 2
-                mid_y = (y1 + ye) / 2
-                net = _attr_net(raw) or _net_lookup(mid_x, mid_y, net_points)
-                traces.append(Trace(layer=layer_name, widthMM=max(0.01, sym["w"]),
-                                    startX=x1, startY=y1, endX=xe, endY=ye,
-                                    netName=net))
+                w = max(0.01, sym["w"])
+                net = _attr_net(raw) or _net_lookup(xc, yc, net_points)
+
+                # Emit arc as piecewise line segments so full circles don't
+                # collapse to zero-length blobs.
+                segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw)
+                for sx1, sy1, sx2, sy2 in segs:
+                    traces.append(Trace(layer=layer_name, widthMM=w,
+                                        startX=sx1, startY=sy1,
+                                        endX=sx2, endY=sy2, netName=net))
             except (ValueError, IndexError):
                 pass
 
