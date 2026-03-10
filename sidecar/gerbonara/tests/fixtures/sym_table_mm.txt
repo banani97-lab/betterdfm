@@ -1,0 +1,7 @@
+# ODB++ symbol table fixture — MM units
+# Symbol dimensions are in microns (1/1000 mm); multiply by 0.001 to get mm.
+$0 r304.8
+$1 s700
+$2 oval550x1650
+$3 rect2720x1230
+$4 donut_r400x200

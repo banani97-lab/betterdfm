@@ -1,0 +1,24 @@
+# ODB++ features fixture — INCH units
+# Coordinates are in inches; multiply by 25.4 to get mm.
+# Symbol dims are in mils; multiply by 0.0254 to get mm.
+
+# Symbol table
+$0 r10
+$1 r20
+$2 oval100x200
+
+# L x1 y1 x2 y2 extra P|N sym_num
+# sym $0: r10 mils → 0.254 mm width
+# coords: 0.0,0.0 → 1.0,0.0 in inches → 0.0,0.0 → 25.4,0.0 mm
+L 0.0 0.0 1.0 0.0 0 P 0
+
+# P x y rotation P|N sym_num mirror
+# sym $1: r20 mils → 0.508 mm diameter
+# coords: 0.5,0.5 inches → 12.7,12.7 mm
+P 0.5 0.5 0 P 1 0
+
+# A x1 y1 xe ye xc yc cw [extra] P|N sym_num
+# Quarter-circle arc: start (1,0), end (0,1), center (0,0), CCW
+# sym $0: r10 mils → 0.254 mm width
+# coords in inches → multiply by 25.4 for mm
+A 1.0 0.0 0.0 1.0 0.0 0.0 N 0 P 0

@@ -1,0 +1,12 @@
+# ODB++ symbol table fixture — INCH units
+# Symbol dimensions are in mils (1/1000 inch); multiply by 0.0254 to get mm.
+$0 r254
+$1 s700
+$2 oval550x1650
+$3 oval550x1650 M
+$4 rect2720x1230
+$5 rect550x800xr49.5
+$6 donut_r78.74x27.559
+$7 moire
+$8 thermal
+$9 sc_join0201_hd
