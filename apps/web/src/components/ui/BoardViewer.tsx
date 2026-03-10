@@ -188,9 +188,12 @@ function drawCopper(
     }
   }
 
-  // Vias and drills — only render if at least one layer is visible
-  const anyLayerVisible = boardData?.layers?.some(l => !hiddenLayers.has(l.name)) ?? true
-  if (!anyLayerVisible) return
+  // Vias and drills — only render when copper or drill layers are visible
+  const allLayers = boardData?.layers ?? []
+  const anyCopperVisible = allLayers.some(
+    l => !hiddenLayers.has(l.name) && (l.type === 'COPPER' || l.type === 'DRILL')
+  )
+  if (!anyCopperVisible) return
 
   // Vias
   const MAX_VIA_MM = 15  // cap to guard against parser unit artifacts

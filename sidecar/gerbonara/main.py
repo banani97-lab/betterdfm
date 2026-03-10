@@ -949,9 +949,11 @@ def parse_odb(file_path: str) -> BoardData:
             rout_feat = layers_dir / "rout" / "features"
             if rout_feat.exists():
                 layers.append(Layer(name="rout", type="OUTLINE"))
+                # _parse_rout extracts drill hits (P records) as Drill entries.
+                # Do NOT call _parse_features here — it would add those same P records
+                # as Pad entries (double-count), and rout L records are board-cut paths
+                # that don't belong in the copper trace list.
                 _parse_rout(rout_feat, units, drills)
-                _parse_features(rout_feat, "rout", "ROUT", units, traces, pads, vias,
-                                net_points=net_points, components=components)
                 logger.info("ODB++ rout: %d drills", len(drills))
 
     except Exception as e:
