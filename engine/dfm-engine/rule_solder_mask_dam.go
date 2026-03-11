@@ -16,7 +16,10 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 	if profile.MinSolderMaskDamMM <= 0 {
 		return violations
 	}
-	const maxViol = 500
+	const (
+		maxViol    = 2000 // raised — dedup will collapse the final count
+		damCellMM  = 2.0
+	)
 
 	// Solder mask is only applied to the outer copper layers (top and bottom).
 	// Inner layers never have solder mask, so checking them produces false positives.
@@ -108,5 +111,5 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 			}
 		}
 	}
-	return violations
+	return dedupeViolations(violations, damCellMM)
 }

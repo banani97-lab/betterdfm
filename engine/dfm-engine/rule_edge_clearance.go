@@ -62,7 +62,10 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 			copperLayers[l.Name] = true
 		}
 	}
-	const maxViol = 500
+	const (
+		maxViol    = 2000 // raised — dedup will collapse the final count
+		edgeCellMM = 2.0
+	)
 	for _, trace := range board.Traces {
 		if len(violations) >= maxViol {
 			break
@@ -121,5 +124,5 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 			})
 		}
 	}
-	return violations
+	return dedupeViolations(violations, edgeCellMM)
 }

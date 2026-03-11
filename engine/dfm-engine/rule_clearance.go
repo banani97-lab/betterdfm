@@ -217,47 +217,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		}
 	}
 
-	return dedupeClearanceViolations(violations, clearanceCellMM)
-}
-
-// dedupeClearanceViolations collapses violations that fall in the same spatial
-// grid cell (per layer) into a single representative violation. The cell with
-// the worst (smallest) clearance is kept; Count records the raw pair count so
-// the user knows how widespread the problem is in that area.
-func dedupeClearanceViolations(violations []Violation, cellMM float64) []Violation {
-	type cellKey struct {
-		layer  string
-		cx, cy int
-	}
-
-	type cellBest struct {
-		v     Violation
-		count int
-	}
-
-	cells := make(map[cellKey]*cellBest, len(violations))
-	for _, v := range violations {
-		key := cellKey{
-			layer: v.Layer,
-			cx:    int(math.Floor(v.X / cellMM)),
-			cy:    int(math.Floor(v.Y / cellMM)),
-		}
-		if b, ok := cells[key]; !ok {
-			cells[key] = &cellBest{v: v, count: 1}
-		} else {
-			b.count++
-			if v.MeasuredMM < b.v.MeasuredMM {
-				b.v = v // keep worst-case clearance as the representative
-			}
-		}
-	}
-
-	result := make([]Violation, 0, len(cells))
-	for _, b := range cells {
-		b.v.Count = b.count
-		result = append(result, b.v)
-	}
-	return result
+	return dedupeViolations(violations, clearanceCellMM)
 }
 
 // ptToSegDist returns the minimum distance from point (px,py) to segment (ax,ay)-(bx,by).
