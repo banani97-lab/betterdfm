@@ -164,7 +164,12 @@ func ComputeScore(violations []Violation, outline []Point) ScoreResult {
 	byRuleCount := make(map[string]int)
 
 	for _, v := range violations {
-		p := ruleWeight(v.RuleID) * severityWeight(v.Severity) * marginMult(v)
+		// Count > 1 means this violation was spatially deduplicated and represents
+		// multiple raw pairs (e.g. copper-pour segments vs nearby pads). Use √count
+		// so severity grows with cluster size but with diminishing returns — the
+		// per-rule cap still prevents a single rule from dominating the score.
+		countScale := math.Sqrt(math.Max(1, float64(v.Count)))
+		p := ruleWeight(v.RuleID) * severityWeight(v.Severity) * marginMult(v) * countScale
 		byRule[v.RuleID] += p
 		byRuleCount[v.RuleID]++
 	}
