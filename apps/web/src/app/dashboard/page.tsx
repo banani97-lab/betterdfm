@@ -192,33 +192,33 @@ export default function DashboardPage() {
 
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
   const isCompact = settings.tableDensity === 'compact'
-  const rowPadding = settings.tableDensity === 'compact' ? 'py-3' : 'py-5'
+  const rowPadding = settings.tableDensity === 'compact' ? 'py-3 md:py-3' : 'py-4 md:py-5'
   const filenameSize = settings.tableDensity === 'compact' ? 'text-sm' : 'text-base'
   const tableCols = isCompact
-    ? 'grid-cols-[minmax(0,1.25fr)_112px_210px]'
-    : 'grid-cols-[minmax(0,1.6fr)_150px_260px]'
+    ? 'md:grid-cols-[minmax(0,1.25fr)_112px_210px]'
+    : 'md:grid-cols-[minmax(0,1.6fr)_150px_260px]'
   const rowSurfaceClass = isCompact
     ? 'bg-background/30 hover:bg-muted/25'
     : 'bg-background/12 hover:bg-background/18'
 
   return (
     <div className="min-h-screen">
-      <header className="group/taskbar bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
+      <header className="group/taskbar bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 md:gap-4 sticky top-0 z-30">
         <BetterDFMLogo className="shrink-0" />
-        <div className="flex items-center gap-2">
+        <div className="flex w-full md:w-auto flex-wrap md:flex-nowrap items-center justify-end gap-2">
           <ThemeToggle className="h-11 w-11" />
 
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
             onClick={() => setSettingsOpen(true)}
             aria-label="Open settings"
             title="Open settings"
           >
             <span className="flex items-center justify-center w-full">
-              <Cog className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
-              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+              <Cog className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
+              <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
                 Settings
               </span>
             </span>
@@ -227,14 +227,14 @@ export default function DashboardPage() {
           <Button
             variant="ghost"
             size="icon"
-            className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+            className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
             onClick={handleLogout}
             aria-label="Sign out"
             title="Sign out"
           >
             <span className="flex items-center justify-center w-full">
-              <LogOut className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
-              <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+              <LogOut className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
+              <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
                 Sign out
               </span>
             </span>
@@ -243,13 +243,13 @@ export default function DashboardPage() {
           <Link href="/upload">
             <Button
               size="icon"
-              className="h-11 w-11 overflow-hidden transition-all duration-300 group-hover/taskbar:w-32"
+              className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
               aria-label="Upload"
               title="Upload"
             >
               <span className="flex items-center justify-center w-full">
-                <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 group-hover/taskbar:-translate-x-0.5" />
-                <span className="whitespace-nowrap max-w-0 opacity-0 overflow-hidden transition-all duration-300 group-hover/taskbar:max-w-20 group-hover/taskbar:opacity-100 group-hover/taskbar:ml-2">
+                <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
+                <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
                   Upload
                 </span>
               </span>
@@ -258,7 +258,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4' : 'max-w-7xl px-6')}>
+      <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4 sm:px-5' : 'max-w-7xl px-4 sm:px-6')}>
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Submissions</h1>
@@ -294,7 +294,7 @@ export default function DashboardPage() {
           <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
             <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/20 via-transparent to-primary/15" />
             <div className={cn('relative border-b border-border/70', isCompact ? 'px-4 py-3' : 'px-6 py-4')}>
-              <div className={cn('grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
+              <div className={cn('hidden md:grid items-center', tableCols, isCompact ? 'gap-3' : 'gap-4')}>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Filename</p>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground">Score</p>
                 <p className="text-xs uppercase tracking-[0.16em] font-semibold text-muted-foreground text-right">Actions</p>
@@ -306,7 +306,7 @@ export default function DashboardPage() {
                 <li
                   key={s.id}
                   className={cn(
-                    'grid items-center rounded-2xl border border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
+                    'grid grid-cols-1 md:items-center rounded-2xl border border-border/70 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg',
                     rowSurfaceClass,
                     tableCols,
                     isCompact ? 'gap-3 px-3' : 'gap-4 px-4',
@@ -314,10 +314,11 @@ export default function DashboardPage() {
                   )}
                 >
                   <div className="min-w-0">
-                    <p className={cn('font-mono truncate font-medium text-foreground', filenameSize)}>{s.filename}</p>
+                    <p className={cn('font-mono font-medium text-foreground break-all leading-snug md:truncate', filenameSize)}>{s.filename}</p>
                   </div>
 
-                  <div>
+                  <div className="flex items-center justify-between md:block">
+                    <p className="text-sm font-medium text-muted-foreground md:hidden">Score</p>
                     {s.status === 'DONE' && s.mfgScore > 0 ? (
                       <div
                         className="inline-flex items-center rounded-md px-3 py-1.5 font-mono text-sm font-bold text-white"
@@ -331,11 +332,12 @@ export default function DashboardPage() {
                     )}
                   </div>
 
-                  <div className="flex justify-end items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-2 md:justify-end md:gap-3">
+                    <p className="text-sm font-medium text-muted-foreground md:hidden">Actions</p>
                     <Button
                       variant="outline"
                       size="icon"
-                      className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
+                      className={isCompact ? 'h-10 w-10 md:h-9 md:w-9' : 'h-11 w-11'}
                       onClick={() => setInfoSubmissionId(s.id)}
                       aria-label={`Show details for ${s.filename}`}
                       title="Show details"
@@ -346,7 +348,7 @@ export default function DashboardPage() {
                       <Button
                         variant="outline"
                         size="icon"
-                        className={isCompact ? 'h-9 w-9' : 'h-11 w-11'}
+                        className={isCompact ? 'h-10 w-10 md:h-9 md:w-9' : 'h-11 w-11'}
                         onClick={() => handleRetry(s.id)}
                         disabled={retrying.has(s.id)}
                         aria-label="Retry analysis"
@@ -357,16 +359,16 @@ export default function DashboardPage() {
                     )}
                     {s.status === 'DONE' && s.latestJobId && (
                       <Link href={`/results/${s.latestJobId}`}>
-                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
+                        <Button variant="outline" className={isCompact ? 'h-10 px-3 text-sm md:h-9 md:text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
                       </Link>
                     )}
                     {s.status === 'UPLOADED' && (
                       <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
-                        <Button variant="outline" className={isCompact ? 'h-9 px-3 text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
+                        <Button variant="outline" className={isCompact ? 'h-10 px-3 text-sm md:h-9 md:text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
                       </Link>
                     )}
                     {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
-                      <Badge variant="info" className={isCompact ? 'text-xs px-2.5 py-1' : 'text-sm px-3 py-1.5'}>{s.status}</Badge>
+                      <Badge variant="info" className={isCompact ? 'text-sm px-2.5 py-1.5 md:text-xs md:py-1' : 'text-sm px-3 py-1.5'}>{s.status}</Badge>
                     )}
                   </div>
                 </li>
