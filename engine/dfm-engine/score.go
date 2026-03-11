@@ -49,29 +49,30 @@ func severityWeight(sev string) float64 {
 	}
 }
 
-// marginMult returns a multiplier based on how far the violation is from the limit.
+// marginMult returns a proportional severity factor in [0, 1] based on how far
+// the measured value deviates from the limit, relative to the limit itself.
+//
+// Formula: √(excess) clamped to [0, 1], where:
+//   - "too small" violations (trace width, clearance, etc.): excess = (limit - measured) / limit
+//   - "too large" violations (aspect ratio): excess = (measured - limit) / limit
+//   - measured == 0 (feature entirely absent): hard 1.0
+//
+// Representative values:
+//
+//	 5% off limit → ~0.22   25% off → 0.50   100%+ off → 1.00
 func marginMult(v Violation) float64 {
-	if v.Unit == "ratio" {
-		// For ratios, measured > limit is always a violation; use same logic.
-		if v.LimitMM == 0 {
-			return 1.5
-		}
-		ratio := v.MeasuredMM / v.LimitMM
-		if ratio <= 0 {
-			return 1.5
-		}
-		if ratio < 0.5 {
-			return 1.25
-		}
+	if v.MeasuredMM == 0 || v.LimitMM == 0 {
 		return 1.0
 	}
-	if v.MeasuredMM == 0 {
-		return 1.5
+	var excess float64
+	if v.MeasuredMM > v.LimitMM {
+		// "too large" (e.g. aspect-ratio exceeds max)
+		excess = (v.MeasuredMM - v.LimitMM) / v.LimitMM
+	} else {
+		// "too small" (e.g. trace width below min)
+		excess = (v.LimitMM - v.MeasuredMM) / v.LimitMM
 	}
-	if v.LimitMM > 0 && v.MeasuredMM < 0.5*v.LimitMM {
-		return 1.25
-	}
-	return 1.0
+	return math.Min(math.Sqrt(excess), 1.0)
 }
 
 // ruleMaxContribution returns the maximum normalized penalty points a single rule

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sort"
 
+	dfmengine "github.com/betterdfm/dfm-engine"
 	"github.com/betterdfm/api/src/db"
 	"github.com/fogleman/gg"
 	"github.com/go-pdf/fpdf"
@@ -64,172 +65,26 @@ func scoreBarColor(score int) (int, int, int) {
 	}
 }
 
-// rptRuleWeight mirrors the engine scoring weights (inlined to avoid cross-module import).
-func rptRuleWeight(id string) float64 {
-	switch id {
-	case "clearance":
-		return 3.0
-	case "trace-width":
-		return 2.5
-	case "annular-ring":
-		return 2.5
-	case "drill-size":
-		return 2.0
-	case "aspect-ratio":
-		return 1.5
-	case "edge-clearance":
-		return 1.5
-	case "solder-mask-dam":
-		return 1.0
-	default:
-		return 1.0
-	}
-}
-
-func rptSeverityWeight(sev string) float64 {
-	switch sev {
-	case "ERROR":
-		return 10.0
-	case "WARNING":
-		return 3.0
-	case "INFO":
-		return 0.5
-	default:
-		return 1.0
-	}
-}
-
-func rptRuleMaxContribution(id string) float64 {
-	switch id {
-	case "clearance":
-		return 35.0
-	case "trace-width":
-		return 30.0
-	case "annular-ring":
-		return 20.0
-	case "drill-size":
-		return 15.0
-	case "aspect-ratio":
-		return 10.0
-	case "edge-clearance":
-		return 10.0
-	case "solder-mask-dam":
-		return 10.0
-	default:
-		return 10.0
-	}
-}
-
-func rptMarginMult(v db.Violation) float64 {
-	if v.Unit == "ratio" {
-		if v.LimitMM == 0 {
-			return 1.5
+// computeReportScore converts DB violations + board outline to engine types and
+// delegates scoring to dfmengine.ComputeScore — the single source of truth.
+func computeReportScore(violations []db.Violation, board rptBoardData) dfmengine.ScoreResult {
+	evs := make([]dfmengine.Violation, len(violations))
+	for i, v := range violations {
+		evs[i] = dfmengine.Violation{
+			RuleID:     v.RuleID,
+			Severity:   v.Severity,
+			MeasuredMM: v.MeasuredMM,
+			LimitMM:    v.LimitMM,
+			Unit:       v.Unit,
 		}
-		ratio := v.MeasuredMM / v.LimitMM
-		if ratio <= 0 {
-			return 1.5
-		}
-		if ratio < 0.5 {
-			return 1.25
-		}
-		return 1.0
-	}
-	if v.MeasuredMM == 0 {
-		return 1.5
-	}
-	if v.LimitMM > 0 && v.MeasuredMM < 0.5*v.LimitMM {
-		return 1.25
-	}
-	return 1.0
-}
-
-type reportScoreResult struct {
-	score            int
-	grade            string
-	verdict          string
-	byRule           map[string]float64
-	byRuleCount      map[string]int
-	areaCM2          float64
-	violationDensity float64
-}
-
-// computeReportScore replicates the engine scoring formula inline.
-func computeReportScore(violations []db.Violation, board rptBoardData) reportScoreResult {
-	byRule := make(map[string]float64)
-	byRuleCount := make(map[string]int)
-
-	for _, v := range violations {
-		p := rptRuleWeight(v.RuleID) * rptSeverityWeight(v.Severity) * rptMarginMult(v)
-		byRule[v.RuleID] += p
-		byRuleCount[v.RuleID]++
 	}
 
-	// Bounding box from outline
-	var bboxW, bboxH float64
-	if len(board.Outline) > 0 {
-		minX, minY := board.Outline[0].X, board.Outline[0].Y
-		maxX, maxY := board.Outline[0].X, board.Outline[0].Y
-		for _, p := range board.Outline[1:] {
-			if p.X < minX {
-				minX = p.X
-			}
-			if p.X > maxX {
-				maxX = p.X
-			}
-			if p.Y < minY {
-				minY = p.Y
-			}
-			if p.Y > maxY {
-				maxY = p.Y
-			}
-		}
-		bboxW = maxX - minX
-		bboxH = maxY - minY
-	}
-	areaCM2 := bboxW * bboxH / 100.0
-	areaFactor := math.Sqrt(math.Max(1.0, areaCM2))
-
-	var pNorm float64
-	for ruleID, rawPenalty := range byRule {
-		rawNorm := rawPenalty / areaFactor
-		cap := rptRuleMaxContribution(ruleID)
-		if rawNorm > cap {
-			rawNorm = cap
-		}
-		pNorm += rawNorm
+	outline := make([]dfmengine.Point, len(board.Outline))
+	for i, p := range board.Outline {
+		outline[i] = dfmengine.Point{X: p.X, Y: p.Y}
 	}
 
-	rawScore := 100.0 - pNorm
-	score := int(math.Round(math.Max(0, math.Min(100, rawScore))))
-
-	density := 0.0
-	if areaCM2 > 0 {
-		density = float64(len(violations)) / areaCM2
-	}
-
-	var grade, verdict string
-	switch {
-	case score >= 90:
-		grade, verdict = "A", "Production Ready — no significant issues"
-	case score >= 75:
-		grade, verdict = "B", "Minor Issues — review recommended before submission"
-	case score >= 60:
-		grade, verdict = "C", "Moderate Issues — rework required"
-	case score >= 40:
-		grade, verdict = "D", "Significant Issues — major redesign required"
-	default:
-		grade, verdict = "F", "Not Manufacturable — critical failures present"
-	}
-
-	return reportScoreResult{
-		score:            score,
-		grade:            grade,
-		verdict:          verdict,
-		byRule:           byRule,
-		byRuleCount:      byRuleCount,
-		areaCM2:          areaCM2,
-		violationDensity: density,
-	}
+	return dfmengine.ComputeScore(evs, outline)
 }
 
 // renderBoardImage draws board outline + violation dots and returns a PNG blob.
@@ -438,8 +293,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	const barH = 10.0
 	barX := 10.0
 	barY := f.GetY()
-	fillW := barW * float64(sr.score) / 100.0
-	sr1, sg1, sb1 := scoreBarColor(sr.score)
+	fillW := barW * float64(sr.Score) / 100.0
+	sr1, sg1, sb1 := scoreBarColor(sr.Score)
 	f.SetFillColor(sr1, sg1, sb1)
 	f.Rect(barX, barY, fillW, barH, "F")
 	f.SetFillColor(220, 220, 220)
@@ -449,17 +304,17 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.SetXY(10, barY+barH+2)
 	f.SetFont("Arial", "B", 10)
 	f.SetTextColor(40, 40, 40)
-	f.CellFormat(barW, 6, fmt.Sprintf("%d / 100", sr.score), "", 1, "L", false, 0, "")
+	f.CellFormat(barW, 6, fmt.Sprintf("%d / 100", sr.Score), "", 1, "L", false, 0, "")
 
 	// Grade letter (large)
 	f.SetX(10)
 	f.Ln(2)
 	f.SetFont("Arial", "B", 28)
 	f.SetTextColor(sr1, sg1, sb1)
-	f.CellFormat(20, 12, sr.grade, "", 0, "L", false, 0, "")
+	f.CellFormat(20, 12, sr.Grade, "", 0, "L", false, 0, "")
 	f.SetFont("Arial", "", 9)
 	f.SetTextColor(80, 80, 80)
-	f.CellFormat(colL-20, 12, tr(sr.verdict), "", 1, "L", false, 0, "")
+	f.CellFormat(colL-20, 12, tr(sr.Verdict), "", 1, "L", false, 0, "")
 
 	// Right column: design summary
 	f.SetXY(10+colL, sectionY)
@@ -476,8 +331,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		{"Warnings:", fmt.Sprintf("%d", warnCount)},
 		{"Info:", fmt.Sprintf("%d", infoCount)},
 		{"Acknowledged/Waived:", fmt.Sprintf("%d", len(ignoredViolations))},
-		{"Board Area:", fmt.Sprintf("%.1f cm\u00b2", sr.areaCM2)},
-		{"Violation Density:", fmt.Sprintf("%.1f /cm\u00b2", sr.violationDensity)},
+		{"Board Area:", fmt.Sprintf("%.1f cm\u00b2", sr.AreaCM2)},
+		{"Violation Density:", fmt.Sprintf("%.1f /cm\u00b2", sr.ViolationDensity)},
 	}
 	for _, row := range summaryRows {
 		f.SetX(10 + colL)
@@ -505,8 +360,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		count   int
 	}
 	var ruleEntries []ruleEntry
-	for id, penalty := range sr.byRule {
-		ruleEntries = append(ruleEntries, ruleEntry{id: id, penalty: penalty, count: sr.byRuleCount[id]})
+	for id, penalty := range sr.ByRule {
+		ruleEntries = append(ruleEntries, ruleEntry{id: id, penalty: penalty, count: sr.ByRuleCount[id]})
 	}
 	sort.Slice(ruleEntries, func(i, j int) bool {
 		return ruleEntries[i].penalty > ruleEntries[j].penalty
@@ -564,13 +419,13 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		"D": "significant",
 		"F": "critical",
 	}
-	gradeLabel := gradeLabels[sr.grade]
+	gradeLabel := gradeLabels[sr.Grade]
 	if gradeLabel == "" {
 		gradeLabel = "some"
 	}
 
 	var verdictText string
-	if sr.score >= 90 {
+	if sr.Score >= 90 {
 		verdictText = "This design meets all manufacturability requirements and is ready for fabrication submission."
 	} else if errCount > 0 {
 		topRule := ""
