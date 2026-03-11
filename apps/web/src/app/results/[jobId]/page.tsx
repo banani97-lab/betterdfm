@@ -205,7 +205,7 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="flex flex-col min-h-screen md:h-screen bg-background">
+    <div className="flex flex-col min-h-screen h-[100dvh] md:h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b px-4 py-3 md:px-6 md:py-5 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4 flex-shrink-0">
         <BetterDFMLogo className="shrink-0" />
@@ -269,7 +269,7 @@ export default function ResultsPage() {
             'order-2 bg-card overflow-hidden flex',
             collapseToBottom ? 'flex-col border-t border-border/80' : 'flex-row border-l border-border/80',
             collapseToBottom
-              ? (violationsOpen ? 'h-[28vh] min-h-40 max-h-[46vh]' : 'h-12')
+              ? (violationsOpen ? 'h-[22dvh] min-h-28 max-h-44' : 'h-10')
               : (violationsOpen ? 'w-[18.5rem] md:w-96' : 'w-12')
           )}
           aria-label="Violations panel"
@@ -278,7 +278,7 @@ export default function ResultsPage() {
             className={cn(
               'bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/75',
               collapseToBottom
-                ? 'h-12 px-3 border-b border-border/70 flex items-center justify-between'
+                ? 'h-10 px-3 border-b border-border/70 flex items-center justify-between'
                 : 'w-12 border-r border-border/70 flex flex-col items-center gap-2 py-2'
             )}
           >
