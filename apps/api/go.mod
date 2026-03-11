@@ -3,6 +3,7 @@ module github.com/betterdfm/api
 go 1.23
 
 require (
+	github.com/betterdfm/dfm-engine v0.0.0
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
@@ -55,3 +56,5 @@ require (
 	golang.org/x/time v0.5.0 // indirect
 	gorm.io/driver/mysql v1.4.7 // indirect
 )
+
+replace github.com/betterdfm/dfm-engine => ../../engine/dfm-engine

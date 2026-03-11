@@ -74,13 +74,13 @@ func (h *JobsHandler) UpdateViolation(c echo.Context) error {
 	_ = json.Unmarshal(job.BoardData, &board)
 
 	sr := computeReportScore(activeViolations, board)
-	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.score, "mfg_grade": sr.grade})
+	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":       v.ID,
 		"ignored":  body.Ignored,
-		"mfgScore": sr.score,
-		"mfgGrade": sr.grade,
+		"mfgScore": sr.Score,
+		"mfgGrade": sr.Grade,
 	})
 }
 
@@ -122,13 +122,13 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 	_ = json.Unmarshal(job.BoardData, &board)
 
 	sr := computeReportScore(activeViolations, board)
-	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.score, "mfg_grade": sr.grade})
+	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"layer":    body.Layer,
 		"ignored":  body.Ignored,
-		"mfgScore": sr.score,
-		"mfgGrade": sr.grade,
+		"mfgScore": sr.Score,
+		"mfgGrade": sr.Grade,
 	})
 }
 
