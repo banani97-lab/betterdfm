@@ -269,7 +269,7 @@ export default function ResultsPage() {
             'order-2 bg-card overflow-hidden flex',
             collapseToBottom ? 'flex-col border-t border-border/80' : 'flex-row border-l border-border/80',
             collapseToBottom
-              ? (violationsOpen ? 'h-[22dvh] min-h-28 max-h-44' : 'h-10')
+              ? (violationsOpen ? 'h-[44dvh] min-h-56 max-h-[68dvh]' : 'h-10')
               : (violationsOpen ? 'w-[18.5rem] md:w-96' : 'w-12')
           )}
           aria-label="Violations panel"
