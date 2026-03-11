@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Download, AlertCircle, AlertTriangle, Info } from 'lucide-react'
+import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, ListFilter } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, patchViolation, ignoreLayerViolations, type AnalysisJob, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
 import { BoardViewer } from '@/components/ui/BoardViewer'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { cn } from '@/lib/utils'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -30,6 +31,8 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set())
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ERROR')
+  const [isPortraitMobile, setIsPortraitMobile] = useState(false)
+  const [violationsOpen, setViolationsOpen] = useState(true)
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -114,6 +117,38 @@ export default function ResultsPage() {
     load()
   }, [jobId, router])
 
+  useEffect(() => {
+    const orientationQuery = window.matchMedia('(orientation: portrait)')
+    const mobileWidthQuery = window.matchMedia('(max-width: 900px)')
+    const update = () => setIsPortraitMobile(orientationQuery.matches && mobileWidthQuery.matches)
+
+    update()
+
+    if (orientationQuery.addEventListener) {
+      orientationQuery.addEventListener('change', update)
+      mobileWidthQuery.addEventListener('change', update)
+    } else {
+      orientationQuery.addListener(update)
+      mobileWidthQuery.addListener(update)
+    }
+    window.addEventListener('resize', update)
+
+    return () => {
+      if (orientationQuery.removeEventListener) {
+        orientationQuery.removeEventListener('change', update)
+        mobileWidthQuery.removeEventListener('change', update)
+      } else {
+        orientationQuery.removeListener(update)
+        mobileWidthQuery.removeListener(update)
+      }
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  useEffect(() => {
+    setViolationsOpen(!isPortraitMobile)
+  }, [isPortraitMobile])
+
   const downloadPDF = async () => {
     const token = getStoredToken()
     const res = await fetch(`${API_URL}/jobs/${jobId}/report.pdf`, {
@@ -149,6 +184,7 @@ export default function ResultsPage() {
   const errorCount = violations.filter((v) => v.severity === 'ERROR' && !v.ignored).length
   const warningCount = violations.filter((v) => v.severity === 'WARNING' && !v.ignored).length
   const infoCount = violations.filter((v) => v.severity === 'INFO' && !v.ignored).length
+  const collapseToBottom = isPortraitMobile
 
   if (loading) {
     return (
@@ -212,23 +248,9 @@ export default function ResultsPage() {
         </div>
       </header>
 
-      {/* Body: split panel */}
-      <div className="flex flex-1 flex-col md:flex-row overflow-auto md:overflow-hidden">
-        {/* Left: violation list */}
-        <div className="order-2 md:order-1 w-full md:w-96 md:flex-shrink-0 h-[34vh] min-h-40 md:h-auto border-t md:border-t-0 md:border-r bg-card overflow-hidden flex flex-col">
-          <ViolationList
-            violations={visibleViolations}
-            allViolations={layerFiltered}
-            selectedId={selectedId}
-            onSelect={(v) => setSelectedId(v.id)}
-            filter={severityFilter}
-            onFilterChange={setSeverityFilter}
-            onIgnore={handleIgnore}
-          />
-        </div>
-
-        {/* Right: board viewer */}
-        <div className="order-1 md:order-2 flex-1 min-h-[240px] md:min-h-0 p-2 sm:p-3 md:p-4 overflow-hidden">
+      {/* Body: board + collapsible issues panel */}
+      <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>
+        <div className={cn('order-1 flex-1 min-h-0 min-w-0 overflow-hidden', collapseToBottom ? 'p-2 sm:p-3' : 'p-2 sm:p-3 md:p-4')}>
           <BoardViewer
             violations={visibleViolations.filter((v) => !v.ignored)}
             boardData={boardData}
@@ -241,6 +263,69 @@ export default function ResultsPage() {
             onIgnoreLayer={handleIgnoreLayer}
           />
         </div>
+
+        <section
+          className={cn(
+            'order-2 bg-card overflow-hidden flex',
+            collapseToBottom ? 'flex-col border-t border-border/80' : 'flex-row border-l border-border/80',
+            collapseToBottom
+              ? (violationsOpen ? 'h-[28vh] min-h-40 max-h-[46vh]' : 'h-12')
+              : (violationsOpen ? 'w-[18.5rem] md:w-96' : 'w-12')
+          )}
+          aria-label="Violations panel"
+        >
+          <div
+            className={cn(
+              'bg-card/85 backdrop-blur supports-[backdrop-filter]:bg-card/75',
+              collapseToBottom
+                ? 'h-12 px-3 border-b border-border/70 flex items-center justify-between'
+                : 'w-12 border-r border-border/70 flex flex-col items-center gap-2 py-2'
+            )}
+          >
+            {collapseToBottom ? (
+              <div className="inline-flex items-center gap-2 text-sm font-medium text-foreground">
+                <ListFilter className="h-4 w-4 text-muted-foreground" />
+                Issues
+                <span className="text-xs text-muted-foreground">{layerFiltered.length}</span>
+              </div>
+            ) : (
+              <>
+                <ListFilter className="h-4 w-4 text-muted-foreground" />
+                <span className="[writing-mode:vertical-rl] rotate-180 text-[11px] tracking-wide uppercase text-muted-foreground select-none">
+                  Issues
+                </span>
+              </>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setViolationsOpen((v) => !v)}
+              aria-label={violationsOpen ? 'Collapse issues panel' : 'Expand issues panel'}
+              title={violationsOpen ? 'Collapse issues panel' : 'Expand issues panel'}
+              className="inline-flex items-center justify-center h-8 w-8 rounded-md border border-border/70 bg-background/70 text-foreground hover:bg-muted/60 transition-colors"
+            >
+              {collapseToBottom ? (
+                violationsOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />
+              ) : (
+                violationsOpen ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />
+              )}
+            </button>
+          </div>
+
+          {violationsOpen && (
+            <div className="flex-1 min-h-0 min-w-0">
+              <ViolationList
+                violations={visibleViolations}
+                allViolations={layerFiltered}
+                selectedId={selectedId}
+                onSelect={(v) => setSelectedId(v.id)}
+                filter={severityFilter}
+                onFilterChange={setSeverityFilter}
+                onIgnore={handleIgnore}
+              />
+            </div>
+          )}
+        </section>
       </div>
     </div>
   )

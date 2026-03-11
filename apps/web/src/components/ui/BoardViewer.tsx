@@ -953,7 +953,7 @@ export function BoardViewer({
       )}
 
       {/* Legend */}
-      <div className="absolute bottom-2 left-2 z-10 flex gap-3 bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-1.5">
+      <div className="absolute bottom-2 left-2 z-10 hidden md:flex gap-3 bg-black/60 backdrop-blur-sm border border-white/10 rounded-lg px-3 py-1.5">
         <div className="flex items-center gap-1.5">
           <svg width="14" height="14" viewBox="0 0 14 14">
             <polygon points="7,1 13,12 1,12" fill="none" stroke="#ff3333" strokeWidth="1.5" />
