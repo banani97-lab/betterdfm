@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react'
-import { ZoomIn, ZoomOut, Maximize2, Layers, Grid3X3 } from 'lucide-react'
+import { ZoomIn, ZoomOut, Home, Layers, Grid3X3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Violation, BoardData } from '@/lib/api'
 
@@ -503,6 +503,13 @@ export function BoardViewer({
   const zoomRef      = useRef(1)
   const panRef       = useRef({ x: 0, y: 0 })
   const lastMouseRef = useRef({ x: 0, y: 0 })
+  const lastTouchRef = useRef<{ x: number; y: number } | null>(null)
+  const pinchStartRef = useRef<{
+    distance: number
+    startZoom: number
+    startPan: { x: number; y: number }
+    startMid: { x: number; y: number }
+  } | null>(null)
   const draggingRef  = useRef(false)
   const hasInitRef   = useRef(false)
 
@@ -634,6 +641,107 @@ export function BoardViewer({
     return () => canvas.removeEventListener('wheel', handler)
   }, [draw])
 
+  // Touch gestures: one-finger pan and two-finger pinch zoom.
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+
+    const getTouchPoint = (touch: Touch) => {
+      const rect = canvas.getBoundingClientRect()
+      return { x: touch.clientX - rect.left, y: touch.clientY - rect.top }
+    }
+
+    const onTouchStart = (e: TouchEvent) => {
+      if (e.touches.length === 1) {
+        lastTouchRef.current = getTouchPoint(e.touches[0])
+        pinchStartRef.current = null
+        return
+      }
+      if (e.touches.length < 2) return
+
+      const p1 = getTouchPoint(e.touches[0])
+      const p2 = getTouchPoint(e.touches[1])
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+
+      pinchStartRef.current = {
+        distance: Math.max(1, dist),
+        startZoom: zoomRef.current,
+        startPan: { ...panRef.current },
+        startMid: mid,
+      }
+      lastTouchRef.current = null
+      e.preventDefault()
+    }
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (e.touches.length === 1 && !pinchStartRef.current) {
+        const point = getTouchPoint(e.touches[0])
+        const last = lastTouchRef.current
+        if (last) {
+          panRef.current = {
+            x: panRef.current.x + point.x - last.x,
+            y: panRef.current.y + point.y - last.y,
+          }
+          draw()
+        }
+        lastTouchRef.current = point
+        e.preventDefault()
+        return
+      }
+
+      if (e.touches.length < 2) return
+
+      const p1 = getTouchPoint(e.touches[0])
+      const p2 = getTouchPoint(e.touches[1])
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }
+      const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y)
+
+      const start = pinchStartRef.current ?? {
+        distance: Math.max(1, dist),
+        startZoom: zoomRef.current,
+        startPan: { ...panRef.current },
+        startMid: mid,
+      }
+      pinchStartRef.current = start
+
+      const nextZoom = Math.max(0.2, Math.min(20, start.startZoom * (dist / start.distance)))
+      const zoomRatio = nextZoom / start.startZoom
+      panRef.current = {
+        x: mid.x - (start.startMid.x - start.startPan.x) * zoomRatio,
+        y: mid.y - (start.startMid.y - start.startPan.y) * zoomRatio,
+      }
+      zoomRef.current = nextZoom
+      setZoomPct(Math.round(nextZoom * 100))
+      draw()
+      e.preventDefault()
+    }
+
+    const onTouchEnd = (e: TouchEvent) => {
+      if (e.touches.length === 0) {
+        lastTouchRef.current = null
+        pinchStartRef.current = null
+        return
+      }
+      if (e.touches.length === 1) {
+        lastTouchRef.current = getTouchPoint(e.touches[0])
+        pinchStartRef.current = null
+      }
+    }
+
+    canvas.addEventListener('touchstart', onTouchStart, { passive: false })
+    canvas.addEventListener('touchmove', onTouchMove, { passive: false })
+    canvas.addEventListener('touchend', onTouchEnd, { passive: false })
+    canvas.addEventListener('touchcancel', onTouchEnd, { passive: false })
+
+    return () => {
+      canvas.removeEventListener('touchstart', onTouchStart)
+      canvas.removeEventListener('touchmove', onTouchMove)
+      canvas.removeEventListener('touchend', onTouchEnd)
+      canvas.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [draw])
+
   // ── Zoom / reset controls ───────────────────────────────────────────────────
 
   const zoomBy = useCallback((factor: number) => {
@@ -738,15 +846,17 @@ export function BoardViewer({
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
         <span className="text-xs text-gray-500 font-mono px-1 select-none">{zoomPct}%</span>
         {[
-          { icon: <Layers className="h-4 w-4" />,   title: 'Layers',    onClick: () => setLayerPanelOpen(o => !o) },
-          { icon: <Grid3X3 className="h-4 w-4" />,  title: 'Grid',      onClick: () => setGridEnabled(g => !g) },
-          { icon: <ZoomIn className="h-4 w-4" />,   title: 'Zoom in',   onClick: () => zoomBy(1.3) },
-          { icon: <ZoomOut className="h-4 w-4" />,  title: 'Zoom out',  onClick: () => zoomBy(1 / 1.3) },
-          { icon: <Maximize2 className="h-4 w-4" />,title: 'Reset view',onClick: resetView },
-        ].map(({ icon, title, onClick }) => (
+          { icon: <Layers className="h-5 w-5" />, title: 'Layers', onClick: () => setLayerPanelOpen(o => !o), emphasize: true },
+          { icon: <Grid3X3 className="h-5 w-5" />, title: 'Grid', onClick: () => setGridEnabled(g => !g), emphasize: true },
+          { icon: <ZoomIn className="h-4 w-4" />, title: 'Zoom in', onClick: () => zoomBy(1.3), mobileHidden: true },
+          { icon: <ZoomOut className="h-4 w-4" />, title: 'Zoom out', onClick: () => zoomBy(1 / 1.3), mobileHidden: true },
+          { icon: <Home className="h-4 w-4" />, title: 'Reset view', onClick: resetView },
+        ].map(({ icon, title, onClick, emphasize, mobileHidden }) => (
           <button key={title} onClick={onClick} title={title}
             className={cn(
-              'p-1.5 rounded border transition-colors',
+              'inline-flex items-center justify-center rounded border transition-colors',
+              emphasize ? 'p-2' : 'p-1.5',
+              mobileHidden && 'hidden md:inline-flex',
               title === 'Grid' && gridEnabled
                 ? 'bg-green-900/60 border-green-500/40 text-green-400'
                 : 'bg-black/60 backdrop-blur-sm border-white/10 text-gray-400 hover:text-white hover:border-white/30',
@@ -876,7 +986,7 @@ export function BoardViewer({
       {/* Canvas viewport */}
       <div
         className={cn('flex-1 overflow-hidden', dragging ? 'cursor-grabbing' : 'cursor-crosshair')}
-        style={{ minHeight: 0 }}
+        style={{ minHeight: 0, touchAction: 'none' }}
         onMouseDown={onMouseDown}
         onMouseMove={onMouseMove}
         onMouseUp={onMouseUp}

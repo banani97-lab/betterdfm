@@ -169,9 +169,9 @@ export default function ResultsPage() {
   }
 
   return (
-    <div className="flex flex-col h-screen bg-background">
+    <div className="flex flex-col min-h-screen md:h-screen bg-background">
       {/* Header */}
-      <header className="bg-card border-b px-6 py-5 flex items-center gap-4 flex-shrink-0">
+      <header className="bg-card border-b px-4 py-3 md:px-6 md:py-5 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4 flex-shrink-0">
         <BetterDFMLogo className="shrink-0" />
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="min-w-0">
@@ -179,8 +179,16 @@ export default function ResultsPage() {
             <p className="text-xs text-muted-foreground font-mono truncate">{jobId}</p>
           </div>
         </div>
+        <div className="order-2 md:order-3 ml-auto flex items-center gap-2">
+          <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={exportCSV} disabled={violations.length === 0}>
+            <Download className="h-4 w-4 mr-1" />CSV
+          </Button>
+          <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={downloadPDF}>
+            <Download className="h-4 w-4 mr-1" />PDF
+          </Button>
+        </div>
         {/* Summary badges */}
-        <div className="flex items-center gap-2">
+        <div className="order-3 md:order-2 w-full md:w-auto flex items-center gap-2">
           <div className="flex items-center gap-1">
             <AlertCircle className="h-4 w-4 text-red-500" />
             <Badge variant="destructive">{errorCount}</Badge>
@@ -202,18 +210,12 @@ export default function ResultsPage() {
             </div>
           )}
         </div>
-        <Button variant="outline" size="lg" onClick={exportCSV} disabled={violations.length === 0}>
-          <Download className="h-4 w-4 mr-1" />CSV
-        </Button>
-        <Button variant="outline" size="lg" onClick={downloadPDF}>
-          <Download className="h-4 w-4 mr-1" />PDF
-        </Button>
       </header>
 
       {/* Body: split panel */}
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 flex-col md:flex-row overflow-auto md:overflow-hidden">
         {/* Left: violation list */}
-        <div className="w-96 flex-shrink-0 border-r bg-card overflow-hidden flex flex-col">
+        <div className="order-2 md:order-1 w-full md:w-96 md:flex-shrink-0 h-[34vh] min-h-40 md:h-auto border-t md:border-t-0 md:border-r bg-card overflow-hidden flex flex-col">
           <ViolationList
             violations={visibleViolations}
             allViolations={layerFiltered}
@@ -226,7 +228,7 @@ export default function ResultsPage() {
         </div>
 
         {/* Right: board viewer */}
-        <div className="flex-1 p-4 overflow-hidden">
+        <div className="order-1 md:order-2 flex-1 min-h-[240px] md:min-h-0 p-2 sm:p-3 md:p-4 overflow-hidden">
           <BoardViewer
             violations={visibleViolations.filter((v) => !v.ignored)}
             boardData={boardData}
