@@ -192,6 +192,9 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                       {v.severity}
                     </Badge>
                     <span className="text-xs font-mono text-muted-foreground">{v.ruleId}</span>
+                    {v.count > 1 && (
+                      <span className="text-xs font-mono text-muted-foreground" title={`${v.count} affected pairs in this area`}>×{v.count}</span>
+                    )}
                     {v.ignored && (
                       <span className="text-xs text-muted-foreground italic">ignored</span>
                     )}
