@@ -1,12 +1,22 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import { AlertCircle, AlertTriangle, Info } from 'lucide-react'
 import { Badge } from './badge'
 import { cn } from '@/lib/utils'
 import type { Violation } from '@/lib/api'
 
 export type SeverityFilter = 'ERROR' | 'WARNING' | 'INFO' | 'NONE'
+
+const RULE_LABELS: Record<string, string> = {
+  'annular-ring':    'Annular Ring',
+  'aspect-ratio':    'Aspect Ratio',
+  'clearance':       'Clearance',
+  'drill-size':      'Drill Size',
+  'edge-clearance':  'Edge Clearance',
+  'solder-mask-dam': 'Solder Mask',
+  'trace-width':     'Trace Width',
+}
 
 interface ViolationListProps {
   violations: Violation[]
@@ -33,6 +43,7 @@ const severityBadgeVariant: Record<string, 'destructive' | 'warning' | 'info'> =
 export function ViolationList({ violations, allViolations, selectedId, onSelect, filter, onFilterChange, onIgnore }: ViolationListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const [showIgnored, setShowIgnored] = useState(false)
+  const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!selectedId || !listRef.current) return
@@ -49,12 +60,40 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
 
   const ignoredCount = allViolations.filter((v) => v.ignored).length
 
-  // When showIgnored is off, hide ignored violations from the list
-  const displayViolations = violations.filter((v) => showIgnored || !v.ignored)
+  // Rule IDs present in the current severity view (allViolations before severity split)
+  const availableRules = useMemo(() => {
+    const ids = new Set<string>()
+    for (const v of allViolations) ids.add(v.ruleId)
+    return Array.from(ids).sort()
+  }, [allViolations])
+
+  // Count per rule among the currently severity-filtered violations (non-ignored)
+  const ruleCounts = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const v of violations) {
+      if (!v.ignored) m.set(v.ruleId, (m.get(v.ruleId) ?? 0) + 1)
+    }
+    return m
+  }, [violations])
+
+  const toggleRule = (ruleId: string) => {
+    setRuleFilter((prev) => {
+      const next = new Set(prev)
+      if (next.has(ruleId)) next.delete(ruleId); else next.add(ruleId)
+      return next
+    })
+  }
+
+  // Apply rule filter then ignored filter
+  const displayViolations = violations.filter((v) => {
+    if (!showIgnored && v.ignored) return false
+    if (ruleFilter.size > 0 && !ruleFilter.has(v.ruleId)) return false
+    return true
+  })
 
   return (
     <div className="flex flex-col h-full">
-      {/* Filter tabs */}
+      {/* Severity filter tabs */}
       <div className="flex gap-1 p-2 border-b bg-muted/40 flex-shrink-0 flex-wrap">
         {(['ERROR', 'WARNING', 'INFO', 'NONE'] as SeverityFilter[]).map((f) => (
           <button
@@ -82,6 +121,42 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
           </button>
         )}
       </div>
+
+      {/* Rule type filter pills */}
+      {availableRules.length > 1 && filter !== 'NONE' && (
+        <div className="flex gap-1 px-2 py-1.5 border-b bg-muted/20 flex-shrink-0 flex-wrap">
+          {availableRules.map((ruleId) => {
+            const active = ruleFilter.size === 0 || ruleFilter.has(ruleId)
+            const count = ruleCounts.get(ruleId) ?? 0
+            return (
+              <button
+                key={ruleId}
+                onClick={() => toggleRule(ruleId)}
+                title={ruleFilter.size === 0 ? `Filter to ${ruleId} only` : ruleFilter.has(ruleId) ? `Remove ${ruleId} filter` : `Add ${ruleId} to filter`}
+                className={cn(
+                  'px-2 py-0.5 rounded-full text-xs transition-colors border',
+                  active
+                    ? 'bg-card border-border text-foreground'
+                    : 'bg-transparent border-transparent text-muted-foreground/50 hover:text-muted-foreground'
+                )}
+              >
+                {RULE_LABELS[ruleId] ?? ruleId}
+                <span className={cn('ml-1', active ? 'text-muted-foreground' : 'text-muted-foreground/40')}>
+                  ({count})
+                </span>
+              </button>
+            )
+          })}
+          {ruleFilter.size > 0 && (
+            <button
+              onClick={() => setRuleFilter(new Set())}
+              className="ml-auto px-2 py-0.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              clear
+            </button>
+          )}
+        </div>
+      )}
 
       {/* List */}
       <div ref={listRef} className="flex-1 overflow-y-auto divide-y">
