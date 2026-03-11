@@ -664,6 +664,8 @@ def _arc_segments(
 
 
 _VIA_ROUND_RE = re.compile(r"D([0-9.]+)H([0-9.]+)", re.IGNORECASE)
+# Allegro-style: "via0.100_round0.275" or "microvia0.100_round0.275" (values in mm)
+_VIA_ALLEGRO_RE = re.compile(r"(?:microvia|via)([0-9.]+)_round([0-9.]+)", re.IGNORECASE)
 
 
 def _parse_attr_tables(lines: list[str]) -> tuple[dict[int, str], dict[int, str]]:
@@ -690,32 +692,47 @@ def _parse_attr_tables(lines: list[str]) -> tuple[dict[int, str], dict[int, str]
     return names, values
 
 
-def _via_outer_mm(attr_str: str, drill_attr_idx: int,
-                  attr_values: dict[int, str], units: str) -> float | None:
-    """Extract the outer pad diameter (mm) from a drill P record's attribute string.
+def _via_geometry_mm(
+    attr_str: str, attr_values: dict[int, str], units: str
+) -> tuple[float, float] | None:
+    """Extract (outer_mm, hole_mm) from a drill P record's attribute string.
 
-    ODB++ drill layers encode via geometry in feature attributes, e.g.:
-        @1 .drill
-        &0 VIA_RoundD660.4000H355.6000C1371.6000
-        P x y rot P sym mirror;1=0,...
+    Scans all attribute value references in the record, checking each against
+    known via-geometry encodings:
 
-    The '.drill' attribute value 'VIA_RoundD<D>H<H>...' contains:
-        D = outer pad diameter in 1/1000 design units (microns for MM boards)
-        H = hole/drill diameter (same as the symbol size)
-    Returns None if the attribute is absent or the value doesn't match the pattern.
+      1. Cadence/IPC format: 'VIA_RoundD<D>H<H>C<C>'
+           D = outer pad diameter in 1/1000 design units (µm for MM boards, mils for INCH)
+           H = hole/drill diameter (same units)
+      2. Allegro format: 'via<H>_round<D>' or 'microvia<H>_round<D>'
+           H = hole diameter in mm, D = outer pad diameter in mm (always mm)
+      3. Allegro extended format: 'hole<H>_round<D>_p_...'
+           H = hole in mm, D = outer pad in mm (plated hole with paste/soldermask info)
+
+    Returns (outer_mm, hole_mm) or None if no known via pattern found.
     """
     for segment in attr_str.split(";"):
         for pair in segment.split(","):
             if "=" not in pair:
                 continue
             try:
-                k_str, v_str = pair.strip().split("=", 1)
-                if int(k_str) != drill_attr_idx:
-                    continue
+                _k_str, v_str = pair.strip().split("=", 1)
                 value_text = attr_values.get(int(v_str), "")
+                if not value_text:
+                    continue
+                # Try Cadence/IPC format: VIA_RoundD<outer_units>H<hole_units>
                 m = _VIA_ROUND_RE.search(value_text)
                 if m:
-                    return _sym_to_mm(float(m.group(1)), units)
+                    outer = _sym_to_mm(float(m.group(1)), units)
+                    hole = _sym_to_mm(float(m.group(2)), units)
+                    return (outer, hole)
+                # Try Allegro format: via<hole_mm>_round<outer_mm>
+                m2 = _VIA_ALLEGRO_RE.match(value_text)
+                if m2:
+                    return (float(m2.group(2)), float(m2.group(1)))
+                # Try Allegro extended: hole<hole_mm>_round<outer_mm>_p_...
+                m3 = re.match(r"hole([0-9.]+)_round([0-9.]+)_p", value_text, re.IGNORECASE)
+                if m3:
+                    return (float(m3.group(2)), float(m3.group(1)))
             except (ValueError, IndexError):
                 pass
     return None
@@ -774,7 +791,6 @@ def _build_features(
     pads: list,
     vias: list,
     warnings: list[str] | None = None,
-    drill_attr_idx: int | None = None,
     drill_attr_values: dict | None = None,
 ) -> None:
     """Build geometry from a token list produced by _tokenize_features.
@@ -784,20 +800,41 @@ def _build_features(
     in_surface = False
     in_island = False
     surface_pts: list[tuple[float, float]] = []
+    surface_sym_num: int = -1  # symbol number from S record, or -1 if absent
 
     def _flush_island() -> None:
-        if ltype not in ("POWER_GROUND", "COPPER") or len(surface_pts) < 2:
+        if len(surface_pts) < 2:
             return
-        for i in range(len(surface_pts) - 1):
-            x1, y1 = surface_pts[i]
-            x2, y2 = surface_pts[i + 1]
+        if ltype in ("COPPER", "POWER_GROUND"):
+            for i in range(len(surface_pts) - 1):
+                x1, y1 = surface_pts[i]
+                x2, y2 = surface_pts[i + 1]
+                traces.append(Trace(layer=layer_name, widthMM=0.05,
+                                    startX=x1, startY=y1, endX=x2, endY=y2))
+            # Close polygon
+            x1, y1 = surface_pts[-1]
+            x2, y2 = surface_pts[0]
             traces.append(Trace(layer=layer_name, widthMM=0.05,
                                 startX=x1, startY=y1, endX=x2, endY=y2))
-        # Close polygon
-        x1, y1 = surface_pts[-1]
-        x2, y2 = surface_pts[0]
-        traces.append(Trace(layer=layer_name, widthMM=0.05,
-                            startX=x1, startY=y1, endX=x2, endY=y2))
+        elif ltype in ("SOLDER_MASK", "SILK"):
+            # Surface polygons on mask/paste/silk layers are pad apertures —
+            # convert the polygon bounding box to a Pad at its centroid.
+            xs = [p[0] for p in surface_pts]
+            ys = [p[1] for p in surface_pts]
+            cx = (min(xs) + max(xs)) / 2
+            cy = (min(ys) + max(ys)) / 2
+            w = max(0.01, max(xs) - min(xs))
+            h = max(0.01, max(ys) - min(ys))
+            # On solder mask layers (not paste), large polygons are compound
+            # IC package areas (entire footprint merged into one polygon) —
+            # not individual pad openings. Skip them to avoid huge bounding-box
+            # RECTs obscuring the board. Paste apertures are always individual.
+            is_paste = "paste" in layer_name.lower()
+            if not is_paste and (w > 2.0 or h > 2.0):
+                return  # compound solder mask region — skip
+            pads.append(Pad(layer=layer_name, x=cx, y=cy,
+                            widthMM=w, heightMM=h, shape="RECT",
+                            netName="", refDes=""))
 
     for token in tokens:
         if token["type"] in ("skip", "$"):
@@ -812,6 +849,11 @@ def _build_features(
             in_surface = True
             in_island = False
             surface_pts = []
+            # S polarity [sym_num] [mirror]  — track sym for future use
+            try:
+                surface_sym_num = int(parts[2]) if len(parts) >= 3 else -1
+            except (ValueError, IndexError):
+                surface_sym_num = -1
             continue
 
         if rec == "SE":
@@ -889,18 +931,21 @@ def _build_features(
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
                     hole_diam = max(0.01, sym["w"])
-                    # Try to extract outer pad diameter from the .drill feature attribute.
+                    # Try to extract outer pad and hole diameters from feature attributes.
                     # Many EDA tools (Cadence/Allegro) encode via geometry as:
-                    #   &N VIA_RoundD<outer_µm>H<hole_µm>C<clearance_µm>
+                    #   &N VIA_RoundD<outer_µm>H<hole_µm>  or  via<hole_mm>_round<outer_mm>
+                    # Use attribute-derived dimensions when available (more accurate than symbol).
                     # If present, create a Via (needed for annular-ring DFM check).
                     # Always also create a Drill so drill-size / aspect-ratio rules fire.
-                    outer = None
-                    if plated and drill_attr_idx is not None and drill_attr_values:
-                        outer = _via_outer_mm(token["attrs"], drill_attr_idx,
-                                              drill_attr_values, units)
-                    if outer and outer > hole_diam:
-                        vias.append(Via(x=x, y=y, outerDiamMM=outer,
-                                        drillDiamMM=hole_diam, netName=net))
+                    geom = None
+                    if plated and drill_attr_values:
+                        geom = _via_geometry_mm(token["attrs"], drill_attr_values, units)
+                    if geom:
+                        outer, attr_hole = geom
+                        hole_diam = max(0.01, attr_hole)  # prefer attribute-derived hole size
+                        if outer > hole_diam:
+                            vias.append(Via(x=x, y=y, outerDiamMM=outer,
+                                            drillDiamMM=hole_diam, netName=net))
                     drills.append(Drill(x=x, y=y, diamMM=hole_diam, plated=plated))
                 elif ltype == "POWER_GROUND" and sym["shape"] == "DONUT":
                     pass  # anti-pads in copper planes are not real vias — skip
@@ -982,20 +1027,16 @@ def _parse_features(
     tokens = _tokenize_features(lines)
 
     # For DRILL layers, parse attribute tables so via outer diameters can be
-    # extracted from the .drill feature attribute (VIA_RoundD<outer>H<hole>...).
-    drill_attr_idx: int | None = None
+    # extracted from feature attributes (supports Cadence VIA_Round and Allegro
+    # via/microvia formats). We scan all attribute values rather than requiring
+    # a specific attribute index.
     attr_values: dict[int, str] = {}
     if ltype == "DRILL":
-        attr_names, attr_values = _parse_attr_tables(lines)
-        for idx, name in attr_names.items():
-            if name == ".drill":
-                drill_attr_idx = idx
-                break
+        _attr_names, attr_values = _parse_attr_tables(lines)
 
     _build_features(tokens, layer_name, ltype, units, symbols,
                     net_points, components, drills, traces, pads, vias,
                     warnings=warnings,
-                    drill_attr_idx=drill_attr_idx,
                     drill_attr_values=attr_values)
 
 
@@ -1174,65 +1215,6 @@ def _extract_odb_archive(file_path: str, tmpdir: str) -> None:
         tf.extractall(tmpdir)
 
 
-def _synthesize_vias_from_drills(
-    drills: list,
-    pads: list,
-    vias: list,
-    copper_layer_names: set,
-    tol: float = 0.15,
-) -> None:
-    """Synthesize Via entries by spatially correlating plated drills with copper pads.
-
-    Many EDA tools (Cadence, Allegro, Zuken) represent vias as:
-      - P record in a drill layer  → Drill entry (the hole)
-      - P record on each copper layer → Pad entry (the annular ring)
-    rather than using donut_r symbols.  This pass finds the nearest copper pad
-    for each plated drill and creates a Via that the DFM annular-ring rule needs.
-
-    Only runs when vias is empty — boards using donut_r symbols already populate
-    vias during feature parsing and do not need this pass.
-    """
-    if vias:
-        return  # already populated via donut_r symbols
-
-    # Only consider pads on copper layers for the annular-ring outer diameter.
-    # Mask/silk pads have different (usually larger) openings that would give
-    # incorrect annular-ring measurements.
-    copper_pads = [
-        (p.x, p.y, max(p.widthMM, p.heightMM), p.netName)
-        for p in pads if p.layer in copper_layer_names
-    ]
-    if not copper_pads:
-        # Fallback if layer-type info is unavailable: match against all pads.
-        copper_pads = [(p.x, p.y, max(p.widthMM, p.heightMM), p.netName) for p in pads]
-
-    tol2 = tol * tol
-    matched = 0
-    for drill in drills:
-        if not drill.plated:
-            continue
-        best: tuple | None = None
-        best_d2 = tol2
-        for px, py, outer, net in copper_pads:
-            d2 = (drill.x - px) ** 2 + (drill.y - py) ** 2
-            if d2 < best_d2:
-                best_d2 = d2
-                best = (px, py, outer, net)
-        if best is None:
-            continue
-        outer = best[2]
-        if outer <= drill.diamMM:
-            # Outer pad smaller than drill — data inconsistency; skip.
-            continue
-        vias.append(Via(
-            x=drill.x, y=drill.y,
-            outerDiamMM=outer,
-            drillDiamMM=drill.diamMM,
-            netName=best[3],
-        ))
-        matched += 1
-    logger.debug("Via synthesis: matched %d of %d plated drills to copper pads", matched, sum(1 for d in drills if d.plated))
-
 
 def _find_job_root(tmp: Path) -> Path:
     """Find the ODB++ job root directory by looking for matrix/matrix inside the archive.
@@ -1378,11 +1360,7 @@ def parse_odb(file_path: str) -> BoardData:
                 _parse_rout(rout_feat, units, drills)
                 logger.info("ODB++ rout: %d drills", len(drills))
 
-            # Synthesize Via entries from plated drills + copper pads for boards
-            # that don't use donut_r symbols (Cadence/Allegro/Zuken exports).
-            copper_names = {l.name for l in layers if l.type in ("COPPER", "POWER_GROUND")}
-            _synthesize_vias_from_drills(drills, pads, vias, copper_names)
-            logger.info("ODB++ vias (post-synthesis): %d", len(vias))
+            logger.info("ODB++ vias: %d", len(vias))
 
     except Exception as e:
         logger.error("ODB++ parse failed: %s", e, exc_info=True)

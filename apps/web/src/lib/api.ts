@@ -63,6 +63,7 @@ export interface BoardData {
   drills: BoardDrill[]
   outline: Array<{ x: number; y: number }>
   boardThicknessMM: number
+  warnings?: string[]
 }
 
 export interface ProfileRules {

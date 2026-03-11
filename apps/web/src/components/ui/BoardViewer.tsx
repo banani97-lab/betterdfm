@@ -181,6 +181,8 @@ function drawCopper(
       ctx.beginPath()
       if (p.shape === 'RECT') {
         ctx.rect(cx - w / 2, cy - h / 2, w, h)
+      } else if (p.shape === 'OVAL' && Math.abs(w - h) > 1) {
+        ctx.ellipse(cx, cy, Math.max(1, w / 2), Math.max(1, h / 2), 0, 0, Math.PI * 2)
       } else {
         ctx.arc(cx, cy, Math.max(1, Math.max(w, h) / 2), 0, Math.PI * 2)
       }
@@ -263,6 +265,8 @@ function drawSoldermask(
       ctx.beginPath()
       if (p.shape === 'RECT') {
         ctx.rect(cx - w / 2, cy - h / 2, w, h)
+      } else if (p.shape === 'OVAL' && Math.abs(w - h) > 1) {
+        ctx.ellipse(cx, cy, Math.max(1, w / 2), Math.max(1, h / 2), 0, 0, Math.PI * 2)
       } else {
         ctx.arc(cx, cy, Math.max(1, Math.max(w, h) / 2), 0, Math.PI * 2)
       }
