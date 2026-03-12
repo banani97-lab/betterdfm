@@ -2,6 +2,7 @@ package routes
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 
 	"github.com/betterdfm/api/src/db"
@@ -23,7 +24,10 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 	id := c.Param("id")
 	var job db.AnalysisJob
 	if err := h.db.First(&job, "id = ?", id).Error; err != nil {
-		return echo.NewHTTPError(http.StatusNotFound, "job not found")
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "job not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 	return c.JSON(http.StatusOK, job)
 }
