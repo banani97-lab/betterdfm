@@ -1,7 +1,6 @@
 package dfmengine
 
 import (
-	"fmt"
 	"math"
 	"sort"
 )
@@ -17,8 +16,8 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 		return violations
 	}
 	const (
-		maxViol    = 2000 // raised — dedup will collapse the final count
-		damCellMM  = 2.0
+		maxViol   = 2000 // raised — dedup will collapse the final count
+		damCellMM = 2.0
 	)
 
 	// Solder mask is only applied to the outer copper layers (top and bottom).
@@ -86,12 +85,7 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 					continue
 				}
 				if edgeDist < minDam {
-					var msg string
-					if edgeDist < 0 {
-						msg = fmt.Sprintf("Solder mask openings overlap by %.4f mm — no dam exists between pads", -edgeDist)
-					} else {
-						msg = fmt.Sprintf("Solder mask dam %.4f mm is below minimum %.4f mm", edgeDist, minDam)
-					}
+					msg, sug := msgSolderMaskDamBelow(edgeDist, minDam)
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
 						Severity:   "WARNING",
@@ -99,7 +93,7 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 						X:          (a.p.X + b.p.X) / 2,
 						Y:          (a.p.Y + b.p.Y) / 2,
 						Message:    msg,
-						Suggestion: fmt.Sprintf("Increase pad spacing to achieve solder mask dam of at least %.4f mm.", minDam),
+						Suggestion: sug,
 						MeasuredMM: edgeDist,
 						LimitMM:    minDam,
 						Unit:       "mm",

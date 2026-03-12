@@ -1,7 +1,5 @@
 package dfmengine
 
-import "fmt"
-
 // TraceWidthRule checks that all traces meet the minimum width requirement.
 type TraceWidthRule struct{}
 
@@ -30,14 +28,15 @@ func (r *TraceWidthRule) Run(board BoardData, profile ProfileRules) []Violation 
 			continue
 		}
 		if trace.WidthMM > 0 && trace.WidthMM < profile.MinTraceWidthMM {
+			msg, sug := msgTraceWidthBelow(trace.WidthMM, profile.MinTraceWidthMM)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
 				Layer:      trace.Layer,
 				X:          trace.StartX,
 				Y:          trace.StartY,
-				Message:    fmt.Sprintf("Trace width %.4f mm is below minimum %.4f mm", trace.WidthMM, profile.MinTraceWidthMM),
-				Suggestion: fmt.Sprintf("Increase trace width to at least %.4f mm.", profile.MinTraceWidthMM),
+				Message:    msg,
+				Suggestion: sug,
 				MeasuredMM: trace.WidthMM,
 				LimitMM:    profile.MinTraceWidthMM,
 				Unit:       "mm",

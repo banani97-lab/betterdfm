@@ -68,32 +68,32 @@ func (w *Worker) Poll(ctx context.Context) {
 	}
 }
 
-// recoverStuckJobs snapshots PENDING job IDs at startup, then re-enqueues any that
-// are still PENDING after 5 minutes — recovering from silent SQS delivery failures.
+// recoverStuckJobs runs a repeating sweep every 10 minutes, re-enqueuing any PENDING
+// jobs older than 5 minutes — recovering from silent SQS delivery failures.
 func (w *Worker) recoverStuckJobs(ctx context.Context) {
-	// Snapshot jobs that were already PENDING when this worker started.
-	var initial []AnalysisJob
-	if err := w.db.Where("status = ?", "PENDING").Find(&initial).Error; err != nil {
-		log.Printf("[recovery] startup snapshot error: %v", err)
-		return
-	}
-	if len(initial) == 0 {
-		return
-	}
-	ids := make([]string, len(initial))
-	for i, j := range initial {
-		ids[i] = j.ID
-	}
-	log.Printf("[recovery] watching %d pre-existing PENDING jobs", len(ids))
-
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+	// Initial delay before the first sweep so the worker has time to start processing.
 	select {
 	case <-ctx.Done():
 		return
 	case <-time.After(5 * time.Minute):
 	}
+	w.doRecovery(ctx)
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			w.doRecovery(ctx)
+		}
+	}
+}
 
+func (w *Worker) doRecovery(ctx context.Context) {
+	staleThreshold := time.Now().Add(-5 * time.Minute)
 	var stuck []AnalysisJob
-	if err := w.db.Where("status = ? AND id IN ?", "PENDING", ids).Find(&stuck).Error; err != nil {
+	if err := w.db.Where("status = ? AND created_at < ?", "PENDING", staleThreshold).Find(&stuck).Error; err != nil {
 		log.Printf("[recovery] sweep query error: %v", err)
 		return
 	}

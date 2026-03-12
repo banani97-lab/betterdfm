@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import _parse_sym, _parse_symbol_table
+from parser_odb import _parse_sym, _parse_symbol_table
 
 FIXTURES = Path(__file__).parent / "fixtures"
 

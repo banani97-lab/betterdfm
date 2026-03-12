@@ -1,7 +1,6 @@
 package dfmengine
 
 import (
-	"fmt"
 	"math"
 	"sort"
 )
@@ -22,9 +21,9 @@ func (r *ClearanceRule) ID() string { return "clearance" }
 
 // traceBB is a trace with its precomputed bounding box.
 type traceBB struct {
-	t              Trace
-	minX, maxX     float64
-	minY, maxY     float64
+	t          Trace
+	minX, maxX float64
+	minY, maxY float64
 }
 
 func newTraceBB(t Trace) traceBB {
@@ -137,14 +136,15 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 					continue
 				}
 				if clearance < minC {
+					msg, sug := msgClearanceTraceTooClose(clearance, minC)
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
 						Severity:   "ERROR",
 						Layer:      layer,
 						X:          (a.t.StartX + a.t.EndX) / 2,
 						Y:          (a.t.StartY + a.t.EndY) / 2,
-						Message:    fmt.Sprintf("Trace-to-trace clearance %.4f mm is below minimum %.4f mm", clearance, minC),
-						Suggestion: fmt.Sprintf("Increase spacing between traces to at least %.4f mm.", minC),
+						Message:    msg,
+						Suggestion: sug,
 						MeasuredMM: clearance,
 						LimitMM:    minC,
 						Unit:       "mm",
@@ -197,14 +197,15 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 					continue // overlapping copper -- DRC issue, not DFM
 				}
 				if clearance < minC {
+					msg, sug := msgClearancePadTooClose(clearance, minC)
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
 						Severity:   "ERROR",
 						Layer:      layer,
 						X:          p.X,
 						Y:          p.Y,
-						Message:    fmt.Sprintf("Trace-to-pad clearance %.4f mm is below minimum %.4f mm", clearance, minC),
-						Suggestion: fmt.Sprintf("Increase spacing between trace and pad to at least %.4f mm.", minC),
+						Message:    msg,
+						Suggestion: sug,
 						MeasuredMM: clearance,
 						LimitMM:    minC,
 						Unit:       "mm",
