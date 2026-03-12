@@ -1,0 +1,33 @@
+{
+  "family": "betterdfm-gerbonara",
+  "executionRoleArn": "arn:aws:iam::578381014577:role/betterdfm-ecs-execution",
+  "taskRoleArn": "arn:aws:iam::578381014577:role/betterdfm-ecs-task",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "gerbonara",
+      "image": "578381014577.dkr.ecr.us-east-1.amazonaws.com/betterdfm-gerbonara:latest",
+      "portMappings": [
+        {
+          "containerPort": 8001,
+          "protocol": "tcp"
+        }
+      ],
+      "environment": [
+        { "name": "AWS_REGION", "value": "us-east-1" }
+      ],
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/betterdfm-gerbonara",
+          "awslogs-region": "us-east-1",
+          "awslogs-stream-prefix": "ecs"
+        }
+      },
+      "essential": true
+    }
+  ]
+}
