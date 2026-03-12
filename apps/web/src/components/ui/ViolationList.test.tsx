@@ -28,12 +28,12 @@ function makeViolation(overrides: Partial<Violation> = {}): Violation {
 }
 
 const defaultProps = {
-  filter: 'NONE' as const,
+  filter: 'ERROR' as const,
   onFilterChange: vi.fn(),
 }
 
 describe('ViolationList', () => {
-  it('renders all violations when no severity filter', () => {
+  it('renders all violations passed via prop when filter is active', () => {
     const violations = [
       makeViolation({ id: 'v1', severity: 'ERROR', message: 'Error msg' }),
       makeViolation({ id: 'v2', severity: 'WARNING', message: 'Warning msg' }),
