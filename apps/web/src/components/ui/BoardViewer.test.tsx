@@ -20,6 +20,8 @@ const mockCtx = {
   restore: vi.fn(),
   scale: vi.fn(),
   translate: vi.fn(),
+  setTransform: vi.fn(),
+  ellipse: vi.fn(),
   measureText: vi.fn(() => ({ width: 50 })),
   fillText: vi.fn(),
   createLinearGradient: vi.fn(() => ({ addColorStop: vi.fn() })),
