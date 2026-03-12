@@ -66,6 +66,7 @@ type AnalysisJob struct {
 	SubmissionID string         `json:"submissionId"`
 	ProfileID    string         `json:"profileId"`
 	Status       string         `json:"status"` // PENDING | PROCESSING | DONE | FAILED
+	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"createdAt"`
 	StartedAt    *time.Time     `json:"startedAt"`
 	CompletedAt  *time.Time     `json:"completedAt"`
 	ErrorMsg     string         `json:"errorMsg"`
