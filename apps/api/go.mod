@@ -3,11 +3,11 @@ module github.com/betterdfm/api
 go 1.23
 
 require (
-	github.com/betterdfm/dfm-engine v0.0.0
 	github.com/aws/aws-sdk-go-v2 v1.41.1
 	github.com/aws/aws-sdk-go-v2/config v1.32.9
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.96.0
 	github.com/aws/aws-sdk-go-v2/service/sqs v1.42.21
+	github.com/betterdfm/dfm-engine v0.0.0
 	github.com/fogleman/gg v1.3.0
 	github.com/go-pdf/fpdf v0.9.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
