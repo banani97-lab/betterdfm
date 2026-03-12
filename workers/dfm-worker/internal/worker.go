@@ -92,7 +92,10 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("gerbonara request failed: %w", err)
 	}
 	defer resp.Body.Close()
-	body, _ := io.ReadAll(resp.Body)
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return fmt.Errorf("reading gerbonara response body: %w", err)
+	}
 	if resp.StatusCode != http.StatusOK {
 		return fmt.Errorf("gerbonara returned %d: %s", resp.StatusCode, string(body))
 	}
@@ -105,7 +108,10 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	// 5.5 Persist board data on the job record for visualization
 	if boardJSON, err := json.Marshal(board); err == nil {
 		job.BoardData = boardJSON
-		w.db.Save(&job)
+		if err := w.db.Save(&job).Error; err != nil {
+			log.Printf("WARN: failed to persist board_data for job %s: %v", job.ID, err)
+			// Non-fatal: DFM analysis can still proceed without stored board geometry
+		}
 	}
 
 	// 6. Run DFM rules

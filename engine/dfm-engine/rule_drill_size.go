@@ -1,7 +1,5 @@
 package dfmengine
 
-import "fmt"
-
 // DrillSizeRule checks that all drills/vias are within the allowed diameter range.
 type DrillSizeRule struct{}
 
@@ -11,28 +9,30 @@ func (r *DrillSizeRule) Run(board BoardData, profile ProfileRules) []Violation {
 	var violations []Violation
 	checkDiam := func(x, y, diam float64, label string) {
 		if profile.MinDrillDiamMM > 0 && diam < profile.MinDrillDiamMM {
+			msg, sug := msgDrillSizeBelow(label, diam, profile.MinDrillDiamMM)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
 				Layer:      "drill",
 				X:          x,
 				Y:          y,
-				Message:    fmt.Sprintf("%s diameter %.4f mm is below minimum %.4f mm", label, diam, profile.MinDrillDiamMM),
-				Suggestion: fmt.Sprintf("Increase %s diameter to at least %.4f mm.", label, profile.MinDrillDiamMM),
+				Message:    msg,
+				Suggestion: sug,
 				MeasuredMM: diam,
 				LimitMM:    profile.MinDrillDiamMM,
 				Unit:       "mm",
 			})
 		}
 		if profile.MaxDrillDiamMM > 0 && diam > profile.MaxDrillDiamMM {
+			msg, sug := msgDrillSizeAbove(label, diam, profile.MaxDrillDiamMM)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
 				Layer:      "drill",
 				X:          x,
 				Y:          y,
-				Message:    fmt.Sprintf("%s diameter %.4f mm exceeds maximum %.4f mm", label, diam, profile.MaxDrillDiamMM),
-				Suggestion: fmt.Sprintf("Reduce %s diameter to at most %.4f mm.", label, profile.MaxDrillDiamMM),
+				Message:    msg,
+				Suggestion: sug,
 				MeasuredMM: diam,
 				LimitMM:    profile.MaxDrillDiamMM,
 				Unit:       "mm",

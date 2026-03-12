@@ -1,0 +1,72 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  engine-tests:
+    name: Go Engine Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Download test ODB++ fixtures
+        run: |
+          aws s3 cp s3://betterdfm-testdata/rigidflex.tgz testdata/odb/ || true
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.TEST_AWS_KEY }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET }}
+          AWS_DEFAULT_REGION: us-east-1
+      - run: cd engine/dfm-engine && go test ./... -v -count=1
+
+  worker-build:
+    name: Go Worker Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: cd workers/dfm-worker && go build ./...
+
+  api-build:
+    name: Go API Build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - run: cd apps/api && go build ./...
+
+  sidecar-tests:
+    name: Python Sidecar Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: |
+          cd sidecar/gerbonara
+          pip install -e ".[dev]"
+          python -m pytest tests/ -v
+
+  frontend-tests:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - run: cd apps/web && pnpm install --frozen-lockfile
+      - run: cd apps/web && pnpm test:run
+      - run: cd apps/web && pnpm build

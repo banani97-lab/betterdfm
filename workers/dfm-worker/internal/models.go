@@ -8,6 +8,7 @@ type AnalysisJob struct {
 	SubmissionID string
 	ProfileID    string
 	Status       string
+	CreatedAt    time.Time  `gorm:"autoCreateTime"`
 	StartedAt    *time.Time
 	CompletedAt  *time.Time
 	ErrorMsg     string

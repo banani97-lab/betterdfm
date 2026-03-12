@@ -1,7 +1,5 @@
 package dfmengine
 
-import "fmt"
-
 // AspectRatioRule checks that drill aspect ratios do not exceed the maximum.
 type AspectRatioRule struct{}
 
@@ -18,15 +16,15 @@ func (r *AspectRatioRule) Run(board BoardData, profile ProfileRules) []Violation
 		}
 		ratio := board.BoardThicknessMM / diam
 		if ratio > profile.MaxAspectRatio {
+			msg, sug := msgAspectRatioExceeds(ratio, profile.MaxAspectRatio, board.BoardThicknessMM, diam)
 			violations = append(violations, Violation{
-				RuleID:   r.ID(),
-				Severity: "WARNING",
-				Layer:    "drill",
-				X:        x,
-				Y:        y,
-				Message: fmt.Sprintf("Drill aspect ratio %.1f:1 exceeds maximum %.1f:1 (board %.2f mm, drill %.4f mm)",
-					ratio, profile.MaxAspectRatio, board.BoardThicknessMM, diam),
-				Suggestion: fmt.Sprintf("Increase drill diameter or reduce board thickness. Target aspect ratio ≤ %.1f:1.", profile.MaxAspectRatio),
+				RuleID:     r.ID(),
+				Severity:   "WARNING",
+				Layer:      "drill",
+				X:          x,
+				Y:          y,
+				Message:    msg,
+				Suggestion: sug,
 				MeasuredMM: ratio,
 				LimitMM:    profile.MaxAspectRatio,
 				Unit:       "ratio",

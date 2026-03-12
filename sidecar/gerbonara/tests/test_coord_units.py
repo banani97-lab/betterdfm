@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import _coord_to_mm, _sym_to_mm
+from units import _coord_to_mm, _sym_to_mm
 
 
 def test_coord_inch_to_mm():

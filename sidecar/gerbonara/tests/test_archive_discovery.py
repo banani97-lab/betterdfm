@@ -2,7 +2,7 @@ import sys, tempfile
 from pathlib import Path
 import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import _find_job_root, _find_step_root, _find_layer_features
+from parser_odb import _find_job_root, _find_step_root, _find_layer_features
 
 
 def make_odb_tree(tmp: Path, job_name="myjob", step_name="pcb", layers=("TOP", "BOT")):

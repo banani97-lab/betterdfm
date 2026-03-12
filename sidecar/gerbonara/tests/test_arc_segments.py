@@ -2,7 +2,7 @@ import math, sys
 from pathlib import Path
 import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from main import _arc_segments
+from parser_odb import _arc_segments
 
 def test_full_circle_segment_count():
     # Full circle: start == end → 8 segments (default n=8)
