@@ -10,7 +10,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from models import BoardData, Layer, Trace, Pad, Via, Drill, Point
+from models import BoardData, Layer, Trace, Pad, Via, Drill, Point, Polygon
 from units import _coord_to_mm, _sym_to_mm
 
 logger = logging.getLogger(__name__)
@@ -193,6 +193,8 @@ def _matrix_type_to_ltype(mtype: str) -> str | None:
         return "DRILL"
     if m == "SOLDER_PASTE":
         return "SOLDER_MASK"
+    if m == "ROUT":
+        return "ROUT"
     return None
 
 
@@ -361,26 +363,25 @@ def _build_features(
     vias: list,
     warnings: list[str] | None = None,
     drill_attr_values: dict | None = None,
+    polygons: list | None = None,
 ) -> None:
     """Build geometry from a token list produced by _tokenize_features."""
     in_surface = False
     in_island = False
     surface_pts: list[tuple[float, float]] = []
     surface_sym_num: int = -1
+    surface_net: str = ""
 
     def _flush_island() -> None:
-        if len(surface_pts) < 2:
+        if len(surface_pts) < 3:
             return
         if ltype in ("COPPER", "POWER_GROUND"):
-            for i in range(len(surface_pts) - 1):
-                x1, y1 = surface_pts[i]
-                x2, y2 = surface_pts[i + 1]
-                traces.append(Trace(layer=layer_name, widthMM=0.05,
-                                    startX=x1, startY=y1, endX=x2, endY=y2))
-            x1, y1 = surface_pts[-1]
-            x2, y2 = surface_pts[0]
-            traces.append(Trace(layer=layer_name, widthMM=0.05,
-                                startX=x1, startY=y1, endX=x2, endY=y2))
+            if polygons is not None:
+                polygons.append(Polygon(
+                    layer=layer_name,
+                    points=[Point(x=x, y=y) for x, y in surface_pts],
+                    netName=surface_net,
+                ))
         elif ltype in ("SOLDER_MASK", "SILK"):
             xs = [p[0] for p in surface_pts]
             ys = [p[1] for p in surface_pts]
@@ -407,6 +408,7 @@ def _build_features(
             in_surface = True
             in_island = False
             surface_pts = []
+            surface_net = _attr_net(raw)
             try:
                 surface_sym_num = int(parts[2]) if len(parts) >= 3 else -1
             except (ValueError, IndexError):
@@ -550,8 +552,9 @@ def _parse_features(
     components: list | None = None,
     drills: list | None = None,
     warnings: list[str] | None = None,
+    polygons: list | None = None,
 ) -> None:
-    """Parse ODB++ features file and append geometry to traces/pads/vias."""
+    """Parse ODB++ features file and append geometry to traces/pads/vias/polygons."""
     net_points = net_points or []
     components = components or []
 
@@ -571,7 +574,8 @@ def _parse_features(
     _build_features(tokens, layer_name, ltype, units, symbols,
                     net_points, components, drills, traces, pads, vias,
                     warnings=warnings,
-                    drill_attr_values=attr_values)
+                    drill_attr_values=attr_values,
+                    polygons=polygons)
 
 
 def _parse_rout(features_path: Path, units: str, drills: list) -> None:
@@ -787,6 +791,7 @@ def parse_odb(file_path: str) -> BoardData:
     drills: list[Drill] = []
     outline: list[Point] = []
     warnings: list[str] = []
+    polygons: list[Polygon] = []
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -838,7 +843,7 @@ def parse_odb(file_path: str) -> BoardData:
                 before = len(traces) + len(pads) + len(vias)
                 _parse_features(feat, layer_name, ltype, units, traces, pads, vias,
                                  net_points=net_points, components=components, drills=drills,
-                                 warnings=warnings)
+                                 warnings=warnings, polygons=polygons)
                 after = len(traces) + len(pads) + len(vias)
                 logger.info("ODB++ %s (%s): %d features", layer_name, ltype, after - before)
 
@@ -848,20 +853,14 @@ def parse_odb(file_path: str) -> BoardData:
                     outline = _parse_profile(feat, units)
                     logger.info("ODB++ outline from layer %r: %d points", outline_layer_name, len(outline))
 
-            rout_feat = _find_layer_features(layers_dir, "rout")
-            if rout_feat is not None:
-                layers.append(Layer(name="rout", type="OUTLINE"))
-                _parse_rout(rout_feat, units, drills)
-                logger.info("ODB++ rout: %d drills", len(drills))
-
             logger.info("ODB++ vias: %d", len(vias))
 
     except Exception as e:
         logger.error("ODB++ parse failed: %s", e, exc_info=True)
         warnings.append(f"Parse aborted: {e}")
 
-    logger.info("ODB++ done: %d layers, %d traces, %d pads, %d vias, %d drills",
-                len(layers), len(traces), len(pads), len(vias), len(drills))
+    logger.info("ODB++ done: %d layers, %d traces, %d pads, %d vias, %d drills, %d polygons",
+                len(layers), len(traces), len(pads), len(vias), len(drills), len(polygons))
     return BoardData(layers=layers, traces=traces, pads=pads, vias=vias,
                      drills=drills, outline=outline, boardThicknessMM=1.6,
-                     warnings=warnings)
+                     warnings=warnings, polygons=polygons)

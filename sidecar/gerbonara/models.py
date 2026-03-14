@@ -55,6 +55,12 @@ class Drill(BaseModel):
     plated: bool
 
 
+class Polygon(BaseModel):
+    layer: str
+    points: list[Point]
+    netName: str = ""
+
+
 class BoardData(BaseModel):
     layers: list[Layer]
     traces: list[Trace]
@@ -64,3 +70,4 @@ class BoardData(BaseModel):
     outline: list[Point]
     boardThicknessMM: float
     warnings: list[str] = []
+    polygons: list[Polygon] = []
