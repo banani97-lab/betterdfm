@@ -474,7 +474,9 @@ def _build_features(
             try:
                 x = _coord_to_mm(float(parts[1]), units)
                 y = _coord_to_mm(float(parts[2]), units)
-                sym = symbols.get(int(parts[5]), {"w": 0.5, "h": 0.5,
+                # ODB++ P record: P x y sym_num polarity rotation mirror ;attrs
+                # sym_num is at parts[3]; parts[5] is rotation (not sym_num)
+                sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
                 net = _attr_net(raw) or _net_lookup(x, y, net_points)
                 ref = _refdes_lookup(x, y, components)
@@ -591,7 +593,7 @@ def _parse_rout(features_path: Path, units: str, drills: list) -> None:
             try:
                 x = _coord_to_mm(float(parts[1]), units)
                 y = _coord_to_mm(float(parts[2]), units)
-                sym = symbols.get(int(parts[5]), {"w": 0.3})
+                sym = symbols.get(int(parts[3]), {"w": 0.3})
                 drills.append(Drill(x=x, y=y, diamMM=max(0.01, sym["w"]), plated=True))
             except (ValueError, IndexError):
                 pass
