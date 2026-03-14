@@ -142,11 +142,29 @@ function drawCopper(
   padsByLayer:   Record<string, NonNullable<BoardData['pads']>>,
   boardData: BoardData | null | undefined,
   hiddenLayers: Set<string>,
+  polygonsByLayer: Record<string, NonNullable<BoardData['polygons']>>,
 ) {
   const { minX, minY, scale: s } = b
   const offX = b.offX, offY = b.offY
   const tx = (x: number) => (x - minX) * s + offX
   const ty = (y: number) => (y - minY) * s + offY
+
+  // Copper fill polygons (surfaces)
+  ctx.fillStyle = '#c88020'
+  for (const [layer, polys] of Object.entries(polygonsByLayer)) {
+    if (hiddenLayers.has(layer)) continue
+    if (!isCopperLayer(layer.toLowerCase())) continue
+    for (const poly of polys) {
+      if (poly.points.length < 3) continue
+      ctx.beginPath()
+      ctx.moveTo(tx(poly.points[0].x), ty(poly.points[0].y))
+      for (let i = 1; i < poly.points.length; i++) {
+        ctx.lineTo(tx(poly.points[i].x), ty(poly.points[i].y))
+      }
+      ctx.closePath()
+      ctx.fill()
+    }
+  }
 
   // Traces
   ctx.lineCap = 'round'
@@ -222,6 +240,39 @@ function drawCopper(
     ctx.fillStyle = '#060606'
     ctx.beginPath(); ctx.arc(cx, cy, r * 0.6, 0, Math.PI * 2); ctx.fill()
   }
+}
+
+/** Step 6b: routing cutouts (ROUT layer traces = router tool paths). */
+function drawRouting(
+  ctx: CanvasRenderingContext2D,
+  b: Bounds,
+  tracesByLayer: Record<string, NonNullable<BoardData['traces']>>,
+  hiddenLayers: Set<string>,
+) {
+  const { minX, minY, scale: s, offX, offY } = b
+  const tx = (x: number) => (x - minX) * s + offX
+  const ty = (y: number) => (y - minY) * s + offY
+
+  ctx.lineCap = 'round'
+  ctx.lineJoin = 'round'
+  ctx.strokeStyle = '#ffffff'
+  ctx.globalAlpha = 0.85
+
+  for (const [layer, traces] of Object.entries(tracesByLayer)) {
+    if (hiddenLayers.has(layer)) continue
+    if (layer.toLowerCase() !== 'rout') continue
+    for (const t of traces) {
+      const x1 = tx(t.startX), y1 = ty(t.startY)
+      const x2 = tx(t.endX),   y2 = ty(t.endY)
+      if (!ok(x1) || !ok(y1) || !ok(x2) || !ok(y2)) continue
+      ctx.lineWidth = Math.max(1, isFinite(t.widthMM) ? t.widthMM * s : 1)
+      ctx.beginPath()
+      ctx.moveTo(x1, y1)
+      ctx.lineTo(x2, y2)
+      ctx.stroke()
+    }
+  }
+  ctx.globalAlpha = 1
 }
 
 /** Step 7: soldermask overlay + pad openings.
@@ -537,6 +588,12 @@ export function BoardViewer({
     return m
   }, [boardData])
 
+  const polygonsByLayer = useMemo(() => {
+    const m: Record<string, NonNullable<BoardData['polygons']>> = {}
+    for (const p of boardData?.polygons ?? []) (m[p.layer] ??= []).push(p)
+    return m
+  }, [boardData])
+
   // ── Imperative draw ─────────────────────────────────────────────────────────
 
   const draw = useCallback(() => {
@@ -562,7 +619,8 @@ export function BoardViewer({
 
     if (bounds && boardData) {
       drawBoardFill(ctx, boardData, bounds)                               // 2: FR4
-      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers) // 3–6
+      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer) // 3–6
+      drawRouting(ctx, bounds, tracesByLayer, hiddenLayers)               // 6b: rout cutouts
       drawSoldermask(ctx, boardData, bounds, padsByLayer, hiddenLayers)   // 7: multiply
       drawSilkscreen(ctx, bounds, tracesByLayer, hiddenLayers)            // 8: silk
       drawBoardEdge(ctx, boardData, bounds)                               // 9: edge glow
@@ -572,7 +630,7 @@ export function BoardViewer({
     drawViolations(ctx, bounds, violations, selectedViolationId)          // 11: markers
 
     ctx.restore()
-  }, [bounds, boardData, tracesByLayer, padsByLayer, hiddenLayers, violations, selectedViolationId, gridEnabled])
+  }, [bounds, boardData, tracesByLayer, padsByLayer, polygonsByLayer, hiddenLayers, violations, selectedViolationId, gridEnabled])
 
   // ── ResizeObserver — keeps canvas px matched to container at DPR ───────────
 
