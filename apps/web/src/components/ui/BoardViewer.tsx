@@ -111,9 +111,9 @@ function computeBounds(boardData: BoardData): Bounds {
 
 /** Builds the board outline path (polygon from outline pts or fallback rect). */
 function boardOutlinePath(ctx: CanvasRenderingContext2D, boardData: BoardData, b: Bounds) {
-  const { minX, minY, scale: s, offX, offY, maxX, maxY } = b
+  const { minX, minY, maxX, maxY, scale: s, offX, offY } = b
   const tx = (x: number) => (x - minX) * s + offX
-  const ty = (y: number) => (y - minY) * s + offY
+  const ty = (y: number) => (maxY - y) * s + offY   // flip Y: ODB++ Y-up → canvas Y-down
   ctx.beginPath()
   if (boardData.outline?.length > 1) {
     const pts = boardData.outline.filter(p => ok(p.x) && ok(p.y))
@@ -124,7 +124,7 @@ function boardOutlinePath(ctx: CanvasRenderingContext2D, boardData: BoardData, b
       return
     }
   }
-  ctx.rect(tx(minX), ty(minY), (maxX - minX) * s, (maxY - minY) * s)
+  ctx.rect(tx(minX), ty(maxY), (maxX - minX) * s, (maxY - minY) * s)
 }
 
 /** Step 2: FR4 substrate fill. */
@@ -144,10 +144,10 @@ function drawCopper(
   hiddenLayers: Set<string>,
   polygonsByLayer: Record<string, NonNullable<BoardData['polygons']>>,
 ) {
-  const { minX, minY, scale: s } = b
+  const { minX, minY, maxY, scale: s } = b
   const offX = b.offX, offY = b.offY
   const tx = (x: number) => (x - minX) * s + offX
-  const ty = (y: number) => (y - minY) * s + offY
+  const ty = (y: number) => (maxY - y) * s + offY
 
   // Copper fill polygons (surfaces) — use evenodd so hole contours cut through
   ctx.fillStyle = '#c88020'
@@ -259,9 +259,9 @@ function drawRouting(
   tracesByLayer: Record<string, NonNullable<BoardData['traces']>>,
   hiddenLayers: Set<string>,
 ) {
-  const { minX, minY, scale: s, offX, offY } = b
+  const { minX, minY, maxY, scale: s, offX, offY } = b
   const tx = (x: number) => (x - minX) * s + offX
-  const ty = (y: number) => (y - minY) * s + offY
+  const ty = (y: number) => (maxY - y) * s + offY
 
   ctx.lineCap = 'round'
   ctx.lineJoin = 'round'
@@ -309,9 +309,9 @@ function drawSoldermask(
   ctx.restore()
 
   // Pad openings — render exposed copper for each visible mask layer's pads
-  const { minX, minY, scale: s, offX, offY } = b
+  const { minX, minY, maxY, scale: s, offX, offY } = b
   const tx = (x: number) => (x - minX) * s + offX
-  const ty = (y: number) => (y - minY) * s + offY
+  const ty = (y: number) => (maxY - y) * s + offY
 
   ctx.fillStyle = '#e8c050'
   ctx.globalAlpha = 0.9
@@ -344,10 +344,10 @@ function drawSilkscreen(
   tracesByLayer: Record<string, NonNullable<BoardData['traces']>>,
   hiddenLayers: Set<string>,
 ) {
-  const { minX, minY, scale: s } = b
+  const { minX, minY, maxY, scale: s } = b
   const offX = b.offX, offY = b.offY
   const tx = (x: number) => (x - minX) * s + offX
-  const ty = (y: number) => (y - minY) * s + offY
+  const ty = (y: number) => (maxY - y) * s + offY
 
   ctx.lineCap = 'round'
   for (const [layer, traces] of Object.entries(tracesByLayer)) {
@@ -402,12 +402,12 @@ function drawGrid(ctx: CanvasRenderingContext2D, b: Bounds, zoom: number) {
   for (let gx = startX; gx <= endX; gx += spacingMM) {
     const vx = (gx - minX) * scale + offX
     ctx.beginPath()
-    ctx.moveTo(vx, (startY - minY) * scale + offY)
-    ctx.lineTo(vx, (endY   - minY) * scale + offY)
+    ctx.moveTo(vx, (maxY - startY) * scale + offY)
+    ctx.lineTo(vx, (maxY - endY)   * scale + offY)
     ctx.stroke()
   }
   for (let gy = startY; gy <= endY; gy += spacingMM) {
-    const vy = (gy - minY) * scale + offY
+    const vy = (maxY - gy) * scale + offY
     ctx.beginPath()
     ctx.moveTo((startX - minX) * scale + offX, vy)
     ctx.lineTo((endX   - minX) * scale + offX, vy)
@@ -427,9 +427,9 @@ function drawViolations(
   const now = Date.now()
 
   if (b) {
-    const { minX, minY, scale: s, offX, offY } = b
+    const { minX, minY, maxY, scale: s, offX, offY } = b
     const tx = (x: number) => (x - minX) * s + offX
-    const ty = (y: number) => (y - minY) * s + offY
+    const ty = (y: number) => (maxY - y) * s + offY
 
     for (const v of violations) {
       const cx = tx(v.x), cy = ty(v.y)
@@ -880,10 +880,10 @@ export function BoardViewer({
       const sy = e.clientY - rect.top
       const vx = (sx - panRef.current.x) / zoomRef.current
       const vy = (sy - panRef.current.y) / zoomRef.current
-      const { minX, minY, scale: s, offX, offY } = bounds
+      const { minX, maxY, scale: s, offX, offY } = bounds
       setMouseCoords({
         x: (vx - offX) / s + minX,
-        y: (vy - offY) / s + minY,
+        y: maxY - (vy - offY) / s,
       })
     }
   }, [bounds, draw])
@@ -909,9 +909,9 @@ export function BoardViewer({
     const vx = (sx - panRef.current.x) / zoomRef.current
     const vy = (sy - panRef.current.y) / zoomRef.current
 
-    const { minX, minY, scale: s, offX, offY } = bounds
+    const { minX, maxY, scale: s, offX, offY } = bounds
     const tx = (x: number) => (x - minX) * s + offX
-    const ty = (y: number) => (y - minY) * s + offY
+    const ty = (y: number) => (maxY - y) * s + offY
 
     let best: Violation | null = null
     let bestDist = 14 / zoomRef.current   // 14 screen px → viewBox units

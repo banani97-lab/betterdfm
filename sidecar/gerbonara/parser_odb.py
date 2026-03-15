@@ -380,6 +380,10 @@ def _build_features(
         if len(surface_pts) < 3:
             return
         if island_flag == "I":
+            # A surface can have multiple outer islands; commit the previous one first
+            if current_polygon is not None and polygons is not None:
+                polygons.append(current_polygon)
+                current_polygon = None
             # Outer island — start a new polygon
             if ltype in ("COPPER", "POWER_GROUND"):
                 current_polygon = Polygon(
