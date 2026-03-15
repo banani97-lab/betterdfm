@@ -149,7 +149,7 @@ function drawCopper(
   const tx = (x: number) => (x - minX) * s + offX
   const ty = (y: number) => (y - minY) * s + offY
 
-  // Copper fill polygons (surfaces)
+  // Copper fill polygons (surfaces) — use evenodd so hole contours cut through
   ctx.fillStyle = '#c88020'
   for (const [layer, polys] of Object.entries(polygonsByLayer)) {
     if (hiddenLayers.has(layer)) continue
@@ -157,12 +157,22 @@ function drawCopper(
     for (const poly of polys) {
       if (poly.points.length < 3) continue
       ctx.beginPath()
+      // Outer island
       ctx.moveTo(tx(poly.points[0].x), ty(poly.points[0].y))
       for (let i = 1; i < poly.points.length; i++) {
         ctx.lineTo(tx(poly.points[i].x), ty(poly.points[i].y))
       }
       ctx.closePath()
-      ctx.fill()
+      // Hole contours (pad/via clearances in the copper pour)
+      for (const hole of poly.holes ?? []) {
+        if (hole.length < 3) continue
+        ctx.moveTo(tx(hole[0].x), ty(hole[0].y))
+        for (let i = 1; i < hole.length; i++) {
+          ctx.lineTo(tx(hole[i].x), ty(hole[i].y))
+        }
+        ctx.closePath()
+      }
+      ctx.fill('evenodd')
     }
   }
 
