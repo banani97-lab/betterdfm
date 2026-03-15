@@ -470,7 +470,7 @@ def _build_features(
             continue
 
         if rec == "L":
-            if ltype not in ("COPPER", "SILK", "ROUT"):
+            if ltype not in ("COPPER", "POWER_GROUND", "SILK", "ROUT"):
                 continue
             pol_idx = next((i for i in (5, 6, 7) if i < len(parts) and parts[i] in ("P", "N")), None)
             if pol_idx is None or parts[pol_idx] != "P" or pol_idx + 1 >= len(parts):
@@ -531,7 +531,7 @@ def _build_features(
                 pass
 
         elif rec == "A":
-            if ltype not in ("COPPER", "SILK"):
+            if ltype not in ("COPPER", "POWER_GROUND", "SILK"):
                 continue
             pol_idx = next((i for i in (8, 9, 10) if i < len(parts)
                             and parts[i] in ("P", "N")), None)
