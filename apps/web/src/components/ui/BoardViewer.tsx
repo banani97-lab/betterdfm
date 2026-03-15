@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react'
-import { ZoomIn, ZoomOut, Home, Layers, Grid3X3 } from 'lucide-react'
+import { ZoomIn, ZoomOut, Home, Layers, Grid3X3, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Violation, BoardData } from '@/lib/api'
 
@@ -553,6 +553,7 @@ export function BoardViewer({
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const zoomRef      = useRef(1)
   const panRef       = useRef({ x: 0, y: 0 })
+  const rotationRef  = useRef(0)  // 0 | 90 | 180 | 270
   const lastMouseRef = useRef({ x: 0, y: 0 })
   const lastTouchRef = useRef<{ x: number; y: number } | null>(null)
   const pinchStartRef = useRef<{
@@ -569,6 +570,7 @@ export function BoardViewer({
   const [gridEnabled,       setGridEnabled]       = useState(false)
   const [mouseCoords,       setMouseCoords]       = useState<{ x: number; y: number } | null>(null)
   const [zoomPct,           setZoomPct]           = useState(100)
+  const [rotation,          setRotation]          = useState(0)
   const [openDropdownLayer, setOpenDropdownLayer] = useState<string | null>(null)
 
   // ── Derived data ────────────────────────────────────────────────────────────
@@ -616,6 +618,13 @@ export function BoardViewer({
       0, zoomRef.current * dpr,
       panRef.current.x * dpr, panRef.current.y * dpr,
     )
+    // Apply board rotation around the viewBox centre (600, 400)
+    if (rotationRef.current !== 0) {
+      const rad = (rotationRef.current * Math.PI) / 180
+      ctx.translate(600, 400)
+      ctx.rotate(rad)
+      ctx.translate(-600, -400)
+    }
 
     if (bounds && boardData) {
       drawBoardFill(ctx, boardData, bounds)                               // 2: FR4
@@ -802,6 +811,13 @@ export function BoardViewer({
 
   // ── Zoom / reset controls ───────────────────────────────────────────────────
 
+  const rotateBoard = useCallback(() => {
+    const next = (rotationRef.current + 90) % 360
+    rotationRef.current = next
+    setRotation(next)
+    draw()
+  }, [draw])
+
   const zoomBy = useCallback((factor: number) => {
     const canvas = canvasRef.current
     if (!canvas) return
@@ -821,9 +837,11 @@ export function BoardViewer({
     const w = canvas.parentElement.clientWidth
     const h = canvas.parentElement.clientHeight
     const z = Math.min(w / 1200, h / 800)
-    zoomRef.current = z
-    panRef.current  = { x: (w - 1200 * z) / 2, y: (h - 800 * z) / 2 }
+    zoomRef.current     = z
+    panRef.current      = { x: (w - 1200 * z) / 2, y: (h - 800 * z) / 2 }
+    rotationRef.current = 0
     setZoomPct(Math.round(z * 100))
+    setRotation(0)
     draw()
   }, [draw])
 
@@ -903,9 +921,13 @@ export function BoardViewer({
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1">
         <span className="text-xs text-gray-500 font-mono px-1 select-none">{zoomPct}%</span>
+        {rotation !== 0 && (
+          <span className="text-xs text-gray-500 font-mono px-1 select-none">{rotation}°</span>
+        )}
         {[
           { icon: <Layers className="h-5 w-5" />, title: 'Layers', onClick: () => setLayerPanelOpen(o => !o), emphasize: true },
           { icon: <Grid3X3 className="h-5 w-5" />, title: 'Grid', onClick: () => setGridEnabled(g => !g), emphasize: true },
+          { icon: <RotateCw className="h-4 w-4" />, title: 'Rotate 90°', onClick: rotateBoard },
           { icon: <ZoomIn className="h-4 w-4" />, title: 'Zoom in', onClick: () => zoomBy(1.3), mobileHidden: true },
           { icon: <ZoomOut className="h-4 w-4" />, title: 'Zoom out', onClick: () => zoomBy(1 / 1.3), mobileHidden: true },
           { icon: <Home className="h-4 w-4" />, title: 'Reset view', onClick: resetView },
