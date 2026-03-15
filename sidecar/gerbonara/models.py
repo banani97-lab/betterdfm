@@ -58,6 +58,7 @@ class Drill(BaseModel):
 class Polygon(BaseModel):
     layer: str
     points: list[Point]
+    holes: list[list[Point]] = []
     netName: str = ""
 
 

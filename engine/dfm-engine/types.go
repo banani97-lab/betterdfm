@@ -2,13 +2,15 @@ package dfmengine
 
 // BoardData is the normalized representation of a parsed PCB file
 type BoardData struct {
-	Layers           []Layer  `json:"layers"`
-	Traces           []Trace  `json:"traces"`
-	Pads             []Pad    `json:"pads"`
-	Vias             []Via    `json:"vias"`
-	Drills           []Drill  `json:"drills"`
-	Outline          []Point  `json:"outline"`
-	BoardThicknessMM float64  `json:"boardThicknessMM"`
+	Layers           []Layer   `json:"layers"`
+	Traces           []Trace   `json:"traces"`
+	Pads             []Pad     `json:"pads"`
+	Vias             []Via     `json:"vias"`
+	Drills           []Drill   `json:"drills"`
+	Outline          []Point   `json:"outline"`
+	BoardThicknessMM float64   `json:"boardThicknessMM"`
+	Warnings         []string  `json:"warnings,omitempty"`
+	Polygons         []Polygon `json:"polygons,omitempty"`
 }
 
 type Layer struct {
@@ -54,6 +56,13 @@ type Drill struct {
 	Y      float64 `json:"y"`
 	DiamMM float64 `json:"diamMM"`
 	Plated bool    `json:"plated"`
+}
+
+type Polygon struct {
+	Layer   string    `json:"layer"`
+	Points  []Point   `json:"points"`
+	Holes   [][]Point `json:"holes,omitempty"`
+	NetName string    `json:"netName,omitempty"`
 }
 
 // ProfileRules defines the CM's manufacturing capabilities

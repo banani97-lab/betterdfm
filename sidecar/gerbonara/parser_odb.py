@@ -368,33 +368,49 @@ def _build_features(
     """Build geometry from a token list produced by _tokenize_features."""
     in_surface = False
     in_island = False
+    island_flag: str = "I"  # "I" = outer island, "H" = hole
     surface_pts: list[tuple[float, float]] = []
     surface_sym_num: int = -1
     surface_net: str = ""
+    current_polygon: Polygon | None = None  # outer island polygon being built
+    current_holes: list[list[tuple[float, float]]] = []  # accumulated holes
 
     def _flush_island() -> None:
+        nonlocal current_polygon
         if len(surface_pts) < 3:
             return
-        if ltype in ("COPPER", "POWER_GROUND"):
-            if polygons is not None:
-                polygons.append(Polygon(
+        if island_flag == "I":
+            # Outer island — start a new polygon
+            if ltype in ("COPPER", "POWER_GROUND"):
+                current_polygon = Polygon(
                     layer=layer_name,
                     points=[Point(x=x, y=y) for x, y in surface_pts],
                     netName=surface_net,
-                ))
-        elif ltype in ("SOLDER_MASK", "SILK"):
-            xs = [p[0] for p in surface_pts]
-            ys = [p[1] for p in surface_pts]
-            cx = (min(xs) + max(xs)) / 2
-            cy = (min(ys) + max(ys)) / 2
-            w = max(0.01, max(xs) - min(xs))
-            h = max(0.01, max(ys) - min(ys))
-            is_paste = "paste" in layer_name.lower()
-            if not is_paste and (w > 2.0 or h > 2.0):
-                return
-            pads.append(Pad(layer=layer_name, x=cx, y=cy,
-                            widthMM=w, heightMM=h, shape="RECT",
-                            netName="", refDes=""))
+                )
+            elif ltype in ("SOLDER_MASK", "SILK"):
+                xs = [p[0] for p in surface_pts]
+                ys = [p[1] for p in surface_pts]
+                cx = (min(xs) + max(xs)) / 2
+                cy = (min(ys) + max(ys)) / 2
+                w = max(0.01, max(xs) - min(xs))
+                h = max(0.01, max(ys) - min(ys))
+                is_paste = "paste" in layer_name.lower()
+                if not is_paste and (w > 2.0 or h > 2.0):
+                    return
+                pads.append(Pad(layer=layer_name, x=cx, y=cy,
+                                widthMM=w, heightMM=h, shape="RECT",
+                                netName="", refDes=""))
+        elif island_flag == "H":
+            # Hole contour — attach to the current polygon (if any)
+            if current_polygon is not None and ltype in ("COPPER", "POWER_GROUND"):
+                current_polygon.holes.append([Point(x=x, y=y) for x, y in surface_pts])
+
+    def _commit_polygon() -> None:
+        """Emit the fully-built polygon (outer + holes) to the output list."""
+        nonlocal current_polygon
+        if current_polygon is not None and polygons is not None:
+            polygons.append(current_polygon)
+            current_polygon = None
 
     for token in tokens:
         if token["type"] in ("skip", "$"):
@@ -405,8 +421,10 @@ def _build_features(
         rec = token["type"]
 
         if rec == "S":
+            _commit_polygon()
             in_surface = True
             in_island = False
+            island_flag = "I"
             surface_pts = []
             surface_net = _attr_net(raw)
             try:
@@ -418,6 +436,7 @@ def _build_features(
         if rec == "SE":
             if in_island:
                 _flush_island()
+            _commit_polygon()
             in_surface = False
             in_island = False
             surface_pts = []
@@ -428,9 +447,10 @@ def _build_features(
                 if in_island:
                     _flush_island()
                 flag = parts[3] if len(parts) >= 4 else "I"
-                in_island = (flag == "I")
+                island_flag = flag
+                in_island = True
                 surface_pts = []
-                if in_island and len(parts) >= 3:
+                if len(parts) >= 3:
                     try:
                         surface_pts.append((_coord_to_mm(float(parts[1]), units),
                                             _coord_to_mm(float(parts[2]), units)))
@@ -538,6 +558,7 @@ def _build_features(
 
     if in_island:
         _flush_island()
+    _commit_polygon()
 
 
 def _parse_features(

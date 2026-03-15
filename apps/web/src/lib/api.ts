@@ -55,7 +55,7 @@ export interface BoardTrace { layer: string; widthMM: number; startX: number; st
 export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL'; netName: string; refDes: string }
 export interface BoardVia { x: number; y: number; outerDiamMM: number; drillDiamMM: number }
 export interface BoardDrill { x: number; y: number; diamMM: number; plated: boolean }
-export interface BoardPolygon { layer: string; points: Array<{ x: number; y: number }>; netName: string }
+export interface BoardPolygon { layer: string; points: Array<{ x: number; y: number }>; holes?: Array<Array<{ x: number; y: number }>>; netName: string }
 export interface BoardData {
   layers: BoardLayer[]
   traces: BoardTrace[]
