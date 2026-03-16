@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { AlertCircle, AlertTriangle, Info } from 'lucide-react'
+import { AlertCircle, AlertTriangle, Eye, EyeOff, Info, Square, SquareCheck } from 'lucide-react'
 import { Badge } from './badge'
+import { Button } from './button'
 import { cn } from '@/lib/utils'
 import type { Violation } from '@/lib/api'
 
@@ -22,7 +23,10 @@ interface ViolationListProps {
   violations: Violation[]
   allViolations: Violation[]  // used for tab counts — not affected by severity filter
   selectedId?: string
-  onSelect?: (v: Violation) => void
+  shownViolationIds: Set<string>
+  onToggleShown: (v: Violation) => void
+  onShowAll: () => void
+  onHideAll: () => void
   filter: SeverityFilter
   onFilterChange: (f: SeverityFilter) => void
   onIgnore?: (v: Violation, ignored: boolean) => void
@@ -40,7 +44,18 @@ const severityBadgeVariant: Record<string, 'destructive' | 'warning' | 'info'> =
   INFO: 'info',
 }
 
-export function ViolationList({ violations, allViolations, selectedId, onSelect, filter, onFilterChange, onIgnore }: ViolationListProps) {
+export function ViolationList({
+  violations,
+  allViolations,
+  selectedId,
+  shownViolationIds,
+  onToggleShown,
+  onShowAll,
+  onHideAll,
+  filter,
+  onFilterChange,
+  onIgnore,
+}: ViolationListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const [showIgnored, setShowIgnored] = useState(false)
   const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
@@ -59,6 +74,9 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
   }
 
   const ignoredCount = allViolations.filter((v) => v.ignored).length
+  const selectableViolationsCount = violations.filter((v) => !v.ignored).length
+  const shownCount = shownViolationIds.size
+  const canAdjustShownViolations = filter !== 'NONE' && selectableViolationsCount > 0
 
   // Rule IDs present in the current severity view (allViolations before severity split)
   const availableRules = useMemo(() => {
@@ -122,6 +140,37 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
         )}
       </div>
 
+      <div className="flex items-center gap-2 px-2 py-2 border-b bg-background/40 flex-shrink-0 flex-wrap">
+        <div className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+          <SquareCheck className="h-3.5 w-3.5" />
+          <span>Showing {shownCount} of {selectableViolationsCount}</span>
+        </div>
+        <div className="ml-auto flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            onClick={onShowAll}
+            disabled={!canAdjustShownViolations}
+          >
+            <Eye className="h-3.5 w-3.5" />
+            Show all
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-8 gap-1.5 px-2.5 text-xs"
+            onClick={onHideAll}
+            disabled={!canAdjustShownViolations}
+          >
+            <EyeOff className="h-3.5 w-3.5" />
+            Hide all
+          </Button>
+        </div>
+      </div>
+
       {/* Rule type filter pills */}
       {availableRules.length > 1 && filter !== 'NONE' && (
         <div className="flex gap-1 px-2 py-1.5 border-b bg-muted/20 flex-shrink-0 flex-wrap">
@@ -175,14 +224,33 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
             <button
               key={v.id}
               data-violation-id={v.id}
-              onClick={() => onSelect?.(v)}
+              onClick={() => { if (!v.ignored) onToggleShown(v) }}
+              aria-pressed={shownViolationIds.has(v.id)}
+              aria-disabled={v.ignored}
+              title={
+                v.ignored
+                  ? 'Restore this violation to show it on the board'
+                  : shownViolationIds.has(v.id)
+                    ? 'Hide this violation from the board'
+                    : 'Show this violation on the board'
+              }
               className={cn(
-                'group w-full text-left p-3 hover:bg-muted/40 transition-colors',
-                selectedId === v.id && 'bg-primary/15 border-l-2 border-primary',
-                v.ignored && 'opacity-50'
+                'group w-full text-left p-3 transition-colors',
+                shownViolationIds.has(v.id)
+                  ? 'bg-background/35 hover:bg-muted/40 border-l-2 border-primary'
+                  : 'border-l-2 border-transparent opacity-70 hover:bg-muted/25',
+                selectedId === v.id && 'bg-primary/10 ring-1 ring-inset ring-primary/35',
+                v.ignored && 'opacity-50 cursor-default'
               )}
             >
-              <div className="flex items-start gap-2">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 flex-shrink-0 text-muted-foreground">
+                  {shownViolationIds.has(v.id) ? (
+                    <SquareCheck className="h-4 w-4 text-primary" />
+                  ) : (
+                    <Square className="h-4 w-4" />
+                  )}
+                </div>
                 <div className="mt-0.5 flex-shrink-0">
                   {severityIcon[v.severity as keyof typeof severityIcon]}
                 </div>

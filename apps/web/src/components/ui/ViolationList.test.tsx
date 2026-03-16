@@ -27,9 +27,15 @@ function makeViolation(overrides: Partial<Violation> = {}): Violation {
   }
 }
 
-const defaultProps = {
-  filter: 'ERROR' as const,
-  onFilterChange: vi.fn(),
+function makeDefaultProps(violations: Violation[]) {
+  return {
+    filter: 'ERROR' as const,
+    onFilterChange: vi.fn(),
+    shownViolationIds: new Set(violations.map((violation) => violation.id)),
+    onToggleShown: vi.fn(),
+    onShowAll: vi.fn(),
+    onHideAll: vi.fn(),
+  }
 }
 
 describe('ViolationList', () => {
@@ -42,7 +48,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={violations}
         allViolations={violations}
-        {...defaultProps}
+        {...makeDefaultProps(violations)}
       />
     )
     expect(screen.getByText('Error msg')).toBeInTheDocument()
@@ -61,6 +67,10 @@ describe('ViolationList', () => {
         allViolations={allViols}
         filter="ERROR"
         onFilterChange={vi.fn()}
+        shownViolationIds={new Set(errorOnly.map((violation) => violation.id))}
+        onToggleShown={vi.fn()}
+        onShowAll={vi.fn()}
+        onHideAll={vi.fn()}
       />
     )
     expect(screen.getByText('Error msg')).toBeInTheDocument()
@@ -75,7 +85,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={[activeViol]}
         allViolations={all}
-        {...defaultProps}
+        {...makeDefaultProps([activeViol])}
       />
     )
     // Active violation is visible
@@ -88,7 +98,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={all}
         allViolations={all}
-        {...defaultProps}
+        {...makeDefaultProps(all)}
       />
     )
     // After toggle, show ignored button appears
@@ -107,7 +117,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={violations}
         allViolations={violations}
-        {...defaultProps}
+        {...makeDefaultProps(violations)}
       />
     )
     // Rule filter pills should be present
@@ -117,5 +127,41 @@ describe('ViolationList', () => {
       // After clicking, it should be selected (has active styling)
       expect(traceWidthPill).toBeInTheDocument()
     }
+  })
+
+  it('shows visibility controls and forwards toggle actions', () => {
+    const violations = [
+      makeViolation({ id: 'v1', message: 'Trace violation' }),
+      makeViolation({ id: 'v2', ruleId: 'clearance', message: 'Clearance violation' }),
+    ]
+    const onToggleShown = vi.fn()
+    const onShowAll = vi.fn()
+    const onHideAll = vi.fn()
+
+    render(
+      <ViolationList
+        violations={violations}
+        allViolations={violations}
+        filter="ERROR"
+        onFilterChange={vi.fn()}
+        shownViolationIds={new Set(['v1'])}
+        onToggleShown={onToggleShown}
+        onShowAll={onShowAll}
+        onHideAll={onHideAll}
+      />
+    )
+
+    expect(screen.getByText('Showing 1 of 2')).toBeInTheDocument()
+
+    const traceButton = screen.getByText('Trace violation').closest('button')
+    expect(traceButton).toHaveAttribute('aria-pressed', 'true')
+    if (traceButton) fireEvent.click(traceButton)
+    expect(onToggleShown).toHaveBeenCalledWith(violations[0])
+
+    fireEvent.click(screen.getByRole('button', { name: /show all/i }))
+    expect(onShowAll).toHaveBeenCalledOnce()
+
+    fireEvent.click(screen.getByRole('button', { name: /hide all/i }))
+    expect(onHideAll).toHaveBeenCalledOnce()
   })
 })

@@ -27,6 +27,7 @@ export default function ResultsPage() {
   const [violations, setViolations] = useState<Violation[]>([])
   const [boardData, setBoardData] = useState<BoardData | null>(null)
   const [selectedId, setSelectedId] = useState<string | undefined>()
+  const [customVisibleIds, setCustomVisibleIds] = useState<Set<string> | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set())
@@ -97,6 +98,17 @@ export default function ResultsPage() {
     return v.severity === severityFilter
   })
 
+  const boardVisibleViolations = useMemo(() => {
+    const activeViolations = visibleViolations.filter((v) => !v.ignored)
+    if (customVisibleIds === null) return activeViolations
+    return activeViolations.filter((v) => customVisibleIds.has(v.id))
+  }, [customVisibleIds, visibleViolations])
+
+  const shownViolationIds = useMemo(
+    () => new Set(boardVisibleViolations.map((v) => v.id)),
+    [boardVisibleViolations]
+  )
+
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
     const load = async () => {
@@ -148,6 +160,40 @@ export default function ResultsPage() {
   useEffect(() => {
     setViolationsOpen(!isPortraitMobile)
   }, [isPortraitMobile])
+
+  const handleToggleShownViolation = useCallback((violation: Violation) => {
+    const nextVisibleIds = customVisibleIds === null
+      ? new Set([violation.id])
+      : new Set(customVisibleIds)
+
+    if (customVisibleIds !== null) {
+      if (nextVisibleIds.has(violation.id)) nextVisibleIds.delete(violation.id)
+      else nextVisibleIds.add(violation.id)
+    }
+
+    setCustomVisibleIds(nextVisibleIds)
+
+    if (nextVisibleIds.has(violation.id)) {
+      setSelectedId(violation.id)
+      return
+    }
+
+    if (selectedId === violation.id) {
+      const fallbackId = visibleViolations.find((candidate) => nextVisibleIds.has(candidate.id))?.id
+      setSelectedId(fallbackId)
+    }
+  }, [customVisibleIds, selectedId, visibleViolations])
+
+  const handleShowAllViolations = useCallback(() => {
+    setCustomVisibleIds(null)
+  }, [])
+
+  const handleHideAllViolations = useCallback(() => {
+    setCustomVisibleIds(new Set())
+    if (selectedId && visibleViolations.some((v) => v.id === selectedId)) {
+      setSelectedId(undefined)
+    }
+  }, [selectedId, visibleViolations])
 
   const downloadPDF = async () => {
     const token = getStoredToken()
@@ -252,7 +298,7 @@ export default function ResultsPage() {
       <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>
         <div className={cn('order-1 flex-1 min-h-0 min-w-0 overflow-hidden', collapseToBottom ? 'p-2 sm:p-3' : 'p-2 sm:p-3 md:p-4')}>
           <BoardViewer
-            violations={visibleViolations.filter((v) => !v.ignored)}
+            violations={boardVisibleViolations}
             boardData={boardData}
             selectedViolationId={selectedId}
             onViolationClick={(v) => setSelectedId(v.id)}
@@ -318,7 +364,10 @@ export default function ResultsPage() {
                 violations={visibleViolations}
                 allViolations={layerFiltered}
                 selectedId={selectedId}
-                onSelect={(v) => setSelectedId(v.id)}
+                shownViolationIds={shownViolationIds}
+                onToggleShown={handleToggleShownViolation}
+                onShowAll={handleShowAllViolations}
+                onHideAll={handleHideAllViolations}
                 filter={severityFilter}
                 onFilterChange={setSeverityFilter}
                 onIgnore={handleIgnore}
