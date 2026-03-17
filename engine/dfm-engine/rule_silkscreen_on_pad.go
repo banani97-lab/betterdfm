@@ -116,16 +116,20 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 		return violations
 	}
 
-	checkOverlap := func(silkLayer string, silkBox bb) {
+	// checkOverlap tests a silk feature against nearby copper pads.
+	// silkBox is used for grid bucketing (AABB pre-filter only).
+	// exactOK, if non-nil, is called after the AABB pre-filter to confirm
+	// actual geometric overlap — this prevents false positives from diagonal
+	// silk segments (e.g. octagon courtyard outlines) whose bounding boxes
+	// extend inward over a pad that doesn't touch the actual line stroke.
+	checkOverlap := func(silkLayer string, silkBox bb, exactOK func(pe padEntry) bool) {
 		if len(violations) >= maxSilkscreenOnPadViolations {
 			return
 		}
-		// Determine which grid cells the silk feature's bounding box covers.
 		cxMin := int(math.Floor(silkBox.minX / gridCellMM))
 		cxMax := int(math.Floor(silkBox.maxX / gridCellMM))
 		cyMin := int(math.Floor(silkBox.minY / gridCellMM))
 		cyMax := int(math.Floor(silkBox.maxY / gridCellMM))
-		// seen prevents double-reporting pads that appear in multiple cells.
 		seen := make(map[int]bool)
 	outer:
 		for cx := cxMin; cx <= cxMax; cx++ {
@@ -139,32 +143,37 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 					if !sameSide(silkLayer, pe.layer) {
 						continue
 					}
-					if silkBox.overlaps(pe.box) {
-						msg, sug := msgSilkscreenOnPad(pe.refDes)
-						// Report at the center of the silk feature.
-						scx := (silkBox.minX + silkBox.maxX) / 2
-						scy := (silkBox.minY + silkBox.maxY) / 2
-						violations = append(violations, Violation{
-							RuleID:     r.ID(),
-							Severity:   "WARNING",
-							Layer:      silkLayer,
-							X:          scx,
-							Y:          scy,
-							X2:         (pe.box.minX + pe.box.maxX) / 2,
-							Y2:         (pe.box.minY + pe.box.maxY) / 2,
-							Message:    msg,
-							Suggestion: sug,
-							RefDes:     pe.refDes,
-						})
-						// Only report the first overlapping pad per silk feature.
-						break outer
+					if !silkBox.overlaps(pe.box) {
+						continue
 					}
+					if exactOK != nil && !exactOK(pe) {
+						continue
+					}
+					msg, sug := msgSilkscreenOnPad(pe.refDes)
+					scx := (silkBox.minX + silkBox.maxX) / 2
+					scy := (silkBox.minY + silkBox.maxY) / 2
+					violations = append(violations, Violation{
+						RuleID:     r.ID(),
+						Severity:   "WARNING",
+						Layer:      silkLayer,
+						X:          scx,
+						Y:          scy,
+						X2:         (pe.box.minX + pe.box.maxX) / 2,
+						Y2:         (pe.box.minY + pe.box.maxY) / 2,
+						Message:    msg,
+						Suggestion: sug,
+						RefDes:     pe.refDes,
+					})
+					break outer
 				}
 			}
 		}
 	}
 
 	// Check silk traces.
+	// Use an exact capsule-vs-pad check so that diagonal segments (e.g. the
+	// 45° sides of an octagon courtyard) don't produce false positives from
+	// their oversized bounding boxes.
 	for _, t := range board.Traces {
 		if len(violations) >= maxSilkscreenOnPadViolations {
 			break
@@ -179,10 +188,18 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 			math.Min(t.StartY, t.EndY) - hw,
 			math.Max(t.StartY, t.EndY) + hw,
 		}
-		checkOverlap(t.Layer, box)
+		t := t // capture for closure
+		exactOK := func(pe padEntry) bool {
+			padCx := (pe.box.minX + pe.box.maxX) / 2
+			padCy := (pe.box.minY + pe.box.maxY) / 2
+			padR := math.Max(pe.box.maxX-pe.box.minX, pe.box.maxY-pe.box.minY) / 2
+			return ptToSegDist(padCx, padCy, t.StartX, t.StartY, t.EndX, t.EndY) < hw+padR
+		}
+		checkOverlap(t.Layer, box, exactOK)
 	}
 
-	// Check silk pads (e.g. silkscreen courtyard pad markings).
+	// Check silk pads. AABB is a good enough approximation for rectangular
+	// pad-shaped silk features so no exact check is needed.
 	for _, p := range board.Pads {
 		if len(violations) >= maxSilkscreenOnPadViolations {
 			break
@@ -192,7 +209,7 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 		}
 		hw, hh := p.WidthMM/2, p.HeightMM/2
 		box := bb{p.X - hw, p.X + hw, p.Y - hh, p.Y + hh}
-		checkOverlap(p.Layer, box)
+		checkOverlap(p.Layer, box, nil)
 	}
 
 	return dedupeViolations(violations, 2.0)

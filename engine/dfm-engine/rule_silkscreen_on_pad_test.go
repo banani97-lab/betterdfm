@@ -96,6 +96,53 @@ func TestSilkscreenOnPad_NoCopperPads(t *testing.T) {
 	}
 }
 
+func TestSilkscreenOnPad_DiagonalSegmentNoFalsePositive(t *testing.T) {
+	rule := &SilkscreenOnPadRule{}
+	// Octagon courtyard: diagonal silk segment from (8,10) to (10,8), width=0.12mm.
+	// Its AABB extends inward and covers a 1mm circular pad at (10,10), but the
+	// actual line stroke does not touch the pad. Must NOT flag a violation.
+	board := BoardData{
+		Layers: []Layer{
+			{Name: "top_copper", Type: "COPPER"},
+			{Name: "top_silk", Type: "SILK"},
+		},
+		Traces: []Trace{
+			// Diagonal segment: part of an octagon outline around the pad
+			{Layer: "top_silk", WidthMM: 0.12, StartX: 8, StartY: 10, EndX: 10, EndY: 8},
+		},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 1.0, HeightMM: 1.0, Shape: "CIRCLE", RefDes: "U1"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	viols := rule.Run(board, ProfileRules{})
+	if len(viols) != 0 {
+		t.Fatalf("diagonal silk segment near but not touching pad should not be flagged, got %d violations", len(viols))
+	}
+}
+
+func TestSilkscreenOnPad_DiagonalSegmentActualOverlap(t *testing.T) {
+	rule := &SilkscreenOnPadRule{}
+	// Diagonal silk segment that genuinely crosses through the pad center.
+	board := BoardData{
+		Layers: []Layer{
+			{Name: "top_copper", Type: "COPPER"},
+			{Name: "top_silk", Type: "SILK"},
+		},
+		Traces: []Trace{
+			{Layer: "top_silk", WidthMM: 0.12, StartX: 8, StartY: 8, EndX: 12, EndY: 12},
+		},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 1.0, HeightMM: 1.0, Shape: "CIRCLE", RefDes: "U1"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	viols := rule.Run(board, ProfileRules{})
+	if len(viols) == 0 {
+		t.Fatal("diagonal silk segment through pad center should be flagged, got 0 violations")
+	}
+}
+
 func TestSilkscreenOnPad_CopperTraceNotChecked(t *testing.T) {
 	rule := &SilkscreenOnPadRule{}
 	// Copper traces are not pads — silk overlapping a copper trace is NOT flagged by this rule.
