@@ -118,68 +118,121 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		padsByLayer[p.Layer] = append(padsByLayer[p.Layer], p)
 	}
 
+	// P3.2: Add copper polygon edges as zero-width pseudo-traces so they
+	// participate in the clearance sweep. Pour-to-trace and pour-to-pad
+	// clearance violations are detected automatically by the existing sweep.
+	for _, poly := range board.Polygons {
+		if !isCopperLayer(poly.Layer) {
+			continue
+		}
+		// Helper to add all edges of a point ring as pseudo-traces.
+		addRing := func(pts []Point) {
+			n := len(pts)
+			if n < 2 {
+				return
+			}
+			for i := 0; i < n; i++ {
+				a := pts[i]
+				b := pts[(i+1)%n]
+				mx := (a.X + b.X) / 2
+				my := (a.Y + b.Y) / 2
+				if !inBoard(mx, my) {
+					continue
+				}
+				t := Trace{
+					Layer:   poly.Layer,
+					WidthMM: 0,
+					StartX:  a.X,
+					StartY:  a.Y,
+					EndX:    b.X,
+					EndY:    b.Y,
+					NetName: poly.NetName,
+				}
+				tracesByLayer[poly.Layer] = append(tracesByLayer[poly.Layer], newTraceBB(t))
+			}
+		}
+		addRing(poly.Points)
+		for _, hole := range poly.Holes {
+			addRing(hole)
+		}
+	}
+
 	minC := profile.MinClearanceMM
 
 	for layer, traces := range tracesByLayer {
-		// Sort by minX to enable a sweep-line approach: for each trace we
-		// only need to consider later traces whose minX is still within
-		// reach (maxX + combined half-widths + minClearance). This turns the
-		// O(n²) pair enumeration into O(n·k) where k is the average number of
-		// traces in the local neighbourhood — typically very small on real boards.
-		sort.Slice(traces, func(i, j int) bool { return traces[i].minX < traces[j].minX })
+		// P4.3: 2D grid hash for trace-to-trace clearance.
+		// Cell size = 2*minC ensures any violating pair occupies the same or adjacent cells.
+		// This eliminates the O(n·k) worst case for vertically-dense designs.
+		gridCell := minC * 2
+		if gridCell < 0.1 {
+			gridCell = 0.1
+		}
+		type gridKey = [2]int
+		traceGrid := make(map[gridKey][]int, len(traces))
+		for i, tb := range traces {
+			cxMin := int(math.Floor(tb.minX / gridCell))
+			cxMax := int(math.Floor(tb.maxX / gridCell))
+			cyMin := int(math.Floor(tb.minY / gridCell))
+			cyMax := int(math.Floor(tb.maxY / gridCell))
+			for cx := cxMin; cx <= cxMax; cx++ {
+				for cy := cyMin; cy <= cyMax; cy++ {
+					traceGrid[gridKey{cx, cy}] = append(traceGrid[gridKey{cx, cy}], i)
+				}
+			}
+		}
 
 		for i, a := range traces {
 			if len(violations) >= maxClearanceViolations {
 				break
 			}
-			// Any trace j with traces[j].minX > a.maxX + minC cannot be
-			// close enough to violate clearance → stop the inner loop.
-			xThreshold := a.maxX + minC
-
-			for j := i + 1; j < len(traces); j++ {
-				b := traces[j]
-				if b.minX > xThreshold {
-					break // all remaining are farther in X
-				}
-				// Quick Y rejection.
-				if a.maxY+minC < b.minY || b.maxY+minC < a.minY {
-					continue
-				}
-				// Full segment-to-segment distance.
-				if len(violations) >= maxClearanceViolations {
-					break
-				}
-				// Same-net traces are intentionally connected — no clearance check needed.
-				if a.t.NetName != "" && a.t.NetName == b.t.NetName {
-					continue
-				}
-				dist := segToSegDist(
-					a.t.StartX, a.t.StartY, a.t.EndX, a.t.EndY,
-					b.t.StartX, b.t.StartY, b.t.EndX, b.t.EndY,
-				)
-				clearance := dist - (a.t.WidthMM+b.t.WidthMM)/2
-				// Overlapping copper (clearance < 0) is a DRC issue, not DFM.
-				// Copper pours, pad stubs, and via rings routinely produce dist=0.
-				if clearance < 0 {
-					continue
-				}
-				if clearance < minC {
-					msg, sug := msgClearanceTraceTooClose(clearance, minC)
-					violations = append(violations, Violation{
-						RuleID:     r.ID(),
-						Severity:   "ERROR",
-						Layer:      layer,
-						X:          (a.t.StartX + a.t.EndX) / 2,
-						Y:          (a.t.StartY + a.t.EndY) / 2,
-						Message:    msg,
-						Suggestion: sug,
-						MeasuredMM: clearance,
-						LimitMM:    minC,
-						Unit:       "mm",
-						NetName:    a.t.NetName,
-						X2:         (b.t.StartX + b.t.EndX) / 2,
-						Y2:         (b.t.StartY + b.t.EndY) / 2,
-					})
+			// Query all cells this trace's expanded bbox overlaps.
+			cxMin := int(math.Floor((a.minX - minC) / gridCell))
+			cxMax := int(math.Floor((a.maxX + minC) / gridCell))
+			cyMin := int(math.Floor((a.minY - minC) / gridCell))
+			cyMax := int(math.Floor((a.maxY + minC) / gridCell))
+			seenJ := make(map[int]bool)
+			for cx := cxMin; cx <= cxMax; cx++ {
+				for cy := cyMin; cy <= cyMax; cy++ {
+					for _, j := range traceGrid[gridKey{cx, cy}] {
+						if j <= i || seenJ[j] {
+							continue // each pair checked once; skip self
+						}
+						seenJ[j] = true
+						if len(violations) >= maxClearanceViolations {
+							break
+						}
+						b := traces[j]
+						// Same-net traces are intentionally connected — no clearance check.
+						if a.t.NetName != "" && a.t.NetName == b.t.NetName {
+							continue
+						}
+						dist := segToSegDist(
+							a.t.StartX, a.t.StartY, a.t.EndX, a.t.EndY,
+							b.t.StartX, b.t.StartY, b.t.EndX, b.t.EndY,
+						)
+						clearance := dist - (a.t.WidthMM+b.t.WidthMM)/2
+						if clearance < 0 {
+							continue // overlapping copper — DRC issue, not DFM
+						}
+						if clearance < minC-geomEps {
+							msg, sug := msgClearanceTraceTooClose(clearance, minC)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          (a.t.StartX + a.t.EndX) / 2,
+								Y:          (a.t.StartY + a.t.EndY) / 2,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: clearance,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    a.t.NetName,
+								X2:         (b.t.StartX + b.t.EndX) / 2,
+								Y2:         (b.t.StartY + b.t.EndY) / 2,
+							})
+						}
+					}
 				}
 			}
 		}
@@ -219,12 +272,13 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				if t.NetName != "" && t.NetName == p.NetName {
 					continue
 				}
-				dist := ptToSegDist(p.X, p.Y, t.StartX, t.StartY, t.EndX, t.EndY)
-				clearance := dist - t.WidthMM/2 - padRadius
+				// P2.1: closest-point + padEdgeDist for shape-aware clearance.
+				cpX, cpY := closestPointOnSeg(p.X, p.Y, t.StartX, t.StartY, t.EndX, t.EndY)
+				clearance := padEdgeDist(cpX, cpY, p) - t.WidthMM/2
 				if clearance < 0 {
 					continue // overlapping copper -- DRC issue, not DFM
 				}
-				if clearance < minC {
+				if clearance < minC-geomEps {
 					msg, sug := msgClearancePadTooClose(clearance, minC)
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
@@ -281,6 +335,9 @@ func segsIntersect(ax, ay, bx, by, cx, cy, dx, dy float64) bool {
 	d2 := cross2D(cx, cy, dx, dy, bx, by)
 	d3 := cross2D(ax, ay, bx, by, cx, cy)
 	d4 := cross2D(ax, ay, bx, by, dx, dy)
-	return ((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) &&
-		((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))
+	// P2.3: Treat near-zero cross products as collinear (not intersecting).
+	pos := func(v float64) bool { return v > geomEps }
+	neg := func(v float64) bool { return v < -geomEps }
+	return ((pos(d1) && neg(d2)) || (neg(d1) && pos(d2))) &&
+		((pos(d3) && neg(d4)) || (neg(d3) && pos(d4)))
 }

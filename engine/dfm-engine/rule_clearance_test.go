@@ -123,6 +123,71 @@ func TestClearance_PowerGroundLayerChecked(t *testing.T) {
 	}
 }
 
+func TestClearance_RectPadGap(t *testing.T) {
+	rule := &ClearanceRule{}
+	// RECT pad 2×1mm at (10,10). Trace at y=11.1, width=0.1mm.
+	// Pad top edge at y=10.5. Closest-on-trace to edge → (10,11.1). dist=0.6, minus w/2=0.05 → 0.55mm > 0.15 → pass.
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Traces: []Trace{
+			{Layer: "top_copper", WidthMM: 0.1, StartX: 0, StartY: 11.1, EndX: 50, EndY: 11.1},
+		},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 2, HeightMM: 1, Shape: "RECT"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinClearanceMM: 0.15}
+	viols := rule.Run(board, profile)
+	if len(viols) != 0 {
+		t.Fatalf("RECT pad 0.55mm from trace should pass, got %d violations", len(viols))
+	}
+}
+
+func TestClearance_RectPadTooClose(t *testing.T) {
+	rule := &ClearanceRule{}
+	// RECT pad 2×1mm at (10,10): top edge at y=10.5.
+	// Trace at y=10.55, width=0.1mm: nearest edge = 0.05mm. gap = 0.05-0.05 = 0 < 0.15 → violation.
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Traces: []Trace{
+			{Layer: "top_copper", WidthMM: 0.1, StartX: 0, StartY: 10.55, EndX: 50, EndY: 10.55},
+		},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 2, HeightMM: 1, Shape: "RECT"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinClearanceMM: 0.15}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("RECT pad nearly touching trace should be flagged, got 0 violations")
+	}
+}
+
+func TestClearance_PolygonEdgesIncluded(t *testing.T) {
+	rule := &ClearanceRule{}
+	// Copper polygon with bottom edge at y=10. Trace at y=10.1, width=0.1mm.
+	// Gap = 0.1 - 0 - 0.05 = 0.05mm < 0.15mm → violation.
+	poly := Polygon{
+		Layer: "top_copper",
+		Points: []Point{
+			{X: 0, Y: 10}, {X: 50, Y: 10}, {X: 50, Y: 11}, {X: 0, Y: 11},
+		},
+	}
+	board := BoardData{
+		Layers:   []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Traces:   []Trace{{Layer: "top_copper", WidthMM: 0.1, StartX: 5, StartY: 10.1, EndX: 45, EndY: 10.1}},
+		Polygons: []Polygon{poly},
+		Outline:  rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinClearanceMM: 0.15}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("trace 0.05mm from polygon edge should be flagged, got 0 violations")
+	}
+}
+
 func TestClearance_DedupeCollapses(t *testing.T) {
 	rule := &ClearanceRule{}
 	// 30 pairs of traces very close together in the same 2mm cell

@@ -104,6 +104,7 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	if err := json.Unmarshal(body, &board); err != nil {
 		return fmt.Errorf("failed to unmarshal board data: %w", err)
 	}
+	board = sanitizeBoard(board, jobID)
 
 	// 5.5 Persist board data on the job record for visualization
 	if boardJSON, err := json.Marshal(board); err == nil {
@@ -171,4 +172,52 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	// Update submission status
 	w.db.Model(&Submission{}).Where("id = ?", submission.ID).Update("status", "DONE")
 	return nil
+}
+
+// sanitizeBoard drops degenerate geometry and warns when the outline looks invalid.
+func sanitizeBoard(board dfmengine.BoardData, jobID string) dfmengine.BoardData {
+	// Drop zero-width traces.
+	validTraces := board.Traces[:0]
+	for _, t := range board.Traces {
+		if t.WidthMM > 0 {
+			validTraces = append(validTraces, t)
+		}
+	}
+	dropped := len(board.Traces) - len(validTraces)
+	if dropped > 0 {
+		log.Printf("job %s: sanitize dropped %d zero-width traces", jobID, dropped)
+	}
+	board.Traces = validTraces
+
+	// Drop zero-size pads.
+	validPads := board.Pads[:0]
+	for _, p := range board.Pads {
+		if p.WidthMM > 0 && p.HeightMM > 0 {
+			validPads = append(validPads, p)
+		}
+	}
+	dropped = len(board.Pads) - len(validPads)
+	if dropped > 0 {
+		log.Printf("job %s: sanitize dropped %d zero-size pads", jobID, dropped)
+	}
+	board.Pads = validPads
+
+	// Drop zero-diameter drills.
+	validDrills := board.Drills[:0]
+	for _, d := range board.Drills {
+		if d.DiamMM > 0 {
+			validDrills = append(validDrills, d)
+		}
+	}
+	dropped = len(board.Drills) - len(validDrills)
+	if dropped > 0 {
+		log.Printf("job %s: sanitize dropped %d zero-diameter drills", jobID, dropped)
+	}
+	board.Drills = validDrills
+
+	if len(board.Outline) < 3 {
+		log.Printf("job %s: WARN outline has %d points (< 3); edge-clearance will be skipped", jobID, len(board.Outline))
+	}
+
+	return board
 }

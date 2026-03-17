@@ -13,6 +13,8 @@ def _layer_type(name: str) -> str:
     n = name.lower()
     if "copper" in n or "gtl" in n or "gbl" in n or "signal" in n or "inner" in n:
         return "COPPER"
+    if "paste" in n or "gtp" in n or "gbp" in n:
+        return "SOLDER_PASTE"
     if "mask" in n or "gts" in n or "gbs" in n:
         return "SOLDER_MASK"
     if "silk" in n or "gto" in n or "gbo" in n or "legend" in n:
@@ -91,6 +93,7 @@ def _extract_graphic_layer(layer_name: str, layer_file, ltype: str,
         if isinstance(c, (Line, Arc)):
             if ltype == "OUTLINE":
                 outline.append(Point(x=c.x1, y=c.y1))
+                outline.append(Point(x=c.x2, y=c.y2))
             elif ltype == "COPPER":
                 w = _ap_width_mm(c.aperture) if c.aperture else 0.1
                 traces.append(Trace(
@@ -212,4 +215,5 @@ def parse_gerber(file_path: str) -> BoardData:
     return BoardData(
         layers=layers_out, traces=traces, pads=pads, vias=vias,
         drills=drills, outline=outline, boardThicknessMM=1.6,
+        outlineHoles=[],
     )

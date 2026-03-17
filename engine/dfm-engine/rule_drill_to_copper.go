@@ -38,16 +38,17 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 			n != "rout"
 	}
 
-	// Collect all drills and vias as (x, y, radius) tuples.
+	// Collect all drills and vias as (x, y, radius, netName) tuples.
 	type hole struct {
 		x, y, radius float64
+		netName      string
 	}
 	holes := make([]hole, 0, len(board.Drills)+len(board.Vias))
 	for _, d := range board.Drills {
-		holes = append(holes, hole{d.X, d.Y, d.DiamMM / 2})
+		holes = append(holes, hole{d.X, d.Y, d.DiamMM / 2, ""})
 	}
 	for _, v := range board.Vias {
-		holes = append(holes, hole{v.X, v.Y, v.DrillDiamMM / 2})
+		holes = append(holes, hole{v.X, v.Y, v.DrillDiamMM / 2, v.NetName})
 	}
 	if len(holes) == 0 {
 		return violations
@@ -115,7 +116,7 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 			if gap < 0 {
 				continue // overlapping (annular ring or DRC issue)
 			}
-			if gap < minD {
+			if gap < minD-geomEps {
 				msg, sug := msgDrillToCopperBelow(gap, minD)
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),
@@ -148,17 +149,21 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 			if p.X > h.x+h.radius+minD+padRadius {
 				break
 			}
+			// Skip via's own annular ring pad (same net).
+			if h.netName != "" && p.NetName == h.netName {
+				continue
+			}
 			// Quick Y rejection.
 			if p.Y+padRadius+h.radius+minD < h.y || p.Y-padRadius-h.radius-minD > h.y {
 				continue
 			}
-			dx, dy := p.X-h.x, p.Y-h.y
-			dist := math.Sqrt(dx*dx + dy*dy)
-			gap := dist - h.radius - padRadius
+			// P2.1: padEdgeDist for shape-aware drill-to-pad gap.
+			
+			gap := padEdgeDist(h.x, h.y, p) - h.radius
 			if gap < 0 {
 				continue // overlapping (annular ring pad or DRC issue)
 			}
-			if gap < minD {
+			if gap < minD-geomEps {
 				msg, sug := msgDrillToCopperBelow(gap, minD)
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),

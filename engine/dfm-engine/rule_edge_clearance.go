@@ -1,5 +1,7 @@
 package dfmengine
 
+import "math"
+
 // EdgeClearanceRule checks that copper features maintain minimum distance from the board edge.
 type EdgeClearanceRule struct{}
 
@@ -7,7 +9,8 @@ func (r *EdgeClearanceRule) ID() string { return "edge-clearance" }
 
 func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 	var violations []Violation
-	if profile.MinEdgeClearanceMM <= 0 || len(board.Outline) < 2 {
+	// P2.4: Require at least 3 outline points for a valid closed polygon.
+	if profile.MinEdgeClearanceMM <= 0 || len(board.Outline) < 3 {
 		return violations
 	}
 
@@ -15,7 +18,11 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 	// Cell size = 2× the minimum clearance so any violating point is guaranteed
 	// to have the nearest outline segment in its 3×3 neighbourhood.
 	cellMM := profile.MinEdgeClearanceMM * 2
-	oidx := newOutlineIndex(board.Outline, cellMM)
+	// P4.1: Build index from all outline rings: outer boundary + inner cutouts.
+	allRings := make([][]Point, 1, 1+len(board.OutlineHoles))
+	allRings[0] = board.Outline
+	allRings = append(allRings, board.OutlineHoles...)
+	oidx := newOutlineIndexFromRings(allRings, cellMM)
 
 	// Compute bounding box of the board outline to quickly reject flex-tail
 	// features that extend far outside the rigid board region.
@@ -53,6 +60,8 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 		edgeCellMM = 2.0
 	)
 
+	limit := profile.MinEdgeClearanceMM
+
 	for _, trace := range board.Traces {
 		if len(violations) >= maxViol {
 			break
@@ -60,27 +69,45 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 		if !copperLayers[trace.Layer] {
 			continue
 		}
-		for _, pt := range [2][2]float64{{trace.StartX, trace.StartY}, {trace.EndX, trace.EndY}} {
+		half := trace.WidthMM / 2
+		// P2.2: Sample N points along the trace at limit/2 intervals so that a
+		// trace running parallel and close to the edge is never missed even when
+		// both endpoints are far away.
+		tdx := trace.EndX - trace.StartX
+		tdy := trace.EndY - trace.StartY
+		traceLen := math.Sqrt(tdx*tdx + tdy*tdy)
+		interval := limit / 2
+		if interval < geomEps {
+			interval = 0.1
+		}
+		nSteps := int(traceLen/interval) + 1
+		if nSteps < 2 {
+			nSteps = 2
+		}
+		for s := 0; s <= nSteps; s++ {
 			if len(violations) >= maxViol {
 				break
 			}
-			// Skip features far outside the board outline bounding box (e.g. flex tails).
-			if !inBBoxRegion(pt[0], pt[1]) {
+			frac := float64(s) / float64(nSteps)
+			ptX := trace.StartX + frac*tdx
+			ptY := trace.StartY + frac*tdy
+			if !inBBoxRegion(ptX, ptY) {
 				continue
 			}
-			dist := oidx.minDist(pt[0], pt[1])
-			if dist < profile.MinEdgeClearanceMM {
-				msg, sug := msgEdgeClearanceTraceBelow(dist, profile.MinEdgeClearanceMM)
+			copperEdgeDist := oidx.minDist(ptX, ptY) - half
+			// P2.3: Only flag if strictly below limit (geomEps tolerance).
+			if copperEdgeDist < limit-geomEps {
+				msg, sug := msgEdgeClearanceTraceBelow(copperEdgeDist, limit)
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),
 					Severity:   "WARNING",
 					Layer:      trace.Layer,
-					X:          pt[0],
-					Y:          pt[1],
+					X:          ptX,
+					Y:          ptY,
 					Message:    msg,
 					Suggestion: sug,
-					MeasuredMM: dist,
-					LimitMM:    profile.MinEdgeClearanceMM,
+					MeasuredMM: copperEdgeDist,
+					LimitMM:    limit,
 					Unit:       "mm",
 					NetName:    trace.NetName,
 				})
@@ -97,9 +124,12 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 		if !inBBoxRegion(pad.X, pad.Y) {
 			continue
 		}
-		dist := oidx.minDist(pad.X, pad.Y)
-		if dist < profile.MinEdgeClearanceMM {
-			msg, sug := msgEdgeClearancePadBelow(dist, profile.MinEdgeClearanceMM)
+		// P2.1: Use the closest outline point + padEdgeDist for shape-aware gap.
+		_, cpX, cpY := oidx.minDistWithPoint(pad.X, pad.Y)
+		copperEdgeDist := padEdgeDist(cpX, cpY, pad)
+		// P2.3: Only flag if strictly below limit.
+		if copperEdgeDist < limit-geomEps {
+			msg, sug := msgEdgeClearancePadBelow(copperEdgeDist, limit)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "WARNING",
@@ -108,12 +138,82 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 				Y:          pad.Y,
 				Message:    msg,
 				Suggestion: sug,
-				MeasuredMM: dist,
-				LimitMM:    profile.MinEdgeClearanceMM,
+				MeasuredMM: copperEdgeDist,
+				LimitMM:    limit,
 				Unit:       "mm",
 				NetName:    pad.NetName,
 				RefDes:     pad.RefDes,
 			})
+		}
+	}
+	// P3.1: Check copper polygon edges (fills/planes/pours) against board outline.
+	for _, poly := range board.Polygons {
+		if len(violations) >= maxViol {
+			break
+		}
+		if !copperLayers[poly.Layer] {
+			continue
+		}
+		// Build a list of rings: outer boundary + each hole.
+		rings := make([][]Point, 0, 1+len(poly.Holes))
+		rings = append(rings, poly.Points)
+		rings = append(rings, poly.Holes...)
+
+		for _, ring := range rings {
+			if len(violations) >= maxViol {
+				break
+			}
+			n := len(ring)
+			if n < 2 {
+				continue
+			}
+			for i := 0; i < n; i++ {
+				if len(violations) >= maxViol {
+					break
+				}
+				a := ring[i]
+				b := ring[(i+1)%n]
+				edx := b.X - a.X
+				edy := b.Y - a.Y
+				edgeLen := math.Sqrt(edx*edx + edy*edy)
+				interval := limit / 2
+				if interval < geomEps {
+					interval = 0.1
+				}
+				nSteps := int(edgeLen/interval) + 1
+				if nSteps < 2 {
+					nSteps = 2
+				}
+				for s := 0; s <= nSteps; s++ {
+					if len(violations) >= maxViol {
+						break
+					}
+					frac := float64(s) / float64(nSteps)
+					ptX := a.X + frac*edx
+					ptY := a.Y + frac*edy
+					if !inBBoxRegion(ptX, ptY) {
+						continue
+					}
+					// Polygon edges have zero copper width — no half-width subtraction.
+					copperEdgeDist := oidx.minDist(ptX, ptY)
+					if copperEdgeDist < limit-geomEps {
+						msg, sug := msgEdgeClearanceTraceBelow(copperEdgeDist, limit)
+						violations = append(violations, Violation{
+							RuleID:     r.ID(),
+							Severity:   "WARNING",
+							Layer:      poly.Layer,
+							X:          ptX,
+							Y:          ptY,
+							Message:    msg,
+							Suggestion: sug,
+							MeasuredMM: copperEdgeDist,
+							LimitMM:    limit,
+							Unit:       "mm",
+							NetName:    poly.NetName,
+						})
+					}
+				}
+			}
 		}
 	}
 	return dedupeViolations(violations, edgeCellMM)

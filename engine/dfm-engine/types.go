@@ -7,15 +7,16 @@ type BoardData struct {
 	Pads             []Pad     `json:"pads"`
 	Vias             []Via     `json:"vias"`
 	Drills           []Drill   `json:"drills"`
-	Outline          []Point   `json:"outline"`
-	BoardThicknessMM float64   `json:"boardThicknessMM"`
-	Warnings         []string  `json:"warnings,omitempty"`
-	Polygons         []Polygon `json:"polygons,omitempty"`
+	Outline          []Point    `json:"outline"`
+	OutlineHoles     [][]Point  `json:"outlineHoles,omitempty"` // inner cutout boundaries (slots, step-outs)
+	BoardThicknessMM float64    `json:"boardThicknessMM"`
+	Warnings         []string   `json:"warnings,omitempty"`
+	Polygons         []Polygon  `json:"polygons,omitempty"`
 }
 
 type Layer struct {
 	Name string `json:"name"`
-	Type string `json:"type"` // COPPER | SOLDER_MASK | SILK | DRILL | OUTLINE
+	Type string `json:"type"` // COPPER | POWER_GROUND | SOLDER_MASK | SOLDER_PASTE | SILK | DRILL | OUTLINE | ROUT
 }
 
 type Point struct {
@@ -39,9 +40,10 @@ type Pad struct {
 	Y        float64 `json:"y"`
 	WidthMM  float64 `json:"widthMM"`
 	HeightMM float64 `json:"heightMM"`
-	Shape    string  `json:"shape"` // RECT | CIRCLE | OVAL
+	Shape    string  `json:"shape"`             // RECT | CIRCLE | OVAL | POLYGON
 	NetName  string  `json:"netName"`
 	RefDes   string  `json:"refDes"`
+	Contour  []Point `json:"contour,omitempty"` // polygon contour points when Shape == "POLYGON"
 }
 
 type Via struct {
@@ -49,6 +51,7 @@ type Via struct {
 	Y           float64 `json:"y"`
 	OuterDiamMM float64 `json:"outerDiamMM"`
 	DrillDiamMM float64 `json:"drillDiamMM"`
+	NetName     string  `json:"netName,omitempty"`
 }
 
 type Drill struct {

@@ -1,0 +1,11 @@
+UNITS=INCH
+OB 0 0 I
+OS 1 0
+OS 1 0.5
+OS 0 0.5
+OE
+OB 0.2 0.1 H
+OS 0.8 0.1
+OS 0.8 0.4
+OS 0.2 0.4
+OE

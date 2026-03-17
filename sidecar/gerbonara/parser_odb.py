@@ -192,42 +192,69 @@ def _matrix_type_to_ltype(mtype: str) -> str | None:
     if m == "DRILL":
         return "DRILL"
     if m == "SOLDER_PASTE":
-        return "SOLDER_MASK"
+        return "SOLDER_PASTE"
     if m == "ROUT":
         return "ROUT"
     return None
 
 
-def _parse_profile(profile_path: Path, units: str) -> list[Point]:
-    """Parse ODB++ profile file → board outline polygon points."""
-    outline: list[Point] = []
+def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[list[Point]]]:
+    """Parse ODB++ profile file → (boundary_points, holes).
+
+    boundary_points: outer island points (flag "I")
+    holes: list of rings, one per "H" block
+    """
+    boundary: list[Point] = []
+    holes: list[list[Point]] = []
+    current_ring: list[Point] = []
+    current_flag: str = "I"
+    in_island = False
     try:
         text = profile_path.read_text(errors="replace")
     except OSError:
-        return outline
-    in_island = False
+        return boundary, holes
     for line in text.splitlines():
         s = line.strip()
         if s.startswith("OB "):
+            # flush previous ring if open
+            if in_island and current_ring:
+                if current_flag == "I":
+                    boundary.extend(current_ring)
+                elif current_flag == "H":
+                    holes.append(current_ring)
+            current_ring = []
             parts = s.split()
-            in_island = (parts[3] == "I") if len(parts) >= 4 else True
-            if in_island and len(parts) >= 3:
+            current_flag = parts[3] if len(parts) >= 4 else "I"
+            in_island = True
+            if len(parts) >= 3:
                 try:
-                    outline.append(Point(x=_coord_to_mm(float(parts[1]), units),
-                                         y=_coord_to_mm(float(parts[2]), units)))
+                    current_ring.append(Point(x=_coord_to_mm(float(parts[1]), units),
+                                              y=_coord_to_mm(float(parts[2]), units)))
                 except ValueError:
                     pass
         elif s.startswith(("OS ", "OC ")) and in_island:
             parts = s.split()
             if len(parts) >= 3:
                 try:
-                    outline.append(Point(x=_coord_to_mm(float(parts[1]), units),
-                                         y=_coord_to_mm(float(parts[2]), units)))
+                    current_ring.append(Point(x=_coord_to_mm(float(parts[1]), units),
+                                              y=_coord_to_mm(float(parts[2]), units)))
                 except ValueError:
                     pass
         elif s == "OE" and in_island:
+            if current_ring:
+                if current_flag == "I":
+                    boundary.extend(current_ring)
+                elif current_flag == "H":
+                    holes.append(list(current_ring))
+            current_ring = []
             in_island = False
-    return outline
+    # flush any open ring at EOF
+    if in_island and current_ring:
+        if current_flag == "I":
+            boundary.extend(current_ring)
+        elif current_flag == "H":
+            holes.append(current_ring)
+    return boundary, holes
 
 
 # ── Arc approximation ─────────────────────────────────────────────────────────
@@ -815,6 +842,7 @@ def parse_odb(file_path: str) -> BoardData:
     vias: list[Via] = []
     drills: list[Drill] = []
     outline: list[Point] = []
+    outline_holes: list[list[Point]] = []
     warnings: list[str] = []
     polygons: list[Polygon] = []
 
@@ -831,8 +859,8 @@ def parse_odb(file_path: str) -> BoardData:
             logger.info("ODB++ units: %s", units)
 
             layer_defs = _parse_matrix(job_root / "matrix" / "matrix")
-            outline = _parse_profile(step_root / "profile", units)
-            logger.info("ODB++ outline: %d points", len(outline))
+            outline, outline_holes = _parse_profile(step_root / "profile", units)
+            logger.info("ODB++ outline: %d points, %d holes", len(outline), len(outline_holes))
 
             netlist_path = step_root / "netlists" / "cadnet" / "netlist"
             _, net_points = _parse_netlist(netlist_path, units)
@@ -875,8 +903,8 @@ def parse_odb(file_path: str) -> BoardData:
             if not outline and outline_layer_name:
                 feat = _find_layer_features(layers_dir, outline_layer_name)
                 if feat:
-                    outline = _parse_profile(feat, units)
-                    logger.info("ODB++ outline from layer %r: %d points", outline_layer_name, len(outline))
+                    outline, outline_holes = _parse_profile(feat, units)
+                    logger.info("ODB++ outline from layer %r: %d points, %d holes", outline_layer_name, len(outline), len(outline_holes))
 
             logger.info("ODB++ vias: %d", len(vias))
 
@@ -888,4 +916,4 @@ def parse_odb(file_path: str) -> BoardData:
                 len(layers), len(traces), len(pads), len(vias), len(drills), len(polygons))
     return BoardData(layers=layers, traces=traces, pads=pads, vias=vias,
                      drills=drills, outline=outline, boardThicknessMM=1.6,
-                     warnings=warnings, polygons=polygons)
+                     warnings=warnings, polygons=polygons, outlineHoles=outline_holes)

@@ -76,25 +76,43 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 			n != "rout"
 	}
 
-	// Collect copper pad bounding boxes keyed by layer.
+	// Collect copper pad bounding boxes and build a 2D grid hash index.
+	// Cell size of 2.0 mm matches typical pad pitch; pads spanning multiple
+	// cells are stored in all overlapping cells (same pattern as outlineIndex
+	// in spatial.go).  Query cost is O(cells_covered) instead of O(n_pads).
+	const gridCellMM = 2.0
+
 	type padEntry struct {
 		box    bb
 		refDes string
 		layer  string
 	}
-	var copperPadBBs []padEntry
+	var padEntries []padEntry
+	padGrid := make(map[[2]int][]int) // grid cell → []index into padEntries
 	for _, p := range board.Pads {
 		if !isCopperLayer(p.Layer) {
 			continue
 		}
 		hw, hh := p.WidthMM/2, p.HeightMM/2
-		copperPadBBs = append(copperPadBBs, padEntry{
+		pe := padEntry{
 			box:    bb{p.X - hw, p.X + hw, p.Y - hh, p.Y + hh},
 			refDes: p.RefDes,
 			layer:  p.Layer,
-		})
+		}
+		idx := len(padEntries)
+		padEntries = append(padEntries, pe)
+		cxMin := int(math.Floor(pe.box.minX / gridCellMM))
+		cxMax := int(math.Floor(pe.box.maxX / gridCellMM))
+		cyMin := int(math.Floor(pe.box.minY / gridCellMM))
+		cyMax := int(math.Floor(pe.box.maxY / gridCellMM))
+		for cx := cxMin; cx <= cxMax; cx++ {
+			for cy := cyMin; cy <= cyMax; cy++ {
+				key := [2]int{cx, cy}
+				padGrid[key] = append(padGrid[key], idx)
+			}
+		}
 	}
-	if len(copperPadBBs) == 0 {
+	if len(padEntries) == 0 {
 		return violations
 	}
 
@@ -102,32 +120,46 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 		if len(violations) >= maxSilkscreenOnPadViolations {
 			return
 		}
-		for _, pe := range copperPadBBs {
-			if !sameSide(silkLayer, pe.layer) {
-				continue
-			}
-			if silkBox.overlaps(pe.box) {
-				msg, sug := msgSilkscreenOnPad(pe.refDes)
-				// Report at the center of the silk feature.
-				cx := (silkBox.minX + silkBox.maxX) / 2
-				cy := (silkBox.minY + silkBox.maxY) / 2
-				violations = append(violations, Violation{
-					RuleID:     r.ID(),
-					Severity:   "WARNING",
-					Layer:      silkLayer,
-					X:          cx,
-					Y:          cy,
-					X2:         (pe.box.minX + pe.box.maxX) / 2,
-					Y2:         (pe.box.minY + pe.box.maxY) / 2,
-					Message:    msg,
-					Suggestion: sug,
-					RefDes:     pe.refDes,
-				})
-				if len(violations) >= maxSilkscreenOnPadViolations {
-					return
+		// Determine which grid cells the silk feature's bounding box covers.
+		cxMin := int(math.Floor(silkBox.minX / gridCellMM))
+		cxMax := int(math.Floor(silkBox.maxX / gridCellMM))
+		cyMin := int(math.Floor(silkBox.minY / gridCellMM))
+		cyMax := int(math.Floor(silkBox.maxY / gridCellMM))
+		// seen prevents double-reporting pads that appear in multiple cells.
+		seen := make(map[int]bool)
+	outer:
+		for cx := cxMin; cx <= cxMax; cx++ {
+			for cy := cyMin; cy <= cyMax; cy++ {
+				for _, padIdx := range padGrid[[2]int{cx, cy}] {
+					if seen[padIdx] {
+						continue
+					}
+					seen[padIdx] = true
+					pe := padEntries[padIdx]
+					if !sameSide(silkLayer, pe.layer) {
+						continue
+					}
+					if silkBox.overlaps(pe.box) {
+						msg, sug := msgSilkscreenOnPad(pe.refDes)
+						// Report at the center of the silk feature.
+						scx := (silkBox.minX + silkBox.maxX) / 2
+						scy := (silkBox.minY + silkBox.maxY) / 2
+						violations = append(violations, Violation{
+							RuleID:     r.ID(),
+							Severity:   "WARNING",
+							Layer:      silkLayer,
+							X:          scx,
+							Y:          scy,
+							X2:         (pe.box.minX + pe.box.maxX) / 2,
+							Y2:         (pe.box.minY + pe.box.maxY) / 2,
+							Message:    msg,
+							Suggestion: sug,
+							RefDes:     pe.refDes,
+						})
+						// Only report the first overlapping pad per silk feature.
+						break outer
+					}
 				}
-				// Only report the first overlapping pad per silk feature.
-				break
 			}
 		}
 	}

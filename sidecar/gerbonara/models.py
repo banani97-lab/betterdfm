@@ -16,7 +16,7 @@ class Point(BaseModel):
 
 class Layer(BaseModel):
     name: str
-    type: str  # "COPPER" | "SOLDER_MASK" | "SILK" | "DRILL" | "OUTLINE"
+    type: str  # "COPPER" | "SOLDER_MASK" | "SOLDER_PASTE" | "SILK" | "DRILL" | "OUTLINE"
 
 
 class Trace(BaseModel):
@@ -35,9 +35,10 @@ class Pad(BaseModel):
     y: float
     widthMM: float
     heightMM: float
-    shape: str  # "RECT" | "CIRCLE" | "OVAL"
+    shape: str  # "RECT" | "CIRCLE" | "OVAL" | "POLYGON"
     netName: str = ""
     refDes: str = ""
+    contour: list[Point] = []  # polygon contour when shape == "POLYGON"
 
 
 class Via(BaseModel):
@@ -72,3 +73,4 @@ class BoardData(BaseModel):
     boardThicknessMM: float
     warnings: list[str] = []
     polygons: list[Polygon] = []
+    outlineHoles: list[list[Point]] = []  # inner cutout boundaries (slots, step-outs)

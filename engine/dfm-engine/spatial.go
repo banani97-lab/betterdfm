@@ -44,8 +44,55 @@ func newOutlineIndex(outline []Point, cellMM float64) *outlineIndex {
 	return idx
 }
 
+// newOutlineIndexFromRings builds an outline spatial index from one or more
+// point rings (outer boundary + any inner cutout holes). Each ring's points
+// are connected in order with wrap-around; no inter-ring connections are made.
+func newOutlineIndexFromRings(rings [][]Point, cellMM float64) *outlineIndex {
+	if cellMM <= 0 {
+		cellMM = 2.0
+	}
+	idx := &outlineIndex{
+		cells:  make(map[[2]int][]int),
+		cellMM: cellMM,
+	}
+	for _, ring := range rings {
+		n := len(ring)
+		if n < 2 {
+			continue
+		}
+		for i := 0; i < n; i++ {
+			a := ring[i]
+			b := ring[(i+1)%n]
+			segIdx := len(idx.segments)
+			idx.segments = append(idx.segments, [4]float64{a.X, a.Y, b.X, b.Y})
+			minX := math.Min(a.X, b.X)
+			maxX := math.Max(a.X, b.X)
+			minY := math.Min(a.Y, b.Y)
+			maxY := math.Max(a.Y, b.Y)
+			cxMin := int(math.Floor(minX / cellMM))
+			cxMax := int(math.Floor(maxX / cellMM))
+			cyMin := int(math.Floor(minY / cellMM))
+			cyMax := int(math.Floor(maxY / cellMM))
+			for cx := cxMin; cx <= cxMax; cx++ {
+				for cy := cyMin; cy <= cyMax; cy++ {
+					key := [2]int{cx, cy}
+					idx.cells[key] = append(idx.cells[key], segIdx)
+				}
+			}
+		}
+	}
+	return idx
+}
+
 // minDist returns the minimum distance from point (px, py) to any outline segment.
 func (idx *outlineIndex) minDist(px, py float64) float64 {
+	d, _, _ := idx.minDistWithPoint(px, py)
+	return d
+}
+
+// minDistWithPoint returns the minimum distance from (px, py) to the outline
+// together with the coordinates of the closest point on the outline.
+func (idx *outlineIndex) minDistWithPoint(px, py float64) (dist, cpX, cpY float64) {
 	cx := int(math.Floor(px / idx.cellMM))
 	cy := int(math.Floor(py / idx.cellMM))
 
@@ -75,10 +122,12 @@ func (idx *outlineIndex) minDist(px, py float64) float64 {
 	minD := math.MaxFloat64
 	for _, si := range candidates {
 		s := idx.segments[si]
-		d := ptToSegDist(px, py, s[0], s[1], s[2], s[3])
+		nx, ny := closestPointOnSeg(px, py, s[0], s[1], s[2], s[3])
+		d := math.Sqrt((px-nx)*(px-nx) + (py-ny)*(py-ny))
 		if d < minD {
 			minD = d
+			cpX, cpY = nx, ny
 		}
 	}
-	return minD
+	return minD, cpX, cpY
 }

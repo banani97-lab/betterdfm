@@ -101,6 +101,47 @@ func TestDrillToCopper_PadTooClose(t *testing.T) {
 	}
 }
 
+func TestDrillToCopper_SameNetViaSkipped(t *testing.T) {
+	rule := &DrillToCopperRule{}
+	// Via with NetName "VCC" and a same-net pad directly on top of it.
+	// Should not generate a violation — this is the via's own annular ring.
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 0.6, HeightMM: 0.6, Shape: "CIRCLE", NetName: "VCC"},
+		},
+		Vias:    []Via{{X: 10, Y: 10, OuterDiamMM: 0.6, DrillDiamMM: 0.3, NetName: "VCC"}},
+		Outline: rectOutline(40, 30),
+	}
+	profile := ProfileRules{MinDrillToCopperMM: 0.25}
+	viols := rule.Run(board, profile)
+	for _, v := range viols {
+		if v.RuleID == "drill-to-copper" {
+			t.Errorf("same-net via-to-pad should be skipped, got violation: %+v", v)
+		}
+	}
+}
+
+func TestDrillToCopper_RectPadTooClose(t *testing.T) {
+	rule := &DrillToCopperRule{}
+	// RECT pad 0.4×0.4mm at (10.5,10): left edge at x=10.3. Drill at (10,10), radius=0.15mm.
+	// padEdgeDist(drill_center, rect_pad) = dist to left edge = 10.3-10 = 0.3mm.
+	// gap = 0.3 - 0.15 = 0.15mm < MinDrillToCopperMM=0.25 → violation.
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 10.5, Y: 10, WidthMM: 0.4, HeightMM: 0.4, Shape: "RECT"},
+		},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Outline: rectOutline(40, 30),
+	}
+	profile := ProfileRules{MinDrillToCopperMM: 0.25}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("RECT pad 0.15mm from drill edge should be flagged, got 0 violations")
+	}
+}
+
 func TestDrillToCopper_SilkSkipped(t *testing.T) {
 	rule := &DrillToCopperRule{}
 	// Silk trace very close to drill — should be ignored (silk is not copper).

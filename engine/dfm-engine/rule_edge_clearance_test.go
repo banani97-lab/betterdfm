@@ -134,6 +134,70 @@ func TestEdgeClearance_PowerGroundTraceChecked(t *testing.T) {
 	}
 }
 
+// TestEdgeClearance_OutlineHoles checks that a trace near an inner board cutout
+// (slot/step-out) is caught even when it is far from the outer boundary.
+func TestEdgeClearance_OutlineHoles(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	// 60×40 board with a 10×10 inner cutout in the centre.
+	// Cutout corners: (25,15)–(35,15)–(35,25)–(25,25).
+	// Trace runs at y=15.05 (only 0.05mm from the top edge of the cutout).
+	// Trace is well within the outer board boundary.
+	innerHole := []Point{
+		{X: 25, Y: 15}, {X: 35, Y: 15}, {X: 35, Y: 25}, {X: 25, Y: 25},
+	}
+	board := BoardData{
+		Layers:       []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Traces:       []Trace{{Layer: "top_copper", WidthMM: 0.1, StartX: 26, StartY: 15.05, EndX: 34, EndY: 15.05}},
+		Outline:      rectOutline(60, 40),
+		OutlineHoles: [][]Point{innerHole},
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("expected ≥1 violation: trace too close to inner board cutout, got 0")
+	}
+}
+
+// TestEdgeClearance_OutlineHoles_Safe ensures a trace well clear of an inner cutout passes.
+func TestEdgeClearance_OutlineHoles_Safe(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	innerHole := []Point{
+		{X: 25, Y: 15}, {X: 35, Y: 15}, {X: 35, Y: 25}, {X: 25, Y: 25},
+	}
+	board := BoardData{
+		Layers:       []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Traces:       []Trace{{Layer: "top_copper", WidthMM: 0.1, StartX: 26, StartY: 16, EndX: 34, EndY: 16}},
+		Outline:      rectOutline(60, 40),
+		OutlineHoles: [][]Point{innerHole},
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) != 0 {
+		t.Fatalf("trace 1mm from cutout edge should pass (limit=0.2mm), got %d violations", len(viols))
+	}
+}
+
+// TestOutlineIndexFromRings_MultipleRings checks that newOutlineIndexFromRings
+// produces independent ring segments (no inter-ring wrap-around edges).
+func TestOutlineIndexFromRings_MultipleRings(t *testing.T) {
+	outer := rectOutline(60, 40)
+	inner := []Point{{X: 25, Y: 15}, {X: 35, Y: 15}, {X: 35, Y: 25}, {X: 25, Y: 25}}
+	rings := [][]Point{outer, inner}
+	idx := newOutlineIndexFromRings(rings, 2.0)
+
+	// A point 0.1mm inside the inner ring's top edge (y≈15) should be ~0.1mm from that edge.
+	d := idx.minDist(30, 15.1)
+	if d > 0.15 || d < 0.05 {
+		t.Errorf("expected ~0.1mm from inner ring top edge, got %f", d)
+	}
+
+	// A point at the outer ring bottom edge (y=0) should be 0mm away.
+	d = idx.minDist(30, 0)
+	if d > 1e-9 {
+		t.Errorf("point on outer ring bottom edge should be 0mm away, got %f", d)
+	}
+}
+
 // TestOutlineIndex_MatchesBruteForce checks that the spatial index agrees with
 // the naive brute-force scan to within 1e-9mm for 50 points around a 60×40 board.
 func TestOutlineIndex_MatchesBruteForce(t *testing.T) {
