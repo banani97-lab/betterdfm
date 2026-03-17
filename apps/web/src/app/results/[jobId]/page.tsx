@@ -255,7 +255,7 @@ export default function ResultsPage() {
             violations={visibleViolations.filter((v) => !v.ignored)}
             boardData={boardData}
             selectedViolationId={selectedId}
-            onViolationClick={(v) => setSelectedId(v.id)}
+            onViolationClick={(v) => setSelectedId(v?.id)}
             hiddenLayers={hiddenLayers}
             onToggleLayer={toggleLayer}
             violationLayers={violationLayers}
@@ -318,7 +318,7 @@ export default function ResultsPage() {
                 violations={visibleViolations}
                 allViolations={layerFiltered}
                 selectedId={selectedId}
-                onSelect={(v) => setSelectedId(v.id)}
+                onSelect={(v) => setSelectedId(prev => prev === v.id ? undefined : v.id)}
                 filter={severityFilter}
                 onFilterChange={setSeverityFilter}
                 onIgnore={handleIgnore}

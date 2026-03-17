@@ -11,7 +11,7 @@ interface BoardViewerProps {
   violations: Violation[]
   boardData?: BoardData | null
   selectedViolationId?: string
-  onViolationClick?: (v: Violation) => void
+  onViolationClick?: (v: Violation | null) => void
   hiddenLayers: Set<string>
   onToggleLayer: (name: string) => void
   violationLayers?: Set<string>       // layers that have at least one violation
@@ -381,6 +381,60 @@ function drawBoardEdge(ctx: CanvasRenderingContext2D, boardData: BoardData, b: B
   ctx.restore()
 }
 
+/** Step 9b: glow highlight around the component responsible for the selected violation. */
+function drawComponentHighlight(
+  ctx: CanvasRenderingContext2D,
+  b: Bounds,
+  pads: NonNullable<BoardData['pads']>,
+  violation: Violation,
+) {
+  if (!violation.refDes) return
+  const { minX, maxY, scale: s, offX, offY } = b
+  const tx = (x: number) => (x - minX) * s + offX
+  const ty = (y: number) => (maxY - y) * s + offY
+  const color = SEV_COLOR[violation.severity] ?? '#7090a8'
+
+  const matchingPads = pads.filter(p => p.refDes === violation.refDes)
+  if (!matchingPads.length) return
+
+  // Bounding box of all component pads in canvas coordinates
+  let minCX = Infinity, minCY = Infinity, maxCX = -Infinity, maxCY = -Infinity
+  for (const p of matchingPads) {
+    const cx = tx(p.x), cy = ty(p.y)
+    if (!ok(cx) || !ok(cy)) continue
+    const hw = Math.max(3, (p.widthMM * s) / 2)
+    const hh = Math.max(3, (p.heightMM * s) / 2)
+    minCX = Math.min(minCX, cx - hw)
+    minCY = Math.min(minCY, cy - hh)
+    maxCX = Math.max(maxCX, cx + hw)
+    maxCY = Math.max(maxCY, cy + hh)
+  }
+  if (!isFinite(minCX)) return
+
+  const pad = 8
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = 1.5
+  ctx.shadowColor = color
+  ctx.shadowBlur = 14
+  ctx.globalAlpha = 0.75
+  ctx.setLineDash([5, 3])
+  ctx.beginPath()
+  ctx.rect(minCX - pad, minCY - pad, maxCX - minCX + pad * 2, maxCY - minCY + pad * 2)
+  ctx.stroke()
+
+  // RefDes label above the bounding box
+  ctx.setLineDash([])
+  ctx.shadowBlur = 6
+  ctx.globalAlpha = 0.95
+  ctx.fillStyle = color
+  ctx.font = 'bold 10px monospace'
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'bottom'
+  ctx.fillText(violation.refDes, (minCX + maxCX) / 2, minCY - pad - 2)
+  ctx.restore()
+}
+
 /** Step 10: adaptive mm grid. */
 function drawGrid(ctx: CanvasRenderingContext2D, b: Bounds, zoom: number) {
   const { minX, minY, maxX, maxY, scale, offX, offY } = b
@@ -422,8 +476,13 @@ function drawViolations(
   b: Bounds | null,
   violations: Violation[],
   selectedViolationId: string | undefined,
+  focusMode: boolean,
 ) {
-  if (!violations.length) return
+  // In focus mode only render the selected marker — hides all the noise
+  const toRender = focusMode
+    ? violations.filter(v => v.id === selectedViolationId)
+    : violations
+  if (!toRender.length) return
   const now = Date.now()
 
   if (b) {
@@ -431,7 +490,7 @@ function drawViolations(
     const tx = (x: number) => (x - minX) * s + offX
     const ty = (y: number) => (maxY - y) * s + offY
 
-    for (const v of violations) {
+    for (const v of toRender) {
       const cx = tx(v.x), cy = ty(v.y)
       if (!ok(cx) || !ok(cy)) continue
       const isSelected = v.id === selectedViolationId
@@ -522,8 +581,8 @@ function drawViolations(
     }
   } else {
     // Fallback: no board data — scatter plot on 1200×800 canvas space
-    const maxVX = violations.reduce((m, v) => Math.max(m, Math.abs(v.x)), 1)
-    const maxVY = violations.reduce((m, v) => Math.max(m, Math.abs(v.y)), 1)
+    const maxVX = toRender.reduce((m, v) => Math.max(m, Math.abs(v.x)), 1)
+    const maxVY = toRender.reduce((m, v) => Math.max(m, Math.abs(v.y)), 1)
     const sx = 1160 / (maxVX * 2 + 1)
     const sy =  760 / (maxVY * 2 + 1)
 
@@ -536,7 +595,7 @@ function drawViolations(
       ctx.beginPath(); ctx.moveTo(20, y);  ctx.lineTo(1180, y); ctx.stroke()
     }
 
-    for (const v of violations) {
+    for (const v of toRender) {
       const cx = 20 + (v.x + maxVX) * sx
       const cy = 20 + (v.y + maxVY) * sy
       ctx.fillStyle = SEV_COLOR[v.severity] ?? '#6b7280'
@@ -573,6 +632,7 @@ export function BoardViewer({
     startMid: { x: number; y: number }
   } | null>(null)
   const draggingRef  = useRef(false)
+  const didMoveRef   = useRef(false)
   const hasInitRef   = useRef(false)
 
   const [dragging,          setDragging]          = useState(false)
@@ -646,7 +706,13 @@ export function BoardViewer({
     }
 
     if (gridEnabled && bounds) drawGrid(ctx, bounds, zoomRef.current)    // 10: grid
-    drawViolations(ctx, bounds, violations, selectedViolationId)          // 11: markers
+
+    const selectedViolation = violations.find(v => v.id === selectedViolationId)
+    const focusMode = !!selectedViolation
+    drawViolations(ctx, bounds, violations, selectedViolationId, focusMode) // 11: markers
+    if (selectedViolation && bounds) {
+      drawComponentHighlight(ctx, bounds, boardData?.pads ?? [], selectedViolation) // 11b: component
+    }
 
     ctx.restore()
   }, [bounds, boardData, tracesByLayer, padsByLayer, polygonsByLayer, hiddenLayers, violations, selectedViolationId, gridEnabled])
@@ -859,12 +925,14 @@ export function BoardViewer({
 
   const onMouseDown = useCallback((e: React.MouseEvent) => {
     draggingRef.current    = true
+    didMoveRef.current     = false
     lastMouseRef.current   = { x: e.clientX, y: e.clientY }
     setDragging(true)
   }, [])
 
   const onMouseMove = useCallback((e: React.MouseEvent) => {
     if (draggingRef.current) {
+      didMoveRef.current = true
       panRef.current = {
         x: panRef.current.x + e.clientX - lastMouseRef.current.x,
         y: panRef.current.y + e.clientY - lastMouseRef.current.y,
@@ -902,6 +970,9 @@ export function BoardViewer({
 
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!onViolationClick || !bounds) return
+    // Don't fire if the mouse moved significantly (was a pan, not a click)
+    if (didMoveRef.current) return
+
     const canvas = canvasRef.current!
     const rect   = canvas.getBoundingClientRect()
     const sx = e.clientX - rect.left
@@ -920,7 +991,8 @@ export function BoardViewer({
       const d = Math.hypot(vx - tx(v.x), vy - ty(v.y))
       if (d < bestDist) { bestDist = d; best = v }
     }
-    if (best) onViolationClick(best)
+    // Pass null to deselect when clicking empty space
+    onViolationClick(best)
   }, [onViolationClick, bounds, violations])
 
   // ── JSX ─────────────────────────────────────────────────────────────────────
