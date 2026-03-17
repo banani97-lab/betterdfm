@@ -44,7 +44,7 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 
 	copperLayers := make(map[string]bool, len(board.Layers))
 	for _, l := range board.Layers {
-		if l.Type == "COPPER" {
+		if l.Type == "COPPER" || l.Type == "POWER_GROUND" {
 			copperLayers[l.Name] = true
 		}
 	}
@@ -90,6 +90,9 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 	for _, pad := range board.Pads {
 		if len(violations) >= maxViol {
 			break
+		}
+		if !copperLayers[pad.Layer] {
+			continue
 		}
 		if !inBBoxRegion(pad.X, pad.Y) {
 			continue

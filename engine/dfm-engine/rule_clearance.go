@@ -3,6 +3,7 @@ package dfmengine
 import (
 	"math"
 	"sort"
+	"strings"
 )
 
 // ClearanceRule checks trace-to-trace and trace-to-pad minimum clearances.
@@ -72,9 +73,33 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				y >= oMinY-outlinePanelBuffer && y <= oMaxY+outlinePanelBuffer)
 	}
 
-	// Group traces and pads by layer, excluding panel-level features.
+	// Build the set of copper layer names from layer metadata.
+	// Clearance is an electrical rule — only copper and power-ground layers matter.
+	// Silkscreen, solder mask, drill, outline, and rout layers are excluded.
+	copperLayerNames := map[string]bool{}
+	for _, l := range board.Layers {
+		if l.Type == "COPPER" || l.Type == "POWER_GROUND" {
+			copperLayerNames[l.Name] = true
+		}
+	}
+	isCopperLayer := func(name string) bool {
+		if len(copperLayerNames) > 0 {
+			return copperLayerNames[name]
+		}
+		// Fallback when layer metadata is absent: exclude known non-copper names.
+		n := strings.ToLower(name)
+		return !strings.Contains(n, "silk") && !strings.Contains(n, "legend") &&
+			!strings.Contains(n, "overlay") && !strings.Contains(n, "mask") &&
+			!strings.Contains(n, "drill") && !strings.Contains(n, "outline") &&
+			n != "rout"
+	}
+
+	// Group traces and pads by layer, excluding panel-level features and non-copper layers.
 	tracesByLayer := map[string][]traceBB{}
 	for _, t := range board.Traces {
+		if !isCopperLayer(t.Layer) {
+			continue
+		}
 		mx := (t.StartX + t.EndX) / 2
 		my := (t.StartY + t.EndY) / 2
 		if !inBoard(mx, my) {
@@ -84,6 +109,9 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 	}
 	padsByLayer := map[string][]Pad{}
 	for _, p := range board.Pads {
+		if !isCopperLayer(p.Layer) {
+			continue
+		}
 		if !inBoard(p.X, p.Y) {
 			continue
 		}
