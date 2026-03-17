@@ -65,13 +65,6 @@ export default function ResultsPage() {
     }
   }, [job])
 
-  // Sets used by BoardViewer layer panel to show ignore buttons
-  const violationLayers = useMemo(() => {
-    const s = new Set<string>()
-    for (const v of violations) { if (v.layer) s.add(v.layer) }
-    return s
-  }, [violations])
-
   const allIgnoredLayers = useMemo(() => {
     const counts = new Map<string, { total: number; ignored: number }>()
     for (const v of violations) {
@@ -96,6 +89,16 @@ export default function ResultsPage() {
     if (severityFilter === 'NONE') return false
     return v.severity === severityFilter
   })
+
+  // Sets used by BoardViewer layer panel to show ignore buttons.
+  // Only layers with visible (non-ignored, current-severity) violations get the indicator.
+  const violationLayers = useMemo(() => {
+    const s = new Set<string>()
+    for (const v of visibleViolations) {
+      if (v.layer && !v.ignored) s.add(v.layer)
+    }
+    return s
+  }, [visibleViolations])
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
