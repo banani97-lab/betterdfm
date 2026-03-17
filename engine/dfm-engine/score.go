@@ -24,11 +24,19 @@ func ruleWeight(id string) float64 {
 		return 2.5
 	case "drill-size":
 		return 2.0
+	case "drill-to-copper":
+		return 2.0
+	case "drill-to-drill":
+		return 2.0
 	case "aspect-ratio":
 		return 1.5
 	case "edge-clearance":
 		return 1.5
 	case "solder-mask-dam":
+		return 1.0
+	case "copper-sliver":
+		return 1.0
+	case "silkscreen-on-pad":
 		return 1.0
 	default:
 		return 1.0
@@ -79,28 +87,39 @@ func marginMult(v Violation) float64 {
 // can contribute to the score, regardless of violation count. This prevents a
 // dense board hitting the 500-violation cap from scoring 0 automatically.
 //
-// Calibration: if only one rule is maxed, the resulting score is (100 - cap):
-//   clearance alone maxed  → score 65  (grade C  — moderate issues)
-//   trace-width alone      → score 70  (grade C)
-//   all rules maxed        → score  0  (grade F  — truly unmanufacturable)
+// Calibration: all caps sum to exactly 100, so when every rule hits its cap the
+// score reaches exactly 0 (grade F). Single-rule-maxed scores:
+//
+//	clearance alone maxed       → score 80  (grade B — still needs fixes)
+//	trace-width alone maxed     → score 84  (grade B)
+//	drill-to-copper alone maxed → score 91  (grade A — isolated drill risk)
+//	all rules maxed             → score  0  (grade F — truly unmanufacturable)
 func ruleMaxContribution(id string) float64 {
 	switch id {
 	case "clearance":
-		return 35.0
-	case "trace-width":
-		return 30.0
-	case "annular-ring":
 		return 20.0
+	case "trace-width":
+		return 16.0
+	case "annular-ring":
+		return 12.0
 	case "drill-size":
-		return 15.0
+		return 10.0
+	case "drill-to-copper":
+		return 9.0
+	case "drill-to-drill":
+		return 8.0
 	case "aspect-ratio":
-		return 10.0
+		return 7.0
 	case "edge-clearance":
-		return 10.0
+		return 7.0
 	case "solder-mask-dam":
-		return 10.0
+		return 5.0
+	case "copper-sliver":
+		return 3.0
+	case "silkscreen-on-pad":
+		return 3.0
 	default:
-		return 10.0
+		return 3.0
 	}
 }
 

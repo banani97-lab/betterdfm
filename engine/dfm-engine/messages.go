@@ -52,3 +52,27 @@ func msgEdgeClearancePadBelow(measured, limit float64) (string, string) {
 	return fmt.Sprintf("Pad is %.4f mm from board edge, below minimum %.4f mm", measured, limit),
 		fmt.Sprintf("Move pad at least %.4f mm away from board edge.", limit)
 }
+
+func msgDrillToDrillBelow(measured, limit float64) (string, string) {
+	return fmt.Sprintf("Drill-to-drill clearance %.4f mm is below minimum %.4f mm", measured, limit),
+		fmt.Sprintf("Increase spacing between holes to at least %.4f mm edge-to-edge.", limit)
+}
+
+func msgDrillToCopperBelow(measured, limit float64) (string, string) {
+	return fmt.Sprintf("Drill-to-copper clearance %.4f mm is below minimum %.4f mm", measured, limit),
+		fmt.Sprintf("Move copper feature at least %.4f mm from the drill hole edge.", limit)
+}
+
+func msgCopperSliver(measured, limit float64) (string, string) {
+	return fmt.Sprintf("Copper sliver %.4f mm wide is below minimum %.4f mm", measured, limit),
+		fmt.Sprintf("Remove or merge copper slivers thinner than %.4f mm.", limit)
+}
+
+func msgSilkscreenOnPad(refDes string) (string, string) {
+	if refDes != "" {
+		return fmt.Sprintf("Silkscreen overlaps copper pad for %s", refDes),
+			"Move silkscreen features away from exposed copper pads to prevent solderability issues."
+	}
+	return "Silkscreen overlaps copper pad",
+		"Move silkscreen features away from exposed copper pads to prevent solderability issues."
+}

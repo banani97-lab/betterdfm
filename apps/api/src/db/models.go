@@ -46,6 +46,9 @@ type ProfileRules struct {
 	MaxAspectRatio     float64 `json:"maxAspectRatio"`
 	MinSolderMaskDamMM float64 `json:"minSolderMaskDamMM"`
 	MinEdgeClearanceMM float64 `json:"minEdgeClearanceMM"`
+	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
+	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
+	MinCopperSliverMM  float64 `json:"minCopperSliverMM"`
 }
 
 // Submission is an uploaded Gerber or ODB++ file

@@ -60,6 +60,80 @@ func TestEdgeClearance_FarOutsideSkipped(t *testing.T) {
 	}
 }
 
+func TestEdgeClearance_PadTooClose(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	// Copper pad centre at x=59.9, right edge at x=60 → dist≈0.1mm < limit=0.2mm
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 59.9, Y: 20, WidthMM: 0.5, HeightMM: 0.5, Shape: "CIRCLE"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("expected ≥1 violation for copper pad too close to board edge, got 0")
+	}
+	if viols[0].RuleID != "edge-clearance" {
+		t.Errorf("expected RuleID=edge-clearance, got %s", viols[0].RuleID)
+	}
+}
+
+func TestEdgeClearance_PadPasses(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	// Pad centre at x=59.5, right edge at x=60 → dist≈0.5mm > limit=0.2mm
+	board := BoardData{
+		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
+		Pads: []Pad{
+			{Layer: "top_copper", X: 59.5, Y: 20, WidthMM: 0.5, HeightMM: 0.5, Shape: "CIRCLE"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) != 0 {
+		t.Fatalf("pad far enough from edge should pass, got %d violations", len(viols))
+	}
+}
+
+func TestEdgeClearance_NonCopperPadSkipped(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	// Silk pad right at the board edge — should be ignored
+	board := BoardData{
+		Layers: []Layer{
+			{Name: "top_copper", Type: "COPPER"},
+			{Name: "top_silk", Type: "SILK"},
+		},
+		Pads: []Pad{
+			{Layer: "top_silk", X: 59.9, Y: 20, WidthMM: 0.5, HeightMM: 0.5, Shape: "CIRCLE"},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) != 0 {
+		t.Fatalf("silk pad near board edge must be skipped, got %d violations", len(viols))
+	}
+}
+
+func TestEdgeClearance_PowerGroundTraceChecked(t *testing.T) {
+	rule := &EdgeClearanceRule{}
+	// POWER_GROUND trace endpoint 0.05mm from right edge, limit=0.2mm → violation
+	board := BoardData{
+		Layers: []Layer{{Name: "gnd_plane", Type: "POWER_GROUND"}},
+		Traces: []Trace{
+			{Layer: "gnd_plane", WidthMM: 0.1, StartX: 10, StartY: 20, EndX: 59.95, EndY: 20},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinEdgeClearanceMM: 0.2}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("POWER_GROUND trace too close to board edge should be flagged, got 0 violations")
+	}
+}
+
 // TestOutlineIndex_MatchesBruteForce checks that the spatial index agrees with
 // the naive brute-force scan to within 1e-9mm for 50 points around a 60×40 board.
 func TestOutlineIndex_MatchesBruteForce(t *testing.T) {

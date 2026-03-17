@@ -17,6 +17,10 @@ func NewRunner() *Runner {
 			&AspectRatioRule{},
 			&SolderMaskDamRule{},
 			&EdgeClearanceRule{},
+			&DrillToDrillRule{},
+			&DrillToCopperRule{},
+			&CopperSliverRule{},
+			&SilkscreenOnPadRule{},
 		},
 	}
 }

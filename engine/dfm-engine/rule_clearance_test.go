@@ -84,6 +84,45 @@ func TestClearance_TraceToPadTooClose(t *testing.T) {
 	}
 }
 
+func TestClearance_SilkLayerSkipped(t *testing.T) {
+	rule := &ClearanceRule{}
+	board := BoardData{
+		Layers: []Layer{
+			{Name: "top_copper", Type: "COPPER"},
+			{Name: "top_silk", Type: "SILK"},
+		},
+		// Two silk traces with only 0.01mm gap — would violate if checked
+		Traces: []Trace{
+			{Layer: "top_silk", WidthMM: 0.1, StartX: 0, StartY: 10, EndX: 50, EndY: 10},
+			{Layer: "top_silk", WidthMM: 0.1, StartX: 0, StartY: 10.01, EndX: 50, EndY: 10.01},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinClearanceMM: 0.1}
+	viols := rule.Run(board, profile)
+	if len(viols) != 0 {
+		t.Fatalf("silk layer traces must be skipped by clearance rule, got %d violations", len(viols))
+	}
+}
+
+func TestClearance_PowerGroundLayerChecked(t *testing.T) {
+	rule := &ClearanceRule{}
+	board := BoardData{
+		Layers: []Layer{{Name: "gnd_plane", Type: "POWER_GROUND"}},
+		// gap = 0.05mm edge-to-edge, min = 0.1mm → violation expected
+		Traces: []Trace{
+			{Layer: "gnd_plane", WidthMM: 0.1, StartX: 0, StartY: 10, EndX: 50, EndY: 10},
+			{Layer: "gnd_plane", WidthMM: 0.1, StartX: 0, StartY: 10.15, EndX: 50, EndY: 10.15},
+		},
+		Outline: rectOutline(60, 40),
+	}
+	profile := ProfileRules{MinClearanceMM: 0.1}
+	viols := rule.Run(board, profile)
+	if len(viols) == 0 {
+		t.Fatal("POWER_GROUND layer traces should be checked for clearance, got 0 violations")
+	}
+}
+
 func TestClearance_DedupeCollapses(t *testing.T) {
 	rule := &ClearanceRule{}
 	// 30 pairs of traces very close together in the same 2mm cell

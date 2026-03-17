@@ -77,6 +77,9 @@ export interface ProfileRules {
   maxAspectRatio: number
   minSolderMaskDamMM: number
   minEdgeClearanceMM: number
+  minDrillToDrillMM: number
+  minDrillToCopperMM: number
+  minCopperSliverMM: number
 }
 
 export interface CapabilityProfile {

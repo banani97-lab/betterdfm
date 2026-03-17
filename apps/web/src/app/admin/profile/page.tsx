@@ -26,6 +26,9 @@ const DEFAULT_RULES: ProfileRules = {
   maxAspectRatio: 10,
   minSolderMaskDamMM: 0.1,
   minEdgeClearanceMM: 0.3,
+  minDrillToDrillMM: 0.25,
+  minDrillToCopperMM: 0.25,
+  minCopperSliverMM: 0.1,
 }
 
 const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string }> = [
@@ -37,6 +40,9 @@ const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string;
   { key: 'maxAspectRatio', label: 'Max Aspect Ratio', unit: ':1', step: '0.5' },
   { key: 'minSolderMaskDamMM', label: 'Min Solder Mask Dam', unit: 'mm', step: '0.01' },
   { key: 'minEdgeClearanceMM', label: 'Min Edge Clearance', unit: 'mm', step: '0.01' },
+  { key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01' },
+  { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01' },
+  { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005' },
 ]
 
 export default function AdminProfilePage() {
