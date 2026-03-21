@@ -460,7 +460,10 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.RegisterImageOptionsReader("board_img", fpdf.ImageOptions{ImageType: "PNG"}, bytes.NewReader(imgBytes))
 	imgY := f.GetY()
 	const imgW = 88.0
-	f.ImageOptions("board_img", 15, imgY, imgW, 0, false, fpdf.ImageOptions{ImageType: "PNG"}, 0, "")
+	// Compute height explicitly (rendered canvas is 900×650) so fpdf knows
+	// how tall the image is and we can advance Y past it afterward.
+	const imgH = imgW * 650.0 / 900.0
+	f.ImageOptions("board_img", 15, imgY, imgW, imgH, false, fpdf.ImageOptions{ImageType: "PNG"}, 0, "")
 
 	// Verdict alongside the image
 	f.SetXY(15+imgW+4, imgY)
@@ -510,6 +513,13 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 			"See following pages for per-rule breakdown. Export CSV for the complete violation list.",
 			"0", "L", false)
 	}
+
+	// Advance past whichever column is taller (image or verdict text).
+	afterImageY := imgY + imgH + 6
+	if f.GetY() > afterImageY {
+		afterImageY = f.GetY()
+	}
+	f.SetY(afterImageY)
 
 	// ════════════════════════════════════════════════════════════════════════
 	// PAGES 2+: Issues by Rule
@@ -611,8 +621,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 					limitStr = fmt.Sprintf("%.1f:1", v.LimitMM)
 				}
 				if v.MeasuredMM == 0 && v.LimitMM == 0 {
-					measStr = "—"
-					limitStr = "—"
+					measStr = tr("—")
+					limitStr = tr("—")
 				}
 				f.CellFormat(iColMeas, 5, measStr, "1", 0, "C", true, 0, "")
 				f.CellFormat(iColLim, 5, limitStr, "1", 1, "C", true, 0, "")
@@ -625,7 +635,7 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 				f.SetTextColor(110, 110, 110)
 				f.SetFont("Arial", "I", 7)
 				f.CellFormat(pW, 4.5,
-					fmt.Sprintf("  … and %d more instance(s) — export CSV for the complete list.", remaining),
+					tr(fmt.Sprintf("  ... and %d more instance(s) - export CSV for the complete list.", remaining)),
 					"LRB", 1, "L", true, 0, "")
 			}
 

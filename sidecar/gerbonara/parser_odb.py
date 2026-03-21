@@ -418,19 +418,31 @@ def _build_features(
                     points=[Point(x=x, y=y) for x, y in surface_pts],
                     netName=surface_net,
                 )
-            elif ltype in ("SOLDER_MASK", "SILK"):
+            elif ltype == "SOLDER_MASK":
                 xs = [p[0] for p in surface_pts]
                 ys = [p[1] for p in surface_pts]
                 cx = (min(xs) + max(xs)) / 2
                 cy = (min(ys) + max(ys)) / 2
                 w = max(0.01, max(xs) - min(xs))
                 h = max(0.01, max(ys) - min(ys))
-                is_paste = "paste" in layer_name.lower()
-                if not is_paste and (w > 2.0 or h > 2.0):
-                    return
                 pads.append(Pad(layer=layer_name, x=cx, y=cy,
                                 widthMM=w, heightMM=h, shape="RECT",
                                 netName="", refDes=""))
+            elif ltype == "SILK":
+                # Emit polygon boundary edges as individual traces rather than
+                # an approximate RECT pad. The engine's silkscreen-on-pad rule
+                # performs an exact capsule check on traces, so courtyard outlines
+                # (e.g. octagon shapes whose bounding box contains a copper pad
+                # but whose edges don't touch it) no longer produce false positives.
+                n = len(surface_pts)
+                for i in range(n):
+                    a = surface_pts[i]
+                    b = surface_pts[(i + 1) % n]
+                    traces.append(Trace(
+                        layer=layer_name, widthMM=0.12,
+                        startX=a[0], startY=a[1],
+                        endX=b[0], endY=b[1],
+                    ))
         elif island_flag == "H":
             # Hole contour — attach to the current polygon (if any)
             if current_polygon is not None and ltype in ("COPPER", "POWER_GROUND"):
