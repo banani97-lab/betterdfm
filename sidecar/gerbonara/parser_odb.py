@@ -739,7 +739,7 @@ def _attr_net(raw_line: str) -> str:
 
 
 _PASSIVE_PACKAGE_SIZES = frozenset({
-    "0201", "0402", "0603", "0805",
+    "01005", "0201", "0402", "0603", "0805",
     "1206", "1210", "1812", "2010", "2512",
 })
 
@@ -751,13 +751,16 @@ def _classify_package(part_name: str) -> str:
     """
     if not part_name:
         return ""
-    # Match 4-digit codes like 0402, 0805 — possibly surrounded by _ - or boundaries
+    # Match 5-digit code first (01005), then 4-digit codes like 0402, 0805
+    m5 = re.search(r"(?:^|[_\-])(01005)(?:[_\-]|$)", part_name)
+    if m5:
+        return "01005"
     m = re.search(r"(?:^|[_\-])(\d{4})(?:[_\-]|$)", part_name)
     if m and m.group(1) in _PASSIVE_PACKAGE_SIZES:
         return m.group(1)
     # Try metric equivalents embedded in name (e.g. "1005Metric" → 0402)
     _metric_to_imperial = {
-        "0603": "0201", "1005": "0402", "1608": "0603",
+        "0402": "01005", "0603": "0201", "1005": "0402", "1608": "0603",
         "2012": "0805", "3216": "1206", "3225": "1210",
         "4532": "1812", "5025": "2010", "6332": "2512",
     }
@@ -808,7 +811,8 @@ def _classify_by_bbox(w_mm: float, h_mm: float) -> str:
     lo, hi = min(w_mm, h_mm), max(w_mm, h_mm)
     # Approximate body dimensions for standard packages
     _body_ranges = [
-        ("0201", 0.2, 0.4, 0.4, 0.8),   # ~0.6 x 0.3 mm body
+        ("01005", 0.1, 0.25, 0.2, 0.45), # ~0.4 x 0.2 mm body
+        ("0201", 0.2, 0.4, 0.4, 0.8),    # ~0.6 x 0.3 mm body
         ("0402", 0.6, 1.2, 0.3, 0.8),    # ~1.0 x 0.5 mm body
         ("0603", 1.2, 2.0, 0.6, 1.2),    # ~1.6 x 0.8 mm body
         ("0805", 1.6, 2.6, 1.0, 1.6),    # ~2.0 x 1.25 mm body
