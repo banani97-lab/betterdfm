@@ -38,6 +38,10 @@ func ruleWeight(id string) float64 {
 		return 1.0
 	case "silkscreen-on-pad":
 		return 1.0
+	case "pad-size-for-package":
+		return 1.5
+	case "tombstoning-risk":
+		return 1.5
 	default:
 		return 1.0
 	}
@@ -118,6 +122,10 @@ func ruleMaxContribution(id string) float64 {
 		return 3.0
 	case "silkscreen-on-pad":
 		return 3.0
+	case "pad-size-for-package":
+		return 5.0
+	case "tombstoning-risk":
+		return 4.0
 	default:
 		return 3.0
 	}

@@ -544,7 +544,7 @@ def _build_features(
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
                 net = _attr_net(raw) or _net_lookup(x, y, net_points)
-                ref = _refdes_lookup(x, y, components)
+                ref, pkg_class = _refdes_lookup(x, y, components)
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
                     hole_diam = max(0.01, sym["w"])
@@ -569,7 +569,8 @@ def _build_features(
                                    widthMM=max(0.01, sym["w"]),
                                    heightMM=max(0.01, sym["h"]),
                                    shape=sym["shape"],
-                                   netName=net, refDes=ref))
+                                   netName=net, refDes=ref,
+                                   packageClass=pkg_class))
             except (ValueError, IndexError):
                 pass
 
@@ -737,9 +738,97 @@ def _attr_net(raw_line: str) -> str:
     return ""
 
 
-def _parse_components(comp_path: Path, units: str) -> list:
-    """Parse ODB++ CMP file → [(x_mm, y_mm, refdes)]."""
-    components: list[tuple[float, float, str]] = []
+_PASSIVE_PACKAGE_SIZES = frozenset({
+    "0201", "0402", "0603", "0805",
+    "1206", "1210", "1812", "2010", "2512",
+})
+
+
+def _classify_package(part_name: str) -> str:
+    """Extract passive package class (e.g. '0402') from an ODB++ part name.
+
+    Returns empty string if the part cannot be classified.
+    """
+    if not part_name:
+        return ""
+    # Match 4-digit codes like 0402, 0805 — possibly surrounded by _ - or boundaries
+    m = re.search(r"(?:^|[_\-])(\d{4})(?:[_\-]|$)", part_name)
+    if m and m.group(1) in _PASSIVE_PACKAGE_SIZES:
+        return m.group(1)
+    # Try metric equivalents embedded in name (e.g. "1005Metric" → 0402)
+    _metric_to_imperial = {
+        "0603": "0201", "1005": "0402", "1608": "0603",
+        "2012": "0805", "3216": "1206", "3225": "1210",
+        "4532": "1812", "5025": "2010", "6332": "2512",
+    }
+    m2 = re.search(r"(\d{4})(?:Metric|metric|_metric)", part_name)
+    if m2 and m2.group(1) in _metric_to_imperial:
+        return _metric_to_imperial[m2.group(1)]
+    return ""
+
+
+def _parse_eda_packages(eda_path: Path, units: str) -> dict[int, dict]:
+    """Parse eda/data PKG records → {pkg_index: {"name": str, "bbox_w_mm": float, "bbox_h_mm": float}}."""
+    pkgs: dict[int, dict] = {}
+    try:
+        text = eda_path.read_text(errors="replace")
+    except OSError:
+        return pkgs
+
+    pkg_idx = 0
+    for line in text.splitlines():
+        s = line.strip()
+        if not s.startswith("PKG "):
+            continue
+        parts = s.rstrip(";").split()
+        if len(parts) < 7:
+            pkg_idx += 1
+            continue
+        try:
+            name = parts[1]
+            xmin = _coord_to_mm(float(parts[3]), units)
+            ymin = _coord_to_mm(float(parts[4]), units)
+            xmax = _coord_to_mm(float(parts[5]), units)
+            ymax = _coord_to_mm(float(parts[6]), units)
+            pkgs[pkg_idx] = {
+                "name": name,
+                "bbox_w_mm": abs(xmax - xmin),
+                "bbox_h_mm": abs(ymax - ymin),
+            }
+        except (ValueError, IndexError):
+            pass
+        pkg_idx += 1
+
+    return pkgs
+
+
+def _classify_by_bbox(w_mm: float, h_mm: float) -> str:
+    """Classify package by physical body dimensions (mm). Fallback when name parsing fails."""
+    # Use the smaller dimension as width, larger as height (body size)
+    lo, hi = min(w_mm, h_mm), max(w_mm, h_mm)
+    # Approximate body dimensions for standard packages
+    _body_ranges = [
+        ("0201", 0.2, 0.4, 0.4, 0.8),   # ~0.6 x 0.3 mm body
+        ("0402", 0.6, 1.2, 0.3, 0.8),    # ~1.0 x 0.5 mm body
+        ("0603", 1.2, 2.0, 0.6, 1.2),    # ~1.6 x 0.8 mm body
+        ("0805", 1.6, 2.6, 1.0, 1.6),    # ~2.0 x 1.25 mm body
+        ("1206", 2.8, 3.8, 1.2, 2.0),    # ~3.2 x 1.6 mm body
+    ]
+    for pkg, lo_min, lo_max, hi_min, hi_max in _body_ranges:
+        if lo_min <= lo <= lo_max and hi_min <= hi <= hi_max:
+            return pkg
+    return ""
+
+
+def _parse_components(
+    comp_path: Path, units: str, eda_pkgs: dict[int, dict] | None = None,
+) -> list:
+    """Parse ODB++ CMP file → [(x_mm, y_mm, refdes, part_name)].
+
+    If eda_pkgs is provided, uses PKG name/bbox as fallback for classification.
+    """
+    eda_pkgs = eda_pkgs or {}
+    components: list[tuple[float, float, str, str]] = []
     try:
         text = comp_path.read_text(errors="replace")
     except OSError:
@@ -755,26 +844,43 @@ def _parse_components(comp_path: Path, units: str) -> list:
         if len(parts) < 7:
             continue
         try:
+            pkg_ref = int(parts[1])
             x_mm = _coord_to_mm(float(parts[2]), units)
             y_mm = _coord_to_mm(float(parts[3]), units)
             refdes = parts[6]
-            components.append((x_mm, y_mm, refdes))
+            part_name = parts[7] if len(parts) > 7 else ""
+
+            # If part_name doesn't classify, try the linked PKG record
+            if not _classify_package(part_name) and pkg_ref in eda_pkgs:
+                pkg_info = eda_pkgs[pkg_ref]
+                pkg_from_name = _classify_package(pkg_info["name"])
+                if pkg_from_name:
+                    part_name = f"{part_name}_{pkg_from_name}" if part_name else pkg_from_name
+                else:
+                    pkg_from_bbox = _classify_by_bbox(
+                        pkg_info["bbox_w_mm"], pkg_info["bbox_h_mm"])
+                    if pkg_from_bbox:
+                        part_name = f"{part_name}_{pkg_from_bbox}" if part_name else pkg_from_bbox
+
+            components.append((x_mm, y_mm, refdes, part_name))
         except (ValueError, IndexError):
             pass
 
     return components
 
 
-def _refdes_lookup(x: float, y: float, components: list, tol: float = 1.0) -> str:
-    """Return nearest component refdes within tol mm, else ''."""
+def _refdes_lookup(x: float, y: float, components: list, tol: float = 1.0) -> tuple[str, str]:
+    """Return (refdes, packageClass) for nearest component within tol mm."""
     best_name = ""
+    best_pkg = ""
     best_dist = tol * tol
-    for cx, cy, refdes in components:
+    for cx, cy, refdes, part_name in components:
         d2 = (x - cx) ** 2 + (y - cy) ** 2
         if d2 <= best_dist:
             best_dist = d2
             best_name = refdes
-    return best_name
+            best_pkg = _classify_package(part_name)
+    return best_name, best_pkg
 
 
 # ── Archive extraction ────────────────────────────────────────────────────────
@@ -878,11 +984,18 @@ def parse_odb(file_path: str) -> BoardData:
             _, net_points = _parse_netlist(netlist_path, units)
             logger.info("ODB++ netlist: %d net points", len(net_points))
 
+            # Parse eda/data for PKG records (secondary classification source)
+            eda_pkgs: dict[int, dict] = {}
+            eda_data_path = step_root / "eda" / "data"
+            if eda_data_path.exists():
+                eda_pkgs = _parse_eda_packages(eda_data_path, units)
+                logger.info("ODB++ eda/data: %d packages", len(eda_pkgs))
+
             components: list = []
             for comp_file in ["top", "bot"]:
                 cp = step_root / "components" / comp_file
                 if cp.exists():
-                    c = _parse_components(cp, units)
+                    c = _parse_components(cp, units, eda_pkgs=eda_pkgs)
                     components.extend(c)
                     logger.info("ODB++ components/%s: %d components", comp_file, len(c))
 

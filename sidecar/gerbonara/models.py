@@ -38,6 +38,7 @@ class Pad(BaseModel):
     shape: str  # "RECT" | "CIRCLE" | "OVAL" | "POLYGON"
     netName: str = ""
     refDes: str = ""
+    packageClass: str = ""  # e.g. "0201", "0402", "0603", "0805", "1206"
     contour: list[Point] = []  # polygon contour when shape == "POLYGON"
 
 

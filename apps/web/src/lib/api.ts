@@ -52,7 +52,7 @@ export interface Violation {
 
 export interface BoardLayer { name: string; type: string }
 export interface BoardTrace { layer: string; widthMM: number; startX: number; startY: number; endX: number; endY: number; netName: string }
-export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL'; netName: string; refDes: string }
+export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL'; netName: string; refDes: string; packageClass?: string }
 export interface BoardVia { x: number; y: number; outerDiamMM: number; drillDiamMM: number }
 export interface BoardDrill { x: number; y: number; diamMM: number; plated: boolean }
 export interface BoardPolygon { layer: string; points: Array<{ x: number; y: number }>; holes?: Array<Array<{ x: number; y: number }>>; netName: string }

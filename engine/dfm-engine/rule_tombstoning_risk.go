@@ -1,0 +1,84 @@
+package dfmengine
+
+// smallPassiveClasses are package classes susceptible to tombstoning.
+var smallPassiveClasses = map[string]bool{
+	"0201": true,
+	"0402": true,
+	"0603": true,
+}
+
+// TombstoningRiskRule checks for asymmetric pad sizes on small 2-pad passives
+// which can cause tombstoning during reflow soldering.
+type TombstoningRiskRule struct{}
+
+func (r *TombstoningRiskRule) ID() string { return "tombstoning-risk" }
+
+func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
+	const maxViolations = 500
+	const maxRatio = 1.3
+
+	// Group pads by RefDes, only for small passive package classes
+	type padInfo struct {
+		area  float64
+		pad   Pad
+	}
+	groups := map[string][]padInfo{}
+
+	for _, pad := range board.Pads {
+		if pad.RefDes == "" || !smallPassiveClasses[pad.PackageClass] {
+			continue
+		}
+		area := pad.WidthMM * pad.HeightMM
+		groups[pad.RefDes] = append(groups[pad.RefDes], padInfo{area: area, pad: pad})
+	}
+
+	var violations []Violation
+	for refDes, padInfos := range groups {
+		if len(violations) >= maxViolations {
+			break
+		}
+
+		// Only check 2-pad components (typical passives: resistors, capacitors)
+		if len(padInfos) != 2 {
+			continue
+		}
+
+		a1 := padInfos[0].area
+		a2 := padInfos[1].area
+		if a1 <= 0 || a2 <= 0 {
+			continue
+		}
+
+		ratio := a1 / a2
+		if a2 > a1 {
+			ratio = a2 / a1
+		}
+
+		if ratio > maxRatio {
+			// Use the smaller pad's location for the violation
+			vPad := padInfos[0].pad
+			if padInfos[1].area < padInfos[0].area {
+				vPad = padInfos[1].pad
+			}
+
+			msg, sug := msgTombstoningRisk(refDes, vPad.PackageClass, ratio)
+			violations = append(violations, Violation{
+				RuleID:     r.ID(),
+				Severity:   "WARNING",
+				Layer:      vPad.Layer,
+				X:          vPad.X,
+				Y:          vPad.Y,
+				X2:         padInfos[0].pad.X + padInfos[1].pad.X - vPad.X,
+				Y2:         padInfos[0].pad.Y + padInfos[1].pad.Y - vPad.Y,
+				Message:    msg,
+				Suggestion: sug,
+				MeasuredMM: ratio,
+				LimitMM:    maxRatio,
+				Unit:       "ratio",
+				RefDes:     refDes,
+			})
+		}
+	}
+
+	return violations
+}

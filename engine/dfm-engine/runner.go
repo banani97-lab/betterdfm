@@ -21,6 +21,8 @@ func NewRunner() *Runner {
 			&DrillToCopperRule{},
 			&CopperSliverRule{},
 			&SilkscreenOnPadRule{},
+			&PadSizeForPackageRule{},
+			&TombstoningRiskRule{},
 		},
 	}
 }
