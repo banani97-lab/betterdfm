@@ -91,6 +91,11 @@ func msgTombstoningRisk(refDes, pkgClass string, ratio float64) (string, string)
 		"Equalize pad sizes on both ends of the component to reduce tombstoning risk during reflow."
 }
 
+func msgPackageCapability(refDes, pkgClass, minClass string) (string, string) {
+	return fmt.Sprintf("Component %s uses %s package, but CM minimum is %s", refDes, pkgClass, minClass),
+		fmt.Sprintf("Use a larger package size (%s or above) or select a CM with %s capability.", minClass, pkgClass)
+}
+
 func msgUnclassifiedComponents(count int) (string, string) {
 	return fmt.Sprintf("%d components could not be classified for pad-size checks", count),
 		"Package classification is based on ODB++ metadata. Unclassified components are skipped."

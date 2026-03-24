@@ -42,6 +42,8 @@ func ruleWeight(id string) float64 {
 		return 1.5
 	case "tombstoning-risk":
 		return 1.5
+	case "package-capability":
+		return 2.0
 	default:
 		return 1.0
 	}
@@ -94,38 +96,40 @@ func marginMult(v Violation) float64 {
 // Calibration: all caps sum to exactly 100, so when every rule hits its cap the
 // score reaches exactly 0 (grade F). Single-rule-maxed scores:
 //
-//	clearance alone maxed       → score 80  (grade B — still needs fixes)
-//	trace-width alone maxed     → score 84  (grade B)
-//	drill-to-copper alone maxed → score 91  (grade A — isolated drill risk)
-//	all rules maxed             → score  0  (grade F — truly unmanufacturable)
+//	clearance alone maxed          → score 83  (grade B — still needs fixes)
+//	trace-width alone maxed        → score 86  (grade B)
+//	package-capability alone maxed → score 93  (grade A — need different CM or package)
+//	all rules maxed                → score  0  (grade F — truly unmanufacturable)
 func ruleMaxContribution(id string) float64 {
 	switch id {
 	case "clearance":
-		return 20.0
+		return 17.0
 	case "trace-width":
-		return 16.0
+		return 14.0
 	case "annular-ring":
-		return 12.0
-	case "drill-size":
 		return 10.0
-	case "drill-to-copper":
+	case "drill-size":
 		return 9.0
-	case "drill-to-drill":
+	case "drill-to-copper":
 		return 8.0
+	case "package-capability":
+		return 7.0
+	case "drill-to-drill":
+		return 7.0
 	case "aspect-ratio":
-		return 7.0
+		return 6.0
 	case "edge-clearance":
-		return 7.0
+		return 6.0
+	case "pad-size-for-package":
+		return 4.0
 	case "solder-mask-dam":
-		return 5.0
+		return 4.0
+	case "tombstoning-risk":
+		return 3.0
 	case "copper-sliver":
 		return 3.0
 	case "silkscreen-on-pad":
-		return 3.0
-	case "pad-size-for-package":
-		return 5.0
-	case "tombstoning-risk":
-		return 4.0
+		return 2.0
 	default:
 		return 3.0
 	}

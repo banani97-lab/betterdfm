@@ -23,6 +23,7 @@ func NewRunner() *Runner {
 			&SilkscreenOnPadRule{},
 			&PadSizeForPackageRule{},
 			&TombstoningRiskRule{},
+			&PackageCapabilityRule{},
 		},
 	}
 }
