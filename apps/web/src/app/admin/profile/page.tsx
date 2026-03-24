@@ -29,6 +29,7 @@ const DEFAULT_RULES: ProfileRules = {
   minDrillToDrillMM: 0.25,
   minDrillToCopperMM: 0.25,
   minCopperSliverMM: 0.1,
+  smallestPackageClass: '',
 }
 
 const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string }> = [
@@ -218,6 +219,26 @@ export default function AdminProfilePage() {
                     </div>
                   </div>
                 ))}
+              </div>
+
+              <div className="mt-4">
+                <Label className="mb-1 block text-xs">Smallest Placeable Package</Label>
+                <select
+                  value={rules.smallestPackageClass ?? ''}
+                  onChange={(e) => setRules((r) => ({ ...r, smallestPackageClass: e.target.value }))}
+                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                >
+                  <option value="">Not set (skip check)</option>
+                  <option value="0201">0201</option>
+                  <option value="0402">0402</option>
+                  <option value="0603">0603</option>
+                  <option value="0805">0805</option>
+                  <option value="1206">1206</option>
+                  <option value="1210">1210</option>
+                  <option value="1812">1812</option>
+                  <option value="2010">2010</option>
+                  <option value="2512">2512</option>
+                </select>
               </div>
 
               {message && (

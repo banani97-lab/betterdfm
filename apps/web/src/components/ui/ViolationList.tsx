@@ -18,6 +18,7 @@ const RULE_LABELS: Record<string, string> = {
   'trace-width':           'Trace Width',
   'pad-size-for-package':  'Pad Size',
   'tombstoning-risk':      'Tombstoning Risk',
+  'package-capability':    'Package Capability',
 }
 
 interface ViolationListProps {

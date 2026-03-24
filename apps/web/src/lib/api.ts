@@ -80,6 +80,7 @@ export interface ProfileRules {
   minDrillToDrillMM: number
   minDrillToCopperMM: number
   minCopperSliverMM: number
+  smallestPackageClass?: string
 }
 
 export interface CapabilityProfile {

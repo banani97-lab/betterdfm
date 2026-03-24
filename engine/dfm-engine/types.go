@@ -81,7 +81,8 @@ type ProfileRules struct {
 	MinEdgeClearanceMM float64 `json:"minEdgeClearanceMM"`
 	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
 	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
-	MinCopperSliverMM  float64 `json:"minCopperSliverMM"`
+	MinCopperSliverMM    float64 `json:"minCopperSliverMM"`
+	SmallestPackageClass string  `json:"smallestPackageClass,omitempty"` // e.g. "0402" — smallest passive the CM can place
 }
 
 // Violation is a single DFM issue found.
