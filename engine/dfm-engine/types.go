@@ -41,9 +41,10 @@ type Pad struct {
 	WidthMM  float64 `json:"widthMM"`
 	HeightMM float64 `json:"heightMM"`
 	Shape    string  `json:"shape"`             // RECT | CIRCLE | OVAL | POLYGON
-	NetName  string  `json:"netName"`
-	RefDes   string  `json:"refDes"`
-	Contour  []Point `json:"contour,omitempty"` // polygon contour points when Shape == "POLYGON"
+	NetName      string  `json:"netName"`
+	RefDes       string  `json:"refDes"`
+	PackageClass string  `json:"packageClass,omitempty"` // e.g. "0201", "0402", "0603"
+	Contour      []Point `json:"contour,omitempty"`      // polygon contour points when Shape == "POLYGON"
 }
 
 type Via struct {

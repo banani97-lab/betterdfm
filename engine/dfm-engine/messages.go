@@ -68,6 +68,34 @@ func msgCopperSliver(measured, limit float64) (string, string) {
 		fmt.Sprintf("Remove or merge copper slivers thinner than %.4f mm.", limit)
 }
 
+func msgPadUndersizedForPackage(refDes, pkgClass string, measured, expected float64) (string, string) {
+	prefix := "Pad"
+	if refDes != "" {
+		prefix = fmt.Sprintf("Pad on %s", refDes)
+	}
+	return fmt.Sprintf("%s dimension %.4f mm is below expected minimum %.4f mm for %s package", prefix, measured, expected, pkgClass),
+		fmt.Sprintf("Increase pad size to at least %.4f mm per IPC-7351 guidelines for %s.", expected, pkgClass)
+}
+
+func msgPadOversizedForPackage(refDes, pkgClass string, measured, expected float64) (string, string) {
+	prefix := "Pad"
+	if refDes != "" {
+		prefix = fmt.Sprintf("Pad on %s", refDes)
+	}
+	return fmt.Sprintf("%s dimension %.4f mm exceeds expected maximum %.4f mm for %s package", prefix, measured, expected, pkgClass),
+		fmt.Sprintf("Reduce pad size to at most %.4f mm for %s to avoid bridging risk.", expected, pkgClass)
+}
+
+func msgTombstoningRisk(refDes, pkgClass string, ratio float64) (string, string) {
+	return fmt.Sprintf("Component %s (%s) has asymmetric pads with area ratio %.2f:1, risking tombstoning", refDes, pkgClass, ratio),
+		"Equalize pad sizes on both ends of the component to reduce tombstoning risk during reflow."
+}
+
+func msgUnclassifiedComponents(count int) (string, string) {
+	return fmt.Sprintf("%d components could not be classified for pad-size checks", count),
+		"Package classification is based on ODB++ metadata. Unclassified components are skipped."
+}
+
 func msgSilkscreenOnPad(refDes string) (string, string) {
 	if refDes != "" {
 		return fmt.Sprintf("Silkscreen overlaps copper pad for %s", refDes),

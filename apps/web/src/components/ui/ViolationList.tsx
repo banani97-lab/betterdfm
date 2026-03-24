@@ -14,8 +14,10 @@ const RULE_LABELS: Record<string, string> = {
   'clearance':       'Clearance',
   'drill-size':      'Drill Size',
   'edge-clearance':  'Edge Clearance',
-  'solder-mask-dam': 'Solder Mask',
-  'trace-width':     'Trace Width',
+  'solder-mask-dam':       'Solder Mask',
+  'trace-width':           'Trace Width',
+  'pad-size-for-package':  'Pad Size',
+  'tombstoning-risk':      'Tombstoning Risk',
 }
 
 interface ViolationListProps {
