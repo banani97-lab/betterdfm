@@ -229,6 +229,7 @@ export default function AdminProfilePage() {
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
                 >
                   <option value="">Not set (skip check)</option>
+                  <option value="01005">01005</option>
                   <option value="0201">0201</option>
                   <option value="0402">0402</option>
                   <option value="0603">0603</option>

@@ -2,9 +2,10 @@ package dfmengine
 
 // smallPassiveClasses are package classes susceptible to tombstoning.
 var smallPassiveClasses = map[string]bool{
-	"0201": true,
-	"0402": true,
-	"0603": true,
+	"01005": true,
+	"0201":  true,
+	"0402":  true,
+	"0603":  true,
 }
 
 // TombstoningRiskRule checks for asymmetric pad sizes on small 2-pad passives

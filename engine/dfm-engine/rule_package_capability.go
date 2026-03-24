@@ -2,15 +2,16 @@ package dfmengine
 
 // packageSizeRank maps passive package classes to a numeric rank (smaller = smaller package).
 var packageSizeRank = map[string]int{
-	"0201": 1,
-	"0402": 2,
-	"0603": 3,
-	"0805": 4,
-	"1206": 5,
-	"1210": 6,
-	"1812": 7,
-	"2010": 8,
-	"2512": 9,
+	"01005": 1,
+	"0201":  2,
+	"0402":  3,
+	"0603":  4,
+	"0805":  5,
+	"1206":  6,
+	"1210":  7,
+	"1812":  8,
+	"2010":  9,
+	"2512":  10,
 }
 
 // PackageCapabilityRule checks that no component uses a package class smaller
