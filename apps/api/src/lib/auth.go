@@ -235,6 +235,24 @@ func GetUser(c echo.Context) *UserClaims {
 	return u
 }
 
+// RequireRole returns middleware that checks the user has one of the allowed roles.
+// Must be chained after Middleware() which populates user claims.
+func RequireRole(roles ...string) echo.MiddlewareFunc {
+	allowed := make(map[string]bool, len(roles))
+	for _, r := range roles {
+		allowed[r] = true
+	}
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			user := GetUser(c)
+			if !allowed[user.Role] {
+				return echo.NewHTTPError(http.StatusForbidden, "insufficient permissions")
+			}
+			return next(c)
+		}
+	}
+}
+
 // GetAdmin retrieves the current admin claims from the echo context.
 func GetAdmin(c echo.Context) *AdminClaims {
 	a, _ := c.Get("admin").(*AdminClaims)

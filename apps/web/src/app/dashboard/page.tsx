@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, type Submission } from '@/lib/api'
-import { clearToken, isLoggedIn } from '@/lib/auth'
+import { clearToken, canWrite, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -240,21 +240,23 @@ export default function DashboardPage() {
             </span>
           </Button>
 
-          <Link href="/upload">
-            <Button
-              size="icon"
-              className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
-              aria-label="Upload"
-              title="Upload"
-            >
-              <span className="flex items-center justify-center w-full">
-                <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
-                <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
-                  Upload
+          {canWrite() && (
+            <Link href="/upload">
+              <Button
+                size="icon"
+                className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
+                aria-label="Upload"
+                title="Upload"
+              >
+                <span className="flex items-center justify-center w-full">
+                  <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
+                  <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
+                    Upload
+                  </span>
                 </span>
-              </span>
-            </Button>
-          </Link>
+              </Button>
+            </Link>
+          )}
         </div>
       </header>
 
@@ -286,9 +288,11 @@ export default function DashboardPage() {
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
-            <Link href="/upload">
-              <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
-            </Link>
+            {canWrite() && (
+              <Link href="/upload">
+                <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
+              </Link>
+            )}
           </div>
         ) : (
           <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-card/55 shadow-[0_30px_90px_-40px_rgba(0,0,0,0.55)]">
@@ -344,7 +348,7 @@ export default function DashboardPage() {
                     >
                       <Info className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
                     </Button>
-                    {s.status === 'DONE' && (
+                    {s.status === 'DONE' && canWrite() && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -362,7 +366,7 @@ export default function DashboardPage() {
                         <Button variant="outline" className={isCompact ? 'h-10 px-3 text-sm md:h-9 md:text-xs' : 'h-11 px-5 text-sm'}>View Results</Button>
                       </Link>
                     )}
-                    {s.status === 'UPLOADED' && (
+                    {s.status === 'UPLOADED' && canWrite() && (
                       <Link href={`/upload?submissionId=${s.id}&step=analyze`}>
                         <Button variant="outline" className={isCompact ? 'h-10 px-3 text-sm md:h-9 md:text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
                       </Link>

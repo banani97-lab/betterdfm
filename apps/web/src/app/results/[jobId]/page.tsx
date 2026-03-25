@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, ListFilter } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, patchViolation, ignoreLayerViolations, type AnalysisJob, type Violation, type BoardData } from '@/lib/api'
-import { isLoggedIn, getStoredToken } from '@/lib/auth'
+import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
@@ -263,7 +263,7 @@ export default function ResultsPage() {
             onToggleLayer={toggleLayer}
             violationLayers={violationLayers}
             allIgnoredLayers={allIgnoredLayers}
-            onIgnoreLayer={handleIgnoreLayer}
+            onIgnoreLayer={canWrite() ? handleIgnoreLayer : undefined}
           />
         </div>
 
@@ -324,7 +324,7 @@ export default function ResultsPage() {
                 onSelect={(v) => setSelectedId(prev => prev === v.id ? undefined : v.id)}
                 filter={severityFilter}
                 onFilterChange={setSeverityFilter}
-                onIgnore={handleIgnore}
+                onIgnore={canWrite() ? handleIgnore : undefined}
               />
             </div>
           )}
