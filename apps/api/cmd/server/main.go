@@ -120,10 +120,12 @@ func main() {
 
 	// Admin routes (separate JWT audience)
 	adminAPI := e.Group("/admin", adminJWTMW.AdminMiddleware())
+	adminAPI.GET("/stats", adminOrgHandler.GetPlatformStats)
 	adminAPI.GET("/organizations", adminOrgHandler.ListOrganizations)
 	adminAPI.POST("/organizations", adminOrgHandler.CreateOrganization)
 	adminAPI.GET("/organizations/:id", adminOrgHandler.GetOrganization)
 	adminAPI.PUT("/organizations/:id", adminOrgHandler.UpdateOrganization)
+	adminAPI.GET("/organizations/:id/stats", adminOrgHandler.GetOrganizationStats)
 
 	port := os.Getenv("PORT")
 	if port == "" {

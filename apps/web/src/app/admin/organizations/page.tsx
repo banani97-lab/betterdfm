@@ -2,12 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Plus, Building2 } from 'lucide-react'
+import { Save, Plus, Building2, BarChart3, XCircle, AlertTriangle, Info, CheckCircle } from 'lucide-react'
 import { isAdminLoggedIn, adminApiFetch } from '@/lib/adminAuth'
 import type { Organization } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+
+interface OrgStats {
+  totalJobs: number
+  jobsByStatus: Record<string, number>
+  totalSubmissions: number
+  totalUsers: number
+  totalViolations: number
+  violationsBySeverity: Record<string, number>
+  topRules: { ruleId: string; count: number }[]
+  avgScore: number
+  gradeDistribution: Record<string, number>
+}
+
+function ruleLabel(ruleId: string): string {
+  return ruleId.replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
 
 export default function AdminOrganizationsPage() {
   const router = useRouter()
@@ -21,6 +37,8 @@ export default function AdminOrganizationsPage() {
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [newName, setNewName] = useState('')
   const [newSlug, setNewSlug] = useState('')
+  const [stats, setStats] = useState<OrgStats | null>(null)
+  const [statsLoading, setStatsLoading] = useState(false)
 
   useEffect(() => {
     if (!isAdminLoggedIn()) { router.replace('/admin/login'); return }
@@ -42,6 +60,20 @@ export default function AdminOrganizationsPage() {
     setName(org.name)
     setSlug(org.slug)
     setLogoUrl(org.logoUrl || '')
+    loadStats(org.id)
+  }
+
+  const loadStats = async (orgId: string) => {
+    setStatsLoading(true)
+    setStats(null)
+    try {
+      const data = await adminApiFetch<OrgStats>(`/admin/organizations/${orgId}/stats`)
+      setStats(data)
+    } catch {
+      setStats(null)
+    } finally {
+      setStatsLoading(false)
+    }
   }
 
   const handleSave = async () => {
@@ -88,6 +120,8 @@ export default function AdminOrganizationsPage() {
     setNewSlug(value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''))
   }
 
+  const totalGraded = stats ? Object.values(stats.gradeDistribution).reduce((a, b) => a + b, 0) : 0
+
   return (
     <div className="min-h-screen bg-slate-950">
       <header className="bg-slate-900 border-b border-slate-800 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
@@ -97,10 +131,10 @@ export default function AdminOrganizationsPage() {
           </div>
           <h1 className="text-xl font-semibold text-white">Organizations</h1>
         </div>
-        <a href="/admin" className="text-sm text-slate-400 hover:text-white">Back to Admin</a>
+        <a href="/admin" className="text-sm text-slate-400 hover:text-white">Back to Dashboard</a>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">
+      <main className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-4 gap-6">
         {/* Org list */}
         <div className="col-span-1">
           <div className="bg-slate-900 rounded-lg border border-slate-800 p-4">
@@ -148,66 +182,169 @@ export default function AdminOrganizationsPage() {
           </div>
         </div>
 
-        {/* Org editor */}
-        <div className="col-span-2">
+        {/* Org detail + stats */}
+        <div className="col-span-3 space-y-4">
           {selected ? (
-            <div className="bg-slate-900 rounded-lg border border-slate-800 p-6">
-              <h3 className="font-semibold text-white mb-4">Edit Organization</h3>
+            <>
+              {/* Org editor */}
+              <div className="bg-slate-900 rounded-lg border border-slate-800 p-6">
+                <h3 className="font-semibold text-white mb-4">Edit Organization</h3>
 
-              <div className="space-y-4">
-                <div>
-                  <Label className="mb-1 block text-sm text-slate-300">Name</Label>
-                  <Input
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-white"
-                  />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label className="mb-1 block text-sm text-slate-300">Name</Label>
+                    <Input
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-sm text-slate-300">Slug</Label>
+                    <Input
+                      value={slug}
+                      onChange={(e) => setSlug(e.target.value)}
+                      className="bg-slate-800 border-slate-700 text-white"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-sm text-slate-300">Logo URL</Label>
+                    <Input
+                      value={logoUrl}
+                      onChange={(e) => setLogoUrl(e.target.value)}
+                      placeholder="https://..."
+                      className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                    />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-sm text-slate-300">Organization ID</Label>
+                    <p className="text-sm text-slate-400 font-mono bg-slate-800 px-3 py-2 rounded border border-slate-700 h-10 flex items-center">{selected.id}</p>
+                  </div>
                 </div>
-                <div>
-                  <Label className="mb-1 block text-sm text-slate-300">Slug</Label>
-                  <Input
-                    value={slug}
-                    onChange={(e) => setSlug(e.target.value)}
-                    className="bg-slate-800 border-slate-700 text-white"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">URL-safe identifier, must be unique</p>
-                </div>
-                <div>
-                  <Label className="mb-1 block text-sm text-slate-300">Logo URL</Label>
-                  <Input
-                    value={logoUrl}
-                    onChange={(e) => setLogoUrl(e.target.value)}
-                    placeholder="https://..."
-                    className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-                  />
-                </div>
-                <div>
-                  <Label className="mb-1 block text-sm text-slate-300">Organization ID</Label>
-                  <p className="text-sm text-slate-400 font-mono bg-slate-800 px-3 py-2 rounded border border-slate-700">{selected.id}</p>
-                </div>
-                <div>
-                  <Label className="mb-1 block text-sm text-slate-300">Created</Label>
-                  <p className="text-sm text-slate-400">{new Date(selected.createdAt).toLocaleString()}</p>
+
+                {message && (
+                  <div className={`mt-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
+                    {message.text}
+                  </div>
+                )}
+
+                <div className="mt-4 flex items-center justify-between">
+                  <p className="text-xs text-slate-500">Created {new Date(selected.createdAt).toLocaleDateString()}</p>
+                  <Button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="bg-orange-600 hover:bg-orange-500 text-white"
+                  >
+                    <Save className="h-4 w-4 mr-1" />
+                    {saving ? 'Saving...' : 'Save'}
+                  </Button>
                 </div>
               </div>
 
-              {message && (
-                <div className={`mt-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
-                  {message.text}
+              {/* Org stats */}
+              {statsLoading ? (
+                <div className="bg-slate-900 rounded-lg border border-slate-800 p-6 text-center text-slate-500">
+                  Loading stats...
                 </div>
-              )}
+              ) : stats ? (
+                <div className="space-y-4">
+                  {/* KPIs row */}
+                  <div className="grid grid-cols-4 gap-3">
+                    {[
+                      { label: 'Users', value: stats.totalUsers },
+                      { label: 'Submissions', value: stats.totalSubmissions },
+                      { label: 'Jobs Run', value: stats.totalJobs },
+                      { label: 'Avg Score', value: Math.round(stats.avgScore) },
+                    ].map((kpi) => (
+                      <div key={kpi.label} className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-center">
+                        <p className="text-2xl font-bold text-white">{kpi.value}</p>
+                        <p className="text-xs text-slate-400 mt-1">{kpi.label}</p>
+                      </div>
+                    ))}
+                  </div>
 
-              <div className="mt-6 flex justify-end">
-                <Button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="bg-orange-600 hover:bg-orange-500 text-white"
-                >
-                  <Save className="h-4 w-4 mr-1" />
-                  {saving ? 'Saving…' : 'Save'}
-                </Button>
-              </div>
-            </div>
+                  <div className="grid grid-cols-3 gap-4">
+                    {/* Job status */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                      <p className="text-sm text-slate-400 mb-3">Jobs by Status</p>
+                      <div className="space-y-2">
+                        {[
+                          { key: 'DONE', label: 'Completed', icon: CheckCircle, color: 'text-green-400' },
+                          { key: 'FAILED', label: 'Failed', icon: XCircle, color: 'text-red-400' },
+                          { key: 'PROCESSING', label: 'Processing', icon: BarChart3, color: 'text-blue-400' },
+                          { key: 'PENDING', label: 'Pending', icon: Info, color: 'text-slate-400' },
+                        ].map(({ key, label, icon: StatusIcon, color }) => (
+                          <div key={key} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <StatusIcon className={`h-4 w-4 ${color}`} />
+                              <span className="text-sm text-slate-300">{label}</span>
+                            </div>
+                            <span className="text-sm font-medium text-white">{stats.jobsByStatus[key] || 0}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Violations by severity */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                      <p className="text-sm text-slate-400 mb-3">Violations</p>
+                      <div className="space-y-3">
+                        {[
+                          { key: 'ERROR', label: 'Errors', icon: XCircle, color: 'text-red-400' },
+                          { key: 'WARNING', label: 'Warnings', icon: AlertTriangle, color: 'text-yellow-400' },
+                          { key: 'INFO', label: 'Info', icon: Info, color: 'text-blue-400' },
+                        ].map(({ key, label, icon: SevIcon, color }) => (
+                          <div key={key} className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <SevIcon className={`h-4 w-4 ${color}`} />
+                              <span className="text-sm text-slate-300">{label}</span>
+                            </div>
+                            <span className="text-sm font-medium text-white">{stats.violationsBySeverity[key] || 0}</span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-xs text-slate-500 mt-3">{stats.totalViolations.toLocaleString()} total</p>
+                    </div>
+
+                    {/* Grade distribution */}
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                      <p className="text-sm text-slate-400 mb-3">Grades</p>
+                      <div className="space-y-2">
+                        {['A', 'B', 'C', 'D'].map(g => {
+                          const count = stats.gradeDistribution[g] || 0
+                          const pct = totalGraded > 0 ? (count / totalGraded) * 100 : 0
+                          const colors: Record<string, string> = { A: 'bg-green-500', B: 'bg-blue-500', C: 'bg-yellow-500', D: 'bg-red-500' }
+                          return (
+                            <div key={g} className="flex items-center gap-3">
+                              <span className="w-5 text-sm font-semibold text-white">{g}</span>
+                              <div className="flex-1 h-4 bg-slate-800 rounded overflow-hidden">
+                                <div className={`h-full ${colors[g]} rounded`} style={{ width: `${pct}%` }} />
+                              </div>
+                              <span className="text-sm text-slate-400 w-8 text-right">{count}</span>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Top rules */}
+                  {stats.topRules.length > 0 && (
+                    <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+                      <p className="text-sm text-slate-400 mb-3">Most Triggered Rules</p>
+                      <div className="grid grid-cols-2 gap-x-8 gap-y-2">
+                        {stats.topRules.slice(0, 10).map((r) => (
+                          <div key={r.ruleId} className="flex items-center justify-between">
+                            <span className="text-sm text-slate-300 truncate">{ruleLabel(r.ruleId)}</span>
+                            <span className="text-sm font-medium text-white ml-2">{r.count.toLocaleString()}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : null}
+            </>
           ) : (
             <div className="flex items-center justify-center h-64 bg-slate-900 rounded-lg border border-slate-800 text-slate-500">
               Select or create an organization
