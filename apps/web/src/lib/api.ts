@@ -25,6 +25,15 @@ export interface Organization {
   createdAt: string
 }
 
+export interface User {
+  id: string
+  orgId: string
+  cognitoSub: string
+  email: string
+  role: 'ADMIN' | 'ANALYST' | 'VIEWER'
+  createdAt: string
+}
+
 export interface AnalysisJob {
   id: string
   orgId: string

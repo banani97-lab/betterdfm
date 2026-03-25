@@ -2,10 +2,12 @@ package routes
 
 import (
 	"errors"
+	"log"
 	"net/http"
 	"time"
 
 	"github.com/betterdfm/api/src/db"
+	"github.com/betterdfm/api/src/lib"
 	"github.com/google/uuid"
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
@@ -44,11 +46,12 @@ type RuleCount struct {
 }
 
 type AdminOrgHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	aws *lib.AWSClients
 }
 
-func NewAdminOrgHandler(database *gorm.DB) *AdminOrgHandler {
-	return &AdminOrgHandler{db: database}
+func NewAdminOrgHandler(database *gorm.DB, awsClients *lib.AWSClients) *AdminOrgHandler {
+	return &AdminOrgHandler{db: database, aws: awsClients}
 }
 
 // ListOrganizations GET /admin/organizations
@@ -281,4 +284,145 @@ func (h *AdminOrgHandler) GetPlatformStats(c echo.Context) error {
 	}
 
 	return c.JSON(http.StatusOK, stats)
+}
+
+// ListOrgUsers GET /admin/organizations/:id/users
+func (h *AdminOrgHandler) ListOrgUsers(c echo.Context) error {
+	orgID := c.Param("id")
+
+	// Verify org exists
+	var org db.Organization
+	if err := h.db.First(&org, "id = ?", orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "organization not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	var users []db.User
+	if err := h.db.Where("org_id = ?", orgID).Order("created_at desc").Find(&users).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, users)
+}
+
+// CreateOrgUser POST /admin/organizations/:id/users
+func (h *AdminOrgHandler) CreateOrgUser(c echo.Context) error {
+	orgID := c.Param("id")
+
+	var req struct {
+		Email string `json:"email"`
+		Role  string `json:"role"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if req.Email == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "email is required")
+	}
+	if req.Role != "ADMIN" && req.Role != "ANALYST" && req.Role != "VIEWER" {
+		return echo.NewHTTPError(http.StatusBadRequest, "role must be ADMIN, ANALYST, or VIEWER")
+	}
+
+	// Verify org exists
+	var org db.Organization
+	if err := h.db.First(&org, "id = ?", orgID).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "organization not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Check no existing user with that email in org
+	var existing db.User
+	if err := h.db.Where("email = ? AND org_id = ?", req.Email, orgID).First(&existing).Error; err == nil {
+		return echo.NewHTTPError(http.StatusConflict, "user with this email already exists in this organization")
+	}
+
+	// Create Cognito user
+	ctx := c.Request().Context()
+	cognitoSub, err := h.aws.CreateCognitoUser(ctx, req.Email, orgID, req.Role)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Create DB user
+	user := db.User{
+		ID:         uuid.New().String(),
+		OrgID:      orgID,
+		CognitoSub: cognitoSub,
+		Email:      req.Email,
+		Role:       req.Role,
+		CreatedAt:  time.Now(),
+	}
+	if err := h.db.Create(&user).Error; err != nil {
+		// Attempt Cognito rollback
+		if delErr := h.aws.DeleteCognitoUser(ctx, req.Email); delErr != nil {
+			log.Printf("failed to rollback cognito user %s: %v", req.Email, delErr)
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.JSON(http.StatusCreated, user)
+}
+
+// UpdateOrgUser PUT /admin/organizations/:id/users/:userId
+func (h *AdminOrgHandler) UpdateOrgUser(c echo.Context) error {
+	orgID := c.Param("id")
+	userID := c.Param("userId")
+
+	var user db.User
+	if err := h.db.Where("id = ? AND org_id = ?", userID, orgID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	var req struct {
+		Role string `json:"role"`
+	}
+	if err := c.Bind(&req); err != nil {
+		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
+	}
+	if req.Role != "ADMIN" && req.Role != "ANALYST" && req.Role != "VIEWER" {
+		return echo.NewHTTPError(http.StatusBadRequest, "role must be ADMIN, ANALYST, or VIEWER")
+	}
+
+	ctx := c.Request().Context()
+	if err := h.aws.UpdateCognitoUserAttributes(ctx, user.Email, orgID, req.Role); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	if err := h.db.Model(&user).Update("role", req.Role).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	user.Role = req.Role
+	return c.JSON(http.StatusOK, user)
+}
+
+// DeleteOrgUser DELETE /admin/organizations/:id/users/:userId
+func (h *AdminOrgHandler) DeleteOrgUser(c echo.Context) error {
+	orgID := c.Param("id")
+	userID := c.Param("userId")
+
+	var user db.User
+	if err := h.db.Where("id = ? AND org_id = ?", userID, orgID).First(&user).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return echo.NewHTTPError(http.StatusNotFound, "user not found")
+		}
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	ctx := c.Request().Context()
+	if err := h.aws.DeleteCognitoUser(ctx, user.Email); err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	if err := h.db.Delete(&user).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	return c.NoContent(http.StatusNoContent)
 }

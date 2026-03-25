@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Plus, Building2, BarChart3, XCircle, AlertTriangle, Info, CheckCircle } from 'lucide-react'
+import { Save, Plus, Building2, BarChart3, XCircle, AlertTriangle, Info, CheckCircle, UserPlus, Trash2 } from 'lucide-react'
 import { isAdminLoggedIn, adminApiFetch } from '@/lib/adminAuth'
-import type { Organization } from '@/lib/api'
+import type { Organization, User } from '@/lib/api'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -39,6 +39,11 @@ export default function AdminOrganizationsPage() {
   const [newSlug, setNewSlug] = useState('')
   const [stats, setStats] = useState<OrgStats | null>(null)
   const [statsLoading, setStatsLoading] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [usersLoading, setUsersLoading] = useState(false)
+  const [newEmail, setNewEmail] = useState('')
+  const [newRole, setNewRole] = useState<string>('ANALYST')
+  const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
     if (!isAdminLoggedIn()) { router.replace('/admin/login'); return }
@@ -61,6 +66,64 @@ export default function AdminOrganizationsPage() {
     setSlug(org.slug)
     setLogoUrl(org.logoUrl || '')
     loadStats(org.id)
+    loadUsers(org.id)
+  }
+
+  const loadUsers = async (orgId: string) => {
+    setUsersLoading(true)
+    try {
+      const data = await adminApiFetch<User[]>(`/admin/organizations/${orgId}/users`)
+      setUsers(data ?? [])
+    } catch {
+      setUsers([])
+    } finally {
+      setUsersLoading(false)
+    }
+  }
+
+  const handleInviteUser = async () => {
+    if (!selected || !newEmail.trim()) return
+    setInviting(true)
+    try {
+      await adminApiFetch(`/admin/organizations/${selected.id}/users`, {
+        method: 'POST',
+        body: JSON.stringify({ email: newEmail, role: newRole }),
+      })
+      await loadUsers(selected.id)
+      setNewEmail('')
+      setMessage({ type: 'success', text: `Invited ${newEmail} as ${newRole}.` })
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+    } finally {
+      setInviting(false)
+    }
+  }
+
+  const handleUpdateRole = async (userId: string, role: string) => {
+    if (!selected) return
+    try {
+      await adminApiFetch(`/admin/organizations/${selected.id}/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ role }),
+      })
+      await loadUsers(selected.id)
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!selected) return
+    if (!window.confirm('Remove this user? They will lose access.')) return
+    try {
+      await adminApiFetch(`/admin/organizations/${selected.id}/users/${userId}`, {
+        method: 'DELETE',
+      })
+      await loadUsers(selected.id)
+      setMessage({ type: 'success', text: 'User removed.' })
+    } catch (e: unknown) {
+      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+    }
   }
 
   const loadStats = async (orgId: string) => {
@@ -239,6 +302,82 @@ export default function AdminOrganizationsPage() {
                     {saving ? 'Saving...' : 'Save'}
                   </Button>
                 </div>
+              </div>
+
+              {/* Users */}
+              <div className="bg-slate-900 rounded-lg border border-slate-800 p-5">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-white">Users</h3>
+                  <span className="text-xs text-slate-500">{users.length} member{users.length !== 1 ? 's' : ''}</span>
+                </div>
+
+                {/* Invite form */}
+                <div className="flex gap-2 mb-4">
+                  <Input
+                    placeholder="email@company.com"
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="flex-1 text-sm h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                  />
+                  <select
+                    value={newRole}
+                    onChange={(e) => setNewRole(e.target.value)}
+                    className="h-9 px-3 rounded-md border border-slate-700 bg-slate-800 text-sm text-white"
+                  >
+                    <option value="ADMIN">Admin</option>
+                    <option value="ANALYST">Analyst</option>
+                    <option value="VIEWER">Viewer</option>
+                  </select>
+                  <Button
+                    size="sm"
+                    onClick={handleInviteUser}
+                    disabled={inviting || !newEmail.trim()}
+                    className="bg-orange-600 hover:bg-orange-500 text-white h-9 px-3"
+                  >
+                    <UserPlus className="h-4 w-4 mr-1" />
+                    {inviting ? 'Inviting...' : 'Invite'}
+                  </Button>
+                </div>
+
+                {/* User list */}
+                {usersLoading ? (
+                  <p className="text-sm text-slate-500 py-4 text-center">Loading users...</p>
+                ) : users.length === 0 ? (
+                  <p className="text-sm text-slate-500 py-4 text-center">No users in this organization yet</p>
+                ) : (
+                  <div className="space-y-1">
+                    {users.map((u) => {
+                      const roleColors: Record<string, string> = {
+                        ADMIN: 'bg-orange-500/20 text-orange-400',
+                        ANALYST: 'bg-blue-500/20 text-blue-400',
+                        VIEWER: 'bg-slate-500/20 text-slate-400',
+                      }
+                      return (
+                        <div key={u.id} className="flex items-center gap-3 px-3 py-2 rounded hover:bg-slate-800/50">
+                          <span className="text-sm text-white flex-1 truncate">{u.email}</span>
+                          <select
+                            value={u.role}
+                            onChange={(e) => handleUpdateRole(u.id, e.target.value)}
+                            className={`text-xs font-medium px-2 py-1 rounded border-0 cursor-pointer ${roleColors[u.role] || 'bg-slate-700 text-slate-300'}`}
+                          >
+                            <option value="ADMIN">Admin</option>
+                            <option value="ANALYST">Analyst</option>
+                            <option value="VIEWER">Viewer</option>
+                          </select>
+                          <span className="text-xs text-slate-500 w-20">{new Date(u.createdAt).toLocaleDateString()}</span>
+                          <button
+                            onClick={() => handleDeleteUser(u.id)}
+                            className="text-slate-500 hover:text-red-400 p-1"
+                            title="Remove user"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </div>
 
               {/* Org stats */}

@@ -28,6 +28,7 @@ func main() {
 	jwtIssuer := os.Getenv("JWT_ISSUER")
 	cognitoClientID := os.Getenv("COGNITO_CLIENT_ID")
 	adminCognitoClientID := os.Getenv("ADMIN_COGNITO_CLIENT_ID")
+	cognitoUserPoolID := os.Getenv("COGNITO_USER_POOL_ID")
 
 	// Database
 	database, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
@@ -53,10 +54,10 @@ func main() {
 	seedDefaultOrg(database)
 
 	// AWS clients
-	awsClients, err := lib.NewAWSClients(context.Background(), s3Bucket, sqsQueueURL)
+	awsClients, err := lib.NewAWSClients(context.Background(), s3Bucket, sqsQueueURL, cognitoUserPoolID)
 	if err != nil {
 		log.Printf("warning: AWS clients unavailable (dev mode): %v", err)
-		awsClients = &lib.AWSClients{Bucket: s3Bucket, QueueURL: sqsQueueURL}
+		awsClients = &lib.AWSClients{Bucket: s3Bucket, QueueURL: sqsQueueURL, UserPoolID: cognitoUserPoolID}
 	}
 
 	// Echo
@@ -90,7 +91,7 @@ func main() {
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
-	adminOrgHandler := routes.NewAdminOrgHandler(database)
+	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
@@ -126,6 +127,10 @@ func main() {
 	adminAPI.GET("/organizations/:id", adminOrgHandler.GetOrganization)
 	adminAPI.PUT("/organizations/:id", adminOrgHandler.UpdateOrganization)
 	adminAPI.GET("/organizations/:id/stats", adminOrgHandler.GetOrganizationStats)
+	adminAPI.GET("/organizations/:id/users", adminOrgHandler.ListOrgUsers)
+	adminAPI.POST("/organizations/:id/users", adminOrgHandler.CreateOrgUser)
+	adminAPI.PUT("/organizations/:id/users/:userId", adminOrgHandler.UpdateOrgUser)
+	adminAPI.DELETE("/organizations/:id/users/:userId", adminOrgHandler.DeleteOrgUser)
 
 	port := os.Getenv("PORT")
 	if port == "" {
