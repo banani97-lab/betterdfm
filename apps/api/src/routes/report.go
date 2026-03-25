@@ -11,6 +11,7 @@ import (
 
 	dfmengine "github.com/betterdfm/dfm-engine"
 	"github.com/betterdfm/api/src/db"
+	"github.com/betterdfm/api/src/lib"
 	"github.com/fogleman/gg"
 	"github.com/go-pdf/fpdf"
 	"github.com/labstack/echo/v4"
@@ -250,10 +251,11 @@ func violationDeviation(v db.Violation) float64 {
 
 // GetJobReport handles GET /jobs/:id/report.pdf
 func (h *ReportHandler) GetJobReport(c echo.Context) error {
+	user := lib.GetUser(c)
 	jobID := c.Param("id")
 
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ?", jobID).Error; err != nil {
+	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 

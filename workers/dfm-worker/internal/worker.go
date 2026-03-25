@@ -130,6 +130,7 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	for _, v := range engineViolations {
 		dbViolations = append(dbViolations, Violation{
 			ID:         uuid.New().String(),
+			OrgID:      job.OrgID,
 			JobID:      jobID,
 			RuleID:     v.RuleID,
 			Severity:   v.Severity,

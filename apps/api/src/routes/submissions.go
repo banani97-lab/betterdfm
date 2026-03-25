@@ -186,6 +186,7 @@ func (h *SubmissionsHandler) StartAnalysis(c echo.Context) error {
 
 	job := db.AnalysisJob{
 		ID:           uuid.New().String(),
+		OrgID:        user.OrgID,
 		SubmissionID: submissionID,
 		ProfileID:    req.ProfileID,
 		Status:       "PENDING",

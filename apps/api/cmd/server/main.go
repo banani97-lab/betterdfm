@@ -26,6 +26,8 @@ func main() {
 	}
 	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
 	jwtIssuer := os.Getenv("JWT_ISSUER")
+	cognitoClientID := os.Getenv("COGNITO_CLIENT_ID")
+	adminCognitoClientID := os.Getenv("ADMIN_COGNITO_CLIENT_ID")
 
 	// Database
 	database, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
@@ -76,8 +78,11 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	// JWT middleware
-	jwtMW := lib.NewJWTMiddleware(jwtIssuer)
+	// JWT middleware for app users (validates audience against app client ID)
+	jwtMW := lib.NewJWTMiddleware(jwtIssuer, cognitoClientID)
+
+	// JWT middleware for BetterDFM admins (validates audience against admin client ID)
+	adminJWTMW := lib.NewJWTMiddleware(jwtIssuer, adminCognitoClientID)
 
 	// Route handlers
 	authHandler := routes.NewAuthHandler(database)
@@ -85,13 +90,14 @@ func main() {
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
+	adminOrgHandler := routes.NewAdminOrgHandler(database)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
 	authGroup.POST("/callback", authHandler.Callback)
 	authGroup.GET("/me", authHandler.Me, jwtMW.Middleware())
 
-	// Protected routes
+	// Protected app routes
 	api := e.Group("", jwtMW.Middleware())
 
 	api.GET("/submissions", submissionsHandler.ListSubmissions)
@@ -111,6 +117,13 @@ func main() {
 	api.GET("/profiles/:id", profilesHandler.GetProfile)
 	api.PUT("/profiles/:id", profilesHandler.UpdateProfile)
 	api.DELETE("/profiles/:id", profilesHandler.DeleteProfile)
+
+	// Admin routes (separate JWT audience)
+	adminAPI := e.Group("/admin", adminJWTMW.AdminMiddleware())
+	adminAPI.GET("/organizations", adminOrgHandler.ListOrganizations)
+	adminAPI.POST("/organizations", adminOrgHandler.CreateOrganization)
+	adminAPI.GET("/organizations/:id", adminOrgHandler.GetOrganization)
+	adminAPI.PUT("/organizations/:id", adminOrgHandler.UpdateOrganization)
 
 	port := os.Getenv("PORT")
 	if port == "" {
