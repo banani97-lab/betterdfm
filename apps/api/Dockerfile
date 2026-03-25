@@ -3,7 +3,7 @@
 # Build command (run from /betterdfm repo root):
 #   docker build -f apps/api/Dockerfile -t betterdfm-api .
 
-FROM golang:1.23-alpine AS builder
+FROM golang:1.24-alpine AS builder
 RUN apk add --no-cache git
 WORKDIR /workspace
 # Copy engine module first (needed for replace directive)
