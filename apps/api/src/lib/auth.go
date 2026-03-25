@@ -1,7 +1,6 @@
 package lib
 
 import (
-	"context"
 	"crypto/rsa"
 	"encoding/base64"
 	"encoding/json"
@@ -24,6 +23,12 @@ type UserClaims struct {
 	Role  string
 }
 
+// AdminClaims extracted from admin Cognito JWT (no org scope)
+type AdminClaims struct {
+	Sub   string
+	Email string
+}
+
 type jwksKey struct {
 	Kid string `json:"kid"`
 	Kty string `json:"kty"`
@@ -36,16 +41,18 @@ type jwksResponse struct {
 }
 
 type JWTMiddleware struct {
-	issuer    string
-	mu        sync.RWMutex
-	keys      map[string]*rsa.PublicKey
+	issuer   string
+	audience string // Cognito app client ID for audience validation
+	mu       sync.RWMutex
+	keys     map[string]*rsa.PublicKey
 	fetchedAt time.Time
 }
 
-func NewJWTMiddleware(issuer string) *JWTMiddleware {
+func NewJWTMiddleware(issuer, audience string) *JWTMiddleware {
 	return &JWTMiddleware{
-		issuer: issuer,
-		keys:   make(map[string]*rsa.PublicKey),
+		issuer:   issuer,
+		audience: audience,
+		keys:     make(map[string]*rsa.PublicKey),
 	}
 }
 
@@ -98,7 +105,63 @@ func (m *JWTMiddleware) getKey(kid string) (*rsa.PublicKey, error) {
 	return k, nil
 }
 
-// Middleware returns an Echo middleware that validates Cognito JWTs.
+// parseAndValidateJWT validates signature, issuer, and expiration. Returns claims.
+func (m *JWTMiddleware) parseAndValidateJWT(tokenStr string) (jwt.MapClaims, error) {
+	// Parse unverified to get kid
+	unverified, _, err := jwt.NewParser().ParseUnverified(tokenStr, jwt.MapClaims{})
+	if err != nil {
+		return nil, err
+	}
+	kid, ok := unverified.Header["kid"].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing kid")
+	}
+	pubKey, err := m.getKey(kid)
+	if err != nil {
+		return nil, err
+	}
+
+	token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
+			return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
+		}
+		return pubKey, nil
+	}, jwt.WithIssuer(m.issuer), jwt.WithExpirationRequired())
+	if err != nil || !token.Valid {
+		return nil, fmt.Errorf("invalid token")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, fmt.Errorf("invalid claims")
+	}
+
+	// Validate audience (Cognito uses "client_id" for access tokens, "aud" for ID tokens)
+	if m.audience != "" {
+		clientID, _ := claims["client_id"].(string)
+		aud, _ := claims["aud"].(string)
+		if clientID != m.audience && aud != m.audience {
+			return nil, fmt.Errorf("audience mismatch")
+		}
+	}
+
+	return claims, nil
+}
+
+// extractBearerToken pulls the token string from the Authorization header.
+func extractBearerToken(c echo.Context) (string, error) {
+	authHeader := c.Request().Header.Get("Authorization")
+	if authHeader == "" {
+		return "", fmt.Errorf("missing authorization header")
+	}
+	parts := strings.SplitN(authHeader, " ", 2)
+	if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
+		return "", fmt.Errorf("invalid authorization header")
+	}
+	return parts[1], nil
+}
+
+// Middleware returns an Echo middleware that validates Cognito JWTs for app users.
 func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
@@ -108,42 +171,13 @@ func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 				return next(c)
 			}
 
-			authHeader := c.Request().Header.Get("Authorization")
-			if authHeader == "" {
-				return echo.ErrUnauthorized
-			}
-			parts := strings.SplitN(authHeader, " ", 2)
-			if len(parts) != 2 || !strings.EqualFold(parts[0], "bearer") {
-				return echo.ErrUnauthorized
-			}
-			tokenStr := parts[1]
-
-			// Parse unverified to get kid
-			unverified, _, err := jwt.NewParser().ParseUnverified(tokenStr, jwt.MapClaims{})
-			if err != nil {
-				return echo.ErrUnauthorized
-			}
-			kid, ok := unverified.Header["kid"].(string)
-			if !ok {
-				return echo.ErrUnauthorized
-			}
-			pubKey, err := m.getKey(kid)
+			tokenStr, err := extractBearerToken(c)
 			if err != nil {
 				return echo.ErrUnauthorized
 			}
 
-			token, err := jwt.Parse(tokenStr, func(t *jwt.Token) (interface{}, error) {
-				if _, ok := t.Method.(*jwt.SigningMethodRSA); !ok {
-					return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-				}
-				return pubKey, nil
-			}, jwt.WithIssuer(m.issuer), jwt.WithExpirationRequired())
-			if err != nil || !token.Valid {
-				return echo.ErrUnauthorized
-			}
-
-			claims, ok := token.Claims.(jwt.MapClaims)
-			if !ok {
+			claims, err := m.parseAndValidateJWT(tokenStr)
+			if err != nil {
 				return echo.ErrUnauthorized
 			}
 
@@ -163,6 +197,35 @@ func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 	}
 }
 
+// AdminMiddleware returns an Echo middleware that validates Cognito JWTs for BetterDFM admins.
+// Admin tokens use a different Cognito app client (different audience) than app tokens.
+func (m *JWTMiddleware) AdminMiddleware() echo.MiddlewareFunc {
+	return func(next echo.HandlerFunc) echo.HandlerFunc {
+		return func(c echo.Context) error {
+			// Dev bypass: if no issuer configured, skip auth
+			if m.issuer == "" {
+				c.Set("admin", &AdminClaims{Sub: "dev-admin", Email: "admin@localhost"})
+				return next(c)
+			}
+
+			tokenStr, err := extractBearerToken(c)
+			if err != nil {
+				return echo.ErrUnauthorized
+			}
+
+			claims, err := m.parseAndValidateJWT(tokenStr)
+			if err != nil {
+				return echo.ErrUnauthorized
+			}
+
+			sub, _ := claims["sub"].(string)
+			email, _ := claims["email"].(string)
+			c.Set("admin", &AdminClaims{Sub: sub, Email: email})
+			return next(c)
+		}
+	}
+}
+
 // GetUser retrieves the current user claims from the echo context.
 func GetUser(c echo.Context) *UserClaims {
 	u, _ := c.Get("user").(*UserClaims)
@@ -172,7 +235,11 @@ func GetUser(c echo.Context) *UserClaims {
 	return u
 }
 
-// GetOrCreateUser upserts a user record. ctx must be a context.Context.
-func GetOrCreateUser(_ context.Context, claims *UserClaims) *UserClaims {
-	return claims
+// GetAdmin retrieves the current admin claims from the echo context.
+func GetAdmin(c echo.Context) *AdminClaims {
+	a, _ := c.Get("admin").(*AdminClaims)
+	if a == nil {
+		return &AdminClaims{}
+	}
+	return a
 }

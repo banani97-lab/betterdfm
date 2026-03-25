@@ -66,6 +66,7 @@ type Submission struct {
 // AnalysisJob is one analysis run
 type AnalysisJob struct {
 	ID           string         `gorm:"primaryKey" json:"id"`
+	OrgID        string         `json:"orgId"`
 	SubmissionID string         `json:"submissionId"`
 	ProfileID    string         `json:"profileId"`
 	Status       string         `json:"status"` // PENDING | PROCESSING | DONE | FAILED
@@ -81,6 +82,7 @@ type AnalysisJob struct {
 // Violation is a single DFM issue found.
 type Violation struct {
 	ID         string  `gorm:"primaryKey" json:"id"`
+	OrgID      string  `json:"orgId"`
 	JobID      string  `json:"jobId"`
 	RuleID     string  `json:"ruleId"`
 	Severity   string  `json:"severity"` // ERROR | WARNING | INFO

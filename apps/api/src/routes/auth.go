@@ -1,9 +1,11 @@
 package routes
 
 import (
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"net/url"
 	"os"
@@ -25,9 +27,13 @@ func NewAuthHandler(database *gorm.DB) *AuthHandler {
 	return &AuthHandler{db: database}
 }
 
-// Me GET /auth/me
+// Me GET /auth/me — returns current user info and upserts the user record
 func (h *AuthHandler) Me(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Upsert user record in DB
+	h.upsertUserFromClaims(user)
+
 	return c.JSON(http.StatusOK, map[string]string{
 		"sub":   user.Sub,
 		"email": user.Email,
@@ -81,27 +87,67 @@ func (h *AuthHandler) Callback(c echo.Context) error {
 
 	idToken, _ := tokenResp["id_token"].(string)
 	if idToken != "" {
-		// Upsert user in DB — in production, parse JWT claims here
-		// For MVP we rely on the client sending the token in subsequent requests
-		_ = h.upsertUser(idToken)
+		h.upsertUserFromIDToken(idToken)
 	}
 
 	return c.JSON(http.StatusOK, tokenResp)
 }
 
-func (h *AuthHandler) upsertUser(idToken string) error {
-	// Simplified: in production parse the JWT to get sub/email
-	// For now just ensure a default org exists
-	var org db.Organization
-	if err := h.db.Where("slug = ?", "default").First(&org).Error; err != nil {
-		org = db.Organization{
-			ID:        uuid.New().String(),
-			Slug:      "default",
-			Name:      "Default Organization",
-			CreatedAt: time.Now(),
-		}
-		h.db.Create(&org)
+// upsertUserFromClaims creates or updates a User row from parsed JWT claims.
+func (h *AuthHandler) upsertUserFromClaims(claims *lib.UserClaims) {
+	if claims.Sub == "" || claims.Sub == "dev-user" {
+		return
 	}
-	_ = idToken
-	return nil
+	user := db.User{
+		ID:         uuid.New().String(),
+		OrgID:      claims.OrgID,
+		CognitoSub: claims.Sub,
+		Email:      claims.Email,
+		Role:       claims.Role,
+		CreatedAt:  time.Now(),
+	}
+	result := h.db.Where("cognito_sub = ?", claims.Sub).First(&db.User{})
+	if result.Error != nil {
+		// User doesn't exist — create
+		if err := h.db.Create(&user).Error; err != nil {
+			log.Printf("upsert user create: %v", err)
+		}
+	} else {
+		// User exists — update
+		h.db.Model(&db.User{}).Where("cognito_sub = ?", claims.Sub).Updates(map[string]interface{}{
+			"email":  claims.Email,
+			"org_id": claims.OrgID,
+			"role":   claims.Role,
+		})
+	}
+}
+
+// upsertUserFromIDToken parses a raw ID token (without signature verification — it was
+// already verified by Cognito token endpoint) and upserts the user record.
+func (h *AuthHandler) upsertUserFromIDToken(idToken string) {
+	parts := strings.Split(idToken, ".")
+	if len(parts) != 3 {
+		return
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(parts[1])
+	if err != nil {
+		return
+	}
+	var claims map[string]interface{}
+	if err := json.Unmarshal(payload, &claims); err != nil {
+		return
+	}
+
+	sub, _ := claims["sub"].(string)
+	email, _ := claims["email"].(string)
+	orgID, _ := claims["custom:orgId"].(string)
+	role, _ := claims["custom:role"].(string)
+	if orgID == "" {
+		orgID = "default-org"
+	}
+	if role == "" {
+		role = "ANALYST"
+	}
+
+	h.upsertUserFromClaims(&lib.UserClaims{Sub: sub, Email: email, OrgID: orgID, Role: role})
 }

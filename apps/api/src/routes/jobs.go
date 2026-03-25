@@ -21,9 +21,10 @@ func NewJobsHandler(database *gorm.DB) *JobsHandler {
 
 // GetJob GET /jobs/:id
 func (h *JobsHandler) GetJob(c echo.Context) error {
+	user := lib.GetUser(c)
 	id := c.Param("id")
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ?", id).Error; err != nil {
+	if err := h.db.First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return echo.NewHTTPError(http.StatusNotFound, "job not found")
 		}
@@ -34,9 +35,10 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 
 // GetBoardData GET /jobs/:id/board
 func (h *JobsHandler) GetBoardData(c echo.Context) error {
+	user := lib.GetUser(c)
 	id := c.Param("id")
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ?", id).Error; err != nil {
+	if err := h.db.First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 	if len(job.BoardData) == 0 {
@@ -49,6 +51,7 @@ func (h *JobsHandler) GetBoardData(c echo.Context) error {
 // Body: {"ignored": true|false}
 // Returns the updated ignored state and the recomputed job score.
 func (h *JobsHandler) UpdateViolation(c echo.Context) error {
+	user := lib.GetUser(c)
 	id := c.Param("id")
 
 	var body struct {
@@ -59,7 +62,7 @@ func (h *JobsHandler) UpdateViolation(c echo.Context) error {
 	}
 
 	var v db.Violation
-	if err := h.db.First(&v, "id = ?", id).Error; err != nil {
+	if err := h.db.First(&v, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "violation not found")
 	}
 
@@ -92,6 +95,7 @@ func (h *JobsHandler) UpdateViolation(c echo.Context) error {
 // Body: {"layer": "signal_1", "ignored": true, "severity": "ERROR"}
 // Severity is optional — omit to affect all severities on the layer.
 func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
+	user := lib.GetUser(c)
 	jobID := c.Param("id")
 
 	var body struct {
@@ -107,7 +111,7 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 	}
 
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ?", jobID).Error; err != nil {
+	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 
@@ -138,12 +142,12 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 
 // GetViolations GET /jobs/:id/violations
 func (h *JobsHandler) GetViolations(c echo.Context) error {
-	_ = lib.GetUser(c)
+	user := lib.GetUser(c)
 	jobID := c.Param("id")
 
-	// Verify job exists
+	// Verify job exists and belongs to user's org
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ?", jobID).Error; err != nil {
+	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 

@@ -5,6 +5,7 @@ import "time"
 // DB models mirroring the API's models
 type AnalysisJob struct {
 	ID           string     `gorm:"primaryKey"`
+	OrgID        string
 	SubmissionID string
 	ProfileID    string
 	Status       string
@@ -37,6 +38,7 @@ type CapabilityProfile struct {
 
 type Violation struct {
 	ID         string `gorm:"primaryKey"`
+	OrgID      string
 	JobID      string
 	RuleID     string
 	Severity   string

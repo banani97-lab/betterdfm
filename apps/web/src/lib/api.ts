@@ -17,8 +17,17 @@ export interface Submission {
   mfgGrade: string
 }
 
+export interface Organization {
+  id: string
+  slug: string
+  name: string
+  logoUrl: string
+  createdAt: string
+}
+
 export interface AnalysisJob {
   id: string
+  orgId: string
   submissionId: string
   profileId: string
   status: 'PENDING' | 'PROCESSING' | 'DONE' | 'FAILED'
@@ -31,6 +40,7 @@ export interface AnalysisJob {
 
 export interface Violation {
   id: string
+  orgId: string
   jobId: string
   ruleId: string
   severity: 'ERROR' | 'WARNING' | 'INFO'
