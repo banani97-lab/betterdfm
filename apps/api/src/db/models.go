@@ -48,7 +48,9 @@ type ProfileRules struct {
 	MinEdgeClearanceMM float64 `json:"minEdgeClearanceMM"`
 	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
 	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
-	MinCopperSliverMM  float64 `json:"minCopperSliverMM"`
+	MinCopperSliverMM          float64 `json:"minCopperSliverMM"`
+	MaxTraceImbalanceRatio     float64 `json:"maxTraceImbalanceRatio"`
+	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 }
 
 // Submission is an uploaded Gerber or ODB++ file

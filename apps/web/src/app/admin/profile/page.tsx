@@ -30,9 +30,11 @@ const DEFAULT_RULES: ProfileRules = {
   minDrillToCopperMM: 0.25,
   minCopperSliverMM: 0.1,
   smallestPackageClass: '',
+  maxTraceImbalanceRatio: 2.0,
+  enableSilkscreenOnPadCheck: true,
 }
 
-const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string }> = [
+const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc?: string }> = [
   { key: 'minTraceWidthMM', label: 'Min Trace Width', unit: 'mm', step: '0.01' },
   { key: 'minClearanceMM', label: 'Min Clearance', unit: 'mm', step: '0.01' },
   { key: 'minDrillDiamMM', label: 'Min Drill Diameter', unit: 'mm', step: '0.01' },
@@ -44,6 +46,7 @@ const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string;
   { key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01' },
   { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01' },
   { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005' },
+  { key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1', desc: 'Flag when one trace on a 2-pad component is wider than this ratio' },
 ]
 
 export default function AdminProfilePage() {
@@ -203,7 +206,7 @@ export default function AdminProfilePage() {
 
               <h3 className="font-semibold text-foreground mb-4">Manufacturing Rules</h3>
               <div className="grid grid-cols-2 gap-4">
-                {RULE_FIELDS.map(({ key, label, unit, step }) => (
+                {RULE_FIELDS.map(({ key, label, unit, step, desc }) => (
                   <div key={key}>
                     <Label className="mb-1 block text-xs">{label}</Label>
                     <div className="flex items-center gap-2">
@@ -211,12 +214,13 @@ export default function AdminProfilePage() {
                         type="number"
                         step={step}
                         min="0"
-                        value={rules[key]}
+                        value={rules[key] as number ?? 0}
                         onChange={(e) => setRuleValue(key, e.target.value)}
                         className="flex-1"
                       />
                       <span className="text-xs text-muted-foreground w-8 flex-shrink-0">{unit}</span>
                     </div>
+                    {desc && <p className="text-xs text-muted-foreground mt-1">{desc}</p>}
                   </div>
                 ))}
               </div>
@@ -240,6 +244,21 @@ export default function AdminProfilePage() {
                   <option value="2010">2010</option>
                   <option value="2512">2512</option>
                 </select>
+              </div>
+
+              <div className="mt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rules.enableSilkscreenOnPadCheck ?? true}
+                    onChange={(e) => setRules((r) => ({ ...r, enableSilkscreenOnPadCheck: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-foreground">Enable Silkscreen-on-Pad Check</span>
+                    <p className="text-xs text-muted-foreground">Check for silkscreen features overlapping copper pads</p>
+                  </div>
+                </label>
               </div>
 
               {message && (

@@ -24,6 +24,7 @@ func NewRunner() *Runner {
 			&PadSizeForPackageRule{},
 			&TombstoningRiskRule{},
 			&PackageCapabilityRule{},
+			&TraceImbalanceRule{},
 		},
 	}
 }

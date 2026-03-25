@@ -101,6 +101,10 @@ func msgUnclassifiedComponents(count int) (string, string) {
 		"Package classification is based on ODB++ metadata. Unclassified components are skipped."
 }
 
+func msgTraceImbalance(refDes string, wide, narrow, ratio float64) string {
+	return fmt.Sprintf("Trace width imbalance on %s: %.3f mm vs %.3f mm (%.1f:1 ratio)", refDes, wide, narrow, ratio)
+}
+
 func msgSilkscreenOnPad(refDes string) (string, string) {
 	if refDes != "" {
 		return fmt.Sprintf("Silkscreen overlaps copper pad for %s", refDes),
