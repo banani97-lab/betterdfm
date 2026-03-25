@@ -100,6 +100,8 @@ export interface ProfileRules {
   minDrillToCopperMM: number
   minCopperSliverMM: number
   smallestPackageClass?: string
+  maxTraceImbalanceRatio?: number
+  enableSilkscreenOnPadCheck?: boolean
 }
 
 export interface CapabilityProfile {

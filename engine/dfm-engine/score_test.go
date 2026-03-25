@@ -13,7 +13,7 @@ func TestScore_NoViolations(t *testing.T) {
 }
 
 func TestScore_SevereClearance(t *testing.T) {
-	// Many clearance errors should max out the clearance cap (20 pts) → score ≤ 80.
+	// Many clearance errors should max out the clearance cap (15 pts) → score ≤ 85.
 	viols := make([]Violation, 50)
 	for i := range viols {
 		viols[i] = Violation{
@@ -28,8 +28,8 @@ func TestScore_SevereClearance(t *testing.T) {
 		}
 	}
 	result := ComputeScore(viols, rectOutline(60, 40))
-	if result.Score >= 85 {
-		t.Errorf("expected score < 85 with many clearance errors (cap=20), got %d", result.Score)
+	if result.Score >= 86 {
+		t.Errorf("expected score < 86 with many clearance errors (cap=15), got %d", result.Score)
 	}
 }
 
@@ -59,9 +59,11 @@ func TestScore_GradeA(t *testing.T) {
 }
 
 func TestScore_GradeF(t *testing.T) {
-	// Max violations for all rules → should score very low (F)
+	// Max violations for many rules → should score very low (F)
 	var viols []Violation
-	rules := []string{"clearance", "trace-width", "annular-ring", "drill-size", "aspect-ratio", "edge-clearance", "solder-mask-dam"}
+	rules := []string{"clearance", "trace-width", "annular-ring", "drill-size",
+		"drill-to-copper", "drill-to-drill", "aspect-ratio", "edge-clearance",
+		"solder-mask-dam", "package-capability", "trace-imbalance"}
 	for _, ruleID := range rules {
 		for i := 0; i < 100; i++ {
 			viols = append(viols, Violation{

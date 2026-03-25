@@ -44,6 +44,8 @@ func ruleWeight(id string) float64 {
 		return 1.5
 	case "package-capability":
 		return 2.0
+	case "trace-imbalance":
+		return 1.5
 	default:
 		return 1.0
 	}
@@ -101,25 +103,28 @@ func marginMult(v Violation) float64 {
 //	package-capability alone maxed → score 93  (grade A — need different CM or package)
 //	all rules maxed                → score  0  (grade F — truly unmanufacturable)
 func ruleMaxContribution(id string) float64 {
+	// All caps must sum to exactly 100.
 	switch id {
 	case "clearance":
-		return 17.0
+		return 15.0 // was 17
 	case "trace-width":
-		return 14.0
+		return 13.0 // was 14
 	case "annular-ring":
-		return 10.0
+		return 9.0 // was 10
 	case "drill-size":
-		return 9.0
+		return 8.0 // was 9
 	case "drill-to-copper":
 		return 8.0
 	case "package-capability":
 		return 7.0
 	case "drill-to-drill":
-		return 7.0
+		return 6.0 // was 7
+	case "trace-imbalance":
+		return 5.0
 	case "aspect-ratio":
-		return 6.0
+		return 5.0 // was 6
 	case "edge-clearance":
-		return 6.0
+		return 5.0 // was 6
 	case "pad-size-for-package":
 		return 4.0
 	case "solder-mask-dam":
@@ -133,6 +138,7 @@ func ruleMaxContribution(id string) float64 {
 	default:
 		return 3.0
 	}
+	// Sum: 15+13+9+8+8+7+6+5+5+5+4+4+3+3+2 = 100
 }
 
 // outlineBBox returns the width and height of the bounding box of outline points in mm.

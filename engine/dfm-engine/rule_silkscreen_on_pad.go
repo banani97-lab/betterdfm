@@ -42,6 +42,10 @@ func sameSide(layerA, layerB string) bool {
 }
 
 func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Violation {
+	if profile.EnableSilkscreenOnPadCheck != nil && !*profile.EnableSilkscreenOnPadCheck {
+		return nil
+	}
+
 	var violations []Violation
 
 	// Build silk layer and copper layer sets from metadata.

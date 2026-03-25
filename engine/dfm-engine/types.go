@@ -83,6 +83,8 @@ type ProfileRules struct {
 	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
 	MinCopperSliverMM    float64 `json:"minCopperSliverMM"`
 	SmallestPackageClass string  `json:"smallestPackageClass,omitempty"` // e.g. "0402" — smallest passive the CM can place
+	MaxTraceImbalanceRatio    float64 `json:"maxTraceImbalanceRatio"`
+	EnableSilkscreenOnPadCheck *bool  `json:"enableSilkscreenOnPadCheck"`
 }
 
 // Violation is a single DFM issue found.
