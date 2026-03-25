@@ -40,6 +40,27 @@ export function isLoggedIn(): boolean {
   return !!getStoredToken()
 }
 
+/** Extract the user's role from the JWT. Returns ADMIN in dev mode. */
+export function getUserRole(): 'ADMIN' | 'ANALYST' | 'VIEWER' {
+  if (isDevMode()) return 'ADMIN'
+  const token = getStoredToken()
+  if (!token) return 'VIEWER'
+  try {
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const role = payload['custom:role']
+    if (role === 'ADMIN' || role === 'ANALYST' || role === 'VIEWER') return role
+    return 'ANALYST' // default matches backend
+  } catch {
+    return 'VIEWER'
+  }
+}
+
+/** Returns true if the current user can perform write operations. */
+export function canWrite(): boolean {
+  const role = getUserRole()
+  return role === 'ADMIN' || role === 'ANALYST'
+}
+
 // ── Sign in via server-side proxy ─────────────────────────────────────────────
 // Routes through /api/auth/signin to avoid browser CORS issues with Cognito.
 
