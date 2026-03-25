@@ -13,7 +13,7 @@ import {
   type CapabilityProfile,
   type AnalysisJob,
 } from '@/lib/api'
-import { isLoggedIn } from '@/lib/auth'
+import { isLoggedIn, canWrite } from '@/lib/auth'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { Button } from '@/components/ui/button'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
@@ -36,6 +36,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
+    if (!canWrite()) { router.replace('/dashboard'); return }
     getProfiles().then((ps) => {
       setProfiles(ps ?? [])
       const def = ps?.find((p) => p.isDefault)
