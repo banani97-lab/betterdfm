@@ -12,10 +12,20 @@ from models import BoardData, Layer, Trace, Pad, Via, Drill, Point
 
 logger = logging.getLogger(__name__)
 
+_s3_client = None
+
+
+def _get_s3_client():
+    """Return a module-level singleton boto3 S3 client."""
+    global _s3_client
+    if _s3_client is None:
+        _s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+    return _s3_client
+
 
 def download_from_s3(bucket: str, key: str) -> str:
     """Download file from S3 to a temp file, return path."""
-    s3 = boto3.client("s3", region_name=os.getenv("AWS_REGION", "us-east-1"))
+    s3 = _get_s3_client()
     suffix = Path(key).suffix or ".zip"
     with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as f:
         tmp_path = f.name
