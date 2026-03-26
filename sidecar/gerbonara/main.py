@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ODB++ / Gerber sidecar parser for BetterDFM.
+"""ODB++ / Gerber sidecar parser for BetterDFM (gerbonara).
 
 Parse pipeline (ODB++):
     parse_odb(file_path)
