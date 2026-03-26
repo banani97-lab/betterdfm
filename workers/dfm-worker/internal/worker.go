@@ -149,7 +149,7 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 			Y2:         v.Y2,
 		})
 	}
-	const batchSize = 500
+	const batchSize = 2000
 	for i := 0; i < len(dbViolations); i += batchSize {
 		end := i + batchSize
 		if end > len(dbViolations) {
