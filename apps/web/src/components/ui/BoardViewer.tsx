@@ -512,89 +512,58 @@ function drawViolations(
       if (!ok(cx) || !ok(cy)) continue
       const isSelected = v.id === selectedViolationId
       const color = SEV_COLOR[v.severity] ?? '#7090a8'
-      const baseR = 8
-      const label = v.severity[0]
-      const fontSize = 6
 
-      // Dashed line + secondary marker for two-object rules
-      if (v.x2 !== 0 || v.y2 !== 0) {
-        const cx2 = tx(v.x2), cy2 = ty(v.y2)
-        if (ok(cx2) && ok(cy2)) {
-          ctx.save()
-          ctx.globalAlpha = 0.4
-          ctx.strokeStyle = color
-          ctx.lineWidth = 1
-          ctx.setLineDash([4, 3])
-          ctx.beginPath()
-          ctx.moveTo(cx, cy)
-          ctx.lineTo(cx2, cy2)
-          ctx.stroke()
-          ctx.setLineDash([])
-          ctx.beginPath()
-          ctx.arc(cx2, cy2, 4, 0, Math.PI * 2)
-          ctx.stroke()
-          ctx.restore()
-        }
-      }
-
-      // Pulsing halo + crosshairs for selected
       if (isSelected) {
+        // Selected: pulsing ring + crosshairs + dashed line to secondary point
+        const baseR = 10
         const t = (now % 1800) / 1800
-        const pulseR = baseR * (1.6 + Math.sin(t * Math.PI * 2) * 0.8)
+        const pulseR = baseR * (1.2 + Math.sin(t * Math.PI * 2) * 0.4)
+
+        // Dashed line to secondary object
+        if (v.x2 !== 0 || v.y2 !== 0) {
+          const cx2 = tx(v.x2), cy2 = ty(v.y2)
+          if (ok(cx2) && ok(cy2)) {
+            ctx.save()
+            ctx.globalAlpha = 0.5
+            ctx.strokeStyle = color
+            ctx.lineWidth = 1
+            ctx.setLineDash([4, 3])
+            ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx2, cy2); ctx.stroke()
+            ctx.setLineDash([])
+            ctx.beginPath(); ctx.arc(cx2, cy2, 4, 0, Math.PI * 2); ctx.stroke()
+            ctx.restore()
+          }
+        }
+
+        // Pulsing halo
         ctx.save()
+        ctx.beginPath(); ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
+        ctx.strokeStyle = color + '90'; ctx.lineWidth = 1.5; ctx.stroke()
+
+        // Crosshairs
+        ctx.strokeStyle = color + 'cc'; ctx.lineWidth = 0.8
         ctx.beginPath()
-        ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
-        ctx.strokeStyle = color + '80'
-        ctx.lineWidth = 1
+        ctx.moveTo(cx - baseR * 2, cy); ctx.lineTo(cx - baseR * 0.8, cy)
+        ctx.moveTo(cx + baseR * 0.8, cy); ctx.lineTo(cx + baseR * 2, cy)
+        ctx.moveTo(cx, cy - baseR * 2); ctx.lineTo(cx, cy - baseR * 0.8)
+        ctx.moveTo(cx, cy + baseR * 0.8); ctx.lineTo(cx, cy + baseR * 2)
         ctx.stroke()
 
-        ctx.strokeStyle = color + 'bf'
-        ctx.lineWidth = 0.8
-        ctx.beginPath()
-        ctx.moveTo(cx - baseR * 1.9, cy); ctx.lineTo(cx - baseR * 1.2, cy)
-        ctx.moveTo(cx + baseR * 1.2, cy); ctx.lineTo(cx + baseR * 1.9, cy)
-        ctx.moveTo(cx, cy - baseR * 1.9); ctx.lineTo(cx, cy - baseR * 1.2)
-        ctx.moveTo(cx, cy + baseR * 1.2); ctx.lineTo(cx, cy + baseR * 1.9)
-        ctx.stroke()
+        // Center dot
+        ctx.fillStyle = color
+        ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill()
+        ctx.restore()
+      } else {
+        // Unselected: small colored dot with a thin ring — minimal footprint
+        ctx.save()
+        ctx.fillStyle = color
+        ctx.globalAlpha = 0.85
+        ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill()
+        ctx.globalAlpha = 0.5
+        ctx.strokeStyle = color; ctx.lineWidth = 1
+        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke()
         ctx.restore()
       }
-
-      // Shape
-      ctx.save()
-      ctx.fillStyle   = color + (isSelected ? '40' : '28')
-      ctx.strokeStyle = color
-      ctx.lineWidth   = isSelected ? 1.5 : 1.2
-      ctx.beginPath()
-
-      if (v.severity === 'ERROR') {
-        // Upward triangle ▲
-        const h = baseR * 1.5
-        ctx.moveTo(cx,          cy - h * 0.7)
-        ctx.lineTo(cx + baseR,  cy + h * 0.3)
-        ctx.lineTo(cx - baseR,  cy + h * 0.3)
-        ctx.closePath()
-      } else if (v.severity === 'WARNING') {
-        // Diamond ◆
-        ctx.moveTo(cx,         cy - baseR)
-        ctx.lineTo(cx + baseR, cy)
-        ctx.lineTo(cx,         cy + baseR)
-        ctx.lineTo(cx - baseR, cy)
-        ctx.closePath()
-      } else {
-        // Circle ●
-        ctx.arc(cx, cy, baseR, 0, Math.PI * 2)
-      }
-
-      ctx.fill()
-      ctx.stroke()
-
-      // Label
-      ctx.fillStyle      = 'white'
-      ctx.font           = `bold ${fontSize}px monospace`
-      ctx.textAlign      = 'center'
-      ctx.textBaseline   = 'middle'
-      ctx.fillText(label, cx, cy)
-      ctx.restore()
     }
   } else {
     // Fallback: no board data — scatter plot on 1200×800 canvas space
