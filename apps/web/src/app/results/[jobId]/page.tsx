@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
-import { API_URL, getJob, getViolations, getBoardData, getSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
+import { API_URL, getJob, getViolations, getBoardData, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -35,6 +35,7 @@ export default function ResultsPage() {
   const [violationsOpen, setViolationsOpen] = useState(true)
   const [compareOpen, setCompareOpen] = useState(false)
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -113,6 +114,11 @@ export default function ResultsPage() {
         setJob(jobData)
         setViolations(violationsData ?? [])
         getBoardData(jobId).then(setBoardData).catch(() => {})
+        // Find the current submission's projectId for compare scoping
+        getSubmissions().then(subs => {
+          const current = subs?.find(s => s.id === jobData.submissionId)
+          if (current?.projectId) setCurrentProjectId(current.projectId)
+        }).catch(() => {})
       } catch (e: unknown) {
         setError(e instanceof Error ? e.message : 'Failed to load results')
       } finally {
@@ -122,11 +128,11 @@ export default function ResultsPage() {
     load()
   }, [jobId, router])
 
-  // Load submissions for compare dropdown
+  // Load project submissions for compare dropdown
   useEffect(() => {
-    if (!compareOpen || submissions.length > 0) return
-    getSubmissions().then(setSubmissions).catch(() => {})
-  }, [compareOpen, submissions.length])
+    if (!compareOpen || submissions.length > 0 || !currentProjectId) return
+    getProjectSubmissions(currentProjectId).then(setSubmissions).catch(() => {})
+  }, [compareOpen, submissions.length, currentProjectId])
 
   useEffect(() => {
     const orientationQuery = window.matchMedia('(orientation: portrait)')
@@ -227,7 +233,7 @@ export default function ResultsPage() {
           </div>
         </div>
         <div className="order-2 md:order-3 ml-auto flex items-center gap-2">
-          <div className="relative">
+          {currentProjectId && <div className="relative">
             <Button variant="outline" className="h-10 px-3 md:h-11 md:px-4" onClick={() => setCompareOpen(o => !o)}>
               <GitCompareArrows className="h-4 w-4 mr-1" />Compare
             </Button>
@@ -256,11 +262,11 @@ export default function ResultsPage() {
                   ))
                 }
                 {submissions.filter(s => s.status === 'DONE' && s.latestJobId && s.latestJobId !== jobId).length === 0 && (
-                  <p className="px-3 py-2 text-xs text-muted-foreground">No other completed analyses found.</p>
+                  <p className="px-3 py-2 text-xs text-muted-foreground">No other completed analyses in this project.</p>
                 )}
               </div>
             )}
-          </div>
+          </div>}
           <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={exportCSV} disabled={violations.length === 0}>
             <Download className="h-4 w-4 mr-1" />CSV
           </Button>
