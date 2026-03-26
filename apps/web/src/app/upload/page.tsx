@@ -35,7 +35,7 @@ interface FileEntry {
 
 function inferFileType(filename: string): 'GERBER' | 'ODB_PLUS_PLUS' {
   const lower = filename.toLowerCase()
-  if (lower.endsWith('.tgz') || lower.includes('odb')) return 'ODB_PLUS_PLUS'
+  if (lower.endsWith('.tgz') || lower.endsWith('.tar') || lower.endsWith('.tar.gz') || lower.includes('odb')) return 'ODB_PLUS_PLUS'
   return 'GERBER'
 }
 

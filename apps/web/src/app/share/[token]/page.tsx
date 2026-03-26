@@ -156,9 +156,9 @@ export default function SharedPage() {
     setUploadProgress(0)
     setUploadSuccess(false)
     try {
-      const fileType = file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.tgz')
-        ? (file.name.toLowerCase().includes('odb') ? 'ODB_PLUS_PLUS' : 'GERBER')
-        : 'GERBER'
+      const lower = file.name.toLowerCase()
+      const isOdb = lower.endsWith('.tgz') || lower.endsWith('.tar') || lower.endsWith('.tar.gz') || lower.includes('odb')
+      const fileType = isOdb ? 'ODB_PLUS_PLUS' : 'GERBER'
       const result = await sharedUpload(token, {
         filename: file.name,
         fileType,
