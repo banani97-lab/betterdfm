@@ -55,6 +55,7 @@ export default function SharedPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadName, setUploadName] = useState('')
   const [uploadEmail, setUploadEmail] = useState('')
+  const [uploadFileType, setUploadFileType] = useState<'GERBER' | 'ODB_PLUS_PLUS'>('GERBER')
   const [dragOver, setDragOver] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
 
@@ -156,12 +157,9 @@ export default function SharedPage() {
     setUploadProgress(0)
     setUploadSuccess(false)
     try {
-      const lower = file.name.toLowerCase()
-      const isOdb = lower.endsWith('.tgz') || lower.endsWith('.tar') || lower.endsWith('.tar.gz') || lower.includes('odb')
-      const fileType = isOdb ? 'ODB_PLUS_PLUS' : 'GERBER'
       const result = await sharedUpload(token, {
         filename: file.name,
-        fileType,
+        fileType: uploadFileType,
         uploaderName: uploadName,
         uploaderEmail: uploadEmail,
       })
@@ -297,6 +295,16 @@ export default function SharedPage() {
                       onChange={(e) => setUploadEmail(e.target.value)}
                       className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
                     />
+                  </div>
+                  <div className="mb-3 max-w-sm mx-auto">
+                    <select
+                      value={uploadFileType}
+                      onChange={(e) => setUploadFileType(e.target.value as 'GERBER' | 'ODB_PLUS_PLUS')}
+                      className="w-full px-3 py-1.5 text-sm border rounded bg-background"
+                    >
+                      <option value="GERBER">Gerber</option>
+                      <option value="ODB_PLUS_PLUS">ODB++</option>
+                    </select>
                   </div>
                   <input
                     type="file"
