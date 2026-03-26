@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, XCircle, Upload, File, X } from 'lucide-react'
@@ -40,6 +40,14 @@ function inferFileType(filename: string): 'GERBER' | 'ODB_PLUS_PLUS' {
 }
 
 export default function UploadPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <UploadPageInner />
+    </Suspense>
+  )
+}
+
+function UploadPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('projectId') || undefined
