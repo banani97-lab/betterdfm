@@ -91,6 +91,7 @@ func main() {
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
+	compareHandler := routes.NewCompareHandler(database)
 	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
 
 	// Auth routes (no JWT required for callback)
@@ -108,6 +109,7 @@ func main() {
 	read.GET("/jobs/:id/report.pdf", reportHandler.GetJobReport)
 	read.GET("/profiles", profilesHandler.ListProfiles)
 	read.GET("/profiles/:id", profilesHandler.GetProfile)
+	read.GET("/compare", compareHandler.Compare)
 
 	// Write routes — ANALYST + ADMIN only
 	write := e.Group("", jwtMW.Middleware(), lib.RequireRole("ANALYST", "ADMIN"))

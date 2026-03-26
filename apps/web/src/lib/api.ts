@@ -277,3 +277,27 @@ export async function updateProfile(
 export async function deleteProfile(id: string): Promise<void> {
   return apiFetch(`/profiles/${id}`, { method: 'DELETE' })
 }
+
+// ── Compare ──────────────────────────────────────────────────────────────────
+
+export interface ComparisonJobSummary {
+  id: string
+  mfgScore: number
+  mfgGrade: string
+  filename: string
+  completedAt: string | null
+}
+
+export interface ComparisonResult {
+  jobA: ComparisonJobSummary
+  jobB: ComparisonJobSummary
+  scoreDelta: number
+  summary: { fixedCount: number; newCount: number; unchangedCount: number }
+  fixed: Violation[]
+  new: Violation[]
+  unchanged: Array<{ a: Violation; b: Violation }>
+}
+
+export async function compareJobs(jobAId: string, jobBId: string): Promise<ComparisonResult> {
+  return apiFetch<ComparisonResult>(`/compare?jobA=${encodeURIComponent(jobAId)}&jobB=${encodeURIComponent(jobBId)}`)
+}

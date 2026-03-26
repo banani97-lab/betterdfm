@@ -3,8 +3,8 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Info, ListFilter } from 'lucide-react'
-import { API_URL, getJob, getViolations, getBoardData, patchViolation, ignoreLayerViolations, type AnalysisJob, type Violation, type BoardData } from '@/lib/api'
+import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
+import { API_URL, getJob, getViolations, getBoardData, getSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,6 +33,8 @@ export default function ResultsPage() {
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ERROR')
   const [isPortraitMobile, setIsPortraitMobile] = useState(false)
   const [violationsOpen, setViolationsOpen] = useState(true)
+  const [compareOpen, setCompareOpen] = useState(false)
+  const [submissions, setSubmissions] = useState<Submission[]>([])
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -119,6 +121,12 @@ export default function ResultsPage() {
     }
     load()
   }, [jobId, router])
+
+  // Load submissions for compare dropdown
+  useEffect(() => {
+    if (!compareOpen || submissions.length > 0) return
+    getSubmissions().then(setSubmissions).catch(() => {})
+  }, [compareOpen, submissions.length])
 
   useEffect(() => {
     const orientationQuery = window.matchMedia('(orientation: portrait)')
@@ -219,6 +227,40 @@ export default function ResultsPage() {
           </div>
         </div>
         <div className="order-2 md:order-3 ml-auto flex items-center gap-2">
+          <div className="relative">
+            <Button variant="outline" className="h-10 px-3 md:h-11 md:px-4" onClick={() => setCompareOpen(o => !o)}>
+              <GitCompareArrows className="h-4 w-4 mr-1" />Compare
+            </Button>
+            {compareOpen && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-card border border-border rounded-lg shadow-lg py-1 max-h-64 overflow-y-auto">
+                <p className="px-3 py-1.5 text-xs font-medium text-muted-foreground">Compare with another analysis:</p>
+                {submissions
+                  .filter(s => s.status === 'DONE' && s.latestJobId && s.latestJobId !== jobId)
+                  .map(s => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      className="w-full text-left px-3 py-2 hover:bg-muted/60 transition-colors flex items-center justify-between"
+                      onClick={() => {
+                        setCompareOpen(false)
+                        router.push(`/compare?jobA=${jobId}&jobB=${s.latestJobId}`)
+                      }}
+                    >
+                      <span className="text-sm truncate">{s.filename}</span>
+                      {s.mfgScore > 0 && (
+                        <span className="text-xs font-mono font-bold ml-2 shrink-0" style={{ color: scoreColor(s.mfgScore) }}>
+                          {s.mfgScore} {s.mfgGrade}
+                        </span>
+                      )}
+                    </button>
+                  ))
+                }
+                {submissions.filter(s => s.status === 'DONE' && s.latestJobId && s.latestJobId !== jobId).length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">No other completed analyses found.</p>
+                )}
+              </div>
+            )}
+          </div>
           <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={exportCSV} disabled={violations.length === 0}>
             <Download className="h-4 w-4 mr-1" />CSV
           </Button>
