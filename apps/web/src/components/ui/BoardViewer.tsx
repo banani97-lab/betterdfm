@@ -44,7 +44,7 @@ const ok = (n: number): boolean => isFinite(n) && n > -SAFE && n < SAFE
 
 const SEV_COLOR: Record<string, string> = {
   ERROR:   '#ff3333',
-  WARNING: '#ffaa00',
+  WARNING: '#ff6b00',
   INFO:    '#44aaff',
 }
 
