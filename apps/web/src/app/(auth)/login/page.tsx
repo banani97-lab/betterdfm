@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { signIn, completeNewPassword, isLoggedIn, isDevMode } from '@/lib/auth'
+import { signIn, completeNewPassword, forgotPassword, resetPassword, isLoggedIn, isDevMode } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,6 +16,12 @@ export default function LoginPage() {
   const [newPasswordSession, setNewPasswordSession] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [forgotStep, setForgotStep] = useState<'off' | 'email' | 'code'>('off')
+  const [resetCode, setResetCode] = useState('')
+  const [resetEmail, setResetEmail] = useState('')
+  const [resetNewPassword, setResetNewPassword] = useState('')
+  const [resetConfirm, setResetConfirm] = useState('')
+  const [resetSuccess, setResetSuccess] = useState(false)
 
   useEffect(() => {
     if (isLoggedIn()) router.replace('/dashboard')
@@ -34,6 +40,46 @@ export default function LoginPage() {
       }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleForgotSubmitEmail = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await forgotPassword(resetEmail || email)
+      if (!resetEmail) setResetEmail(email)
+      setForgotStep('code')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to send reset code')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    if (resetNewPassword !== resetConfirm) {
+      setError('Passwords do not match')
+      return
+    }
+    setLoading(true)
+    try {
+      await resetPassword(resetEmail, resetCode, resetNewPassword)
+      setResetSuccess(true)
+      setTimeout(() => {
+        setForgotStep('off')
+        setResetSuccess(false)
+        setResetCode('')
+        setResetNewPassword('')
+        setResetConfirm('')
+      }, 2000)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to reset password')
     } finally {
       setLoading(false)
     }
@@ -74,7 +120,107 @@ export default function LoginPage() {
 
         {/* Card */}
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
-          {newPasswordSession ? (
+          {forgotStep === 'email' ? (
+            <>
+              <h2 className="text-xl font-semibold text-white mb-1">Reset password</h2>
+              <p className="text-blue-200 text-sm mb-6">Enter your email and we&apos;ll send a verification code.</p>
+
+              {error && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+
+              <form onSubmit={handleForgotSubmitEmail} className="flex flex-col gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <Label htmlFor="reset-email" className="text-blue-100 text-sm">Email</Label>
+                  <Input
+                    id="reset-email"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@example.com"
+                    value={resetEmail || email}
+                    onChange={(e) => setResetEmail(e.target.value)}
+                    required
+                    className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                  />
+                </div>
+                <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1">
+                  {loading ? 'Sending…' : 'Send verification code'}
+                </Button>
+              </form>
+              <button onClick={() => { setForgotStep('off'); setError(null) }} className="mt-4 text-sm text-blue-300 hover:text-white transition-colors w-full text-center">
+                Back to sign in
+              </button>
+            </>
+          ) : forgotStep === 'code' ? (
+            <>
+              <h2 className="text-xl font-semibold text-white mb-1">Enter verification code</h2>
+              <p className="text-blue-200 text-sm mb-6">Check your email for a code from AWS.</p>
+
+              {resetSuccess && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-green-500/10 border border-green-400/20 text-green-300 text-sm">
+                  Password reset successful! Redirecting to sign in…
+                </div>
+              )}
+
+              {error && (
+                <div className="mb-4 px-3 py-2 rounded-lg bg-red-500/10 border border-red-400/20 text-red-300 text-sm">
+                  {error}
+                </div>
+              )}
+
+              {!resetSuccess && (
+                <form onSubmit={handleResetPassword} className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="code" className="text-blue-100 text-sm">Verification code</Label>
+                    <Input
+                      id="code"
+                      type="text"
+                      autoComplete="one-time-code"
+                      placeholder="123456"
+                      value={resetCode}
+                      onChange={(e) => setResetCode(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="reset-new-pw" className="text-blue-100 text-sm">New password</Label>
+                    <Input
+                      id="reset-new-pw"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={resetNewPassword}
+                      onChange={(e) => setResetNewPassword(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label htmlFor="reset-confirm-pw" className="text-blue-100 text-sm">Confirm password</Label>
+                    <Input
+                      id="reset-confirm-pw"
+                      type="password"
+                      autoComplete="new-password"
+                      placeholder="••••••••"
+                      value={resetConfirm}
+                      onChange={(e) => setResetConfirm(e.target.value)}
+                      required
+                      className="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+                    />
+                  </div>
+                  <Button type="submit" disabled={loading} className="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1">
+                    {loading ? 'Resetting…' : 'Reset password'}
+                  </Button>
+                </form>
+              )}
+              <button onClick={() => { setForgotStep('off'); setError(null) }} className="mt-4 text-sm text-blue-300 hover:text-white transition-colors w-full text-center">
+                Back to sign in
+              </button>
+            </>
+          ) : newPasswordSession ? (
             <>
               <h2 className="text-xl font-semibold text-white mb-1">Set your password</h2>
               <p className="text-blue-200 text-sm mb-6">Your account requires a new password before continuing.</p>
@@ -177,6 +323,12 @@ export default function LoginPage() {
                   {loading ? 'Signing in…' : 'Sign in'}
                 </Button>
               </form>
+              <button
+                onClick={() => { setForgotStep('email'); setError(null) }}
+                className="mt-3 text-sm text-blue-300 hover:text-white transition-colors w-full text-center"
+              >
+                Forgot password?
+              </button>
             </>
           )}
 

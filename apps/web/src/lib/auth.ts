@@ -94,6 +94,36 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   return { kind: 'ok' }
 }
 
+export async function forgotPassword(email: string): Promise<void> {
+  if (isDevMode()) return
+  const res = await fetch('/api/auth/forgot-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to send reset code')
+  }
+}
+
+export async function resetPassword(
+  email: string,
+  code: string,
+  newPassword: string,
+): Promise<void> {
+  if (isDevMode()) return
+  const res = await fetch('/api/auth/reset-password', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, newPassword }),
+  })
+  const data = await res.json()
+  if (!res.ok) {
+    throw new Error(data.error || 'Failed to reset password')
+  }
+}
+
 export async function completeNewPassword(
   email: string,
   newPassword: string,
