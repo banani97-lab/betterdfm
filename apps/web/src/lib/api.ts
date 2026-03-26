@@ -12,9 +12,26 @@ export interface Submission {
   createdAt: string
   orgId: string
   userId: string
+  projectId?: string
   latestJobId?: string
   mfgScore: number
   mfgGrade: string
+}
+
+export interface Project {
+  id: string
+  orgId: string
+  name: string
+  description: string
+  customerRef: string
+  createdBy: string
+  archived: boolean
+  createdAt: string
+  updatedAt: string
+  submissionCount: number
+  avgScore: number
+  latestGrade: string
+  lastActivityAt?: string
 }
 
 export interface Organization {
@@ -157,11 +174,12 @@ export async function getSubmissions(): Promise<Submission[]> {
 
 export async function createSubmission(
   filename: string,
-  fileType: string
+  fileType: string,
+  projectId?: string
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return apiFetch('/submissions', {
     method: 'POST',
-    body: JSON.stringify({ filename, fileType }),
+    body: JSON.stringify({ filename, fileType, ...(projectId ? { projectId } : {}) }),
   })
 }
 
@@ -255,6 +273,77 @@ export async function patchViolation(
   return apiFetch(`/violations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
 
+// ── Batches ──────────────────────────────────────────────────────────────────
+
+export interface BatchSubmission extends Submission {
+  latestJobId: string
+  jobStatus: string
+  mfgScore: number
+  mfgGrade: string
+}
+
+export interface Batch {
+  id: string
+  orgId: string
+  projectId?: string
+  userId: string
+  profileId?: string
+  status: 'PENDING' | 'PROCESSING' | 'DONE' | 'PARTIAL_FAIL'
+  total: number
+  completed: number
+  failed: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BatchDetail {
+  batch: Batch
+  submissions: BatchSubmission[]
+  avgScore: number | null
+}
+
+export interface CreateBatchResponse {
+  batchId: string
+  submissions: Array<{
+    submissionId: string
+    filename: string
+    presignedUrl: string
+  }>
+}
+
+export async function createBatch(
+  files: Array<{ filename: string; fileType: string }>,
+  projectId?: string,
+  profileId?: string
+): Promise<CreateBatchResponse> {
+  return apiFetch('/batches', {
+    method: 'POST',
+    body: JSON.stringify({ files, projectId, profileId }),
+  })
+}
+
+export async function getBatch(batchId: string): Promise<BatchDetail> {
+  return apiFetch<BatchDetail>(`/batches/${batchId}`)
+}
+
+export async function analyzeBatch(
+  batchId: string,
+  profileId?: string
+): Promise<{ batchId: string; jobIds: string[] }> {
+  return apiFetch(`/batches/${batchId}/analyze`, {
+    method: 'POST',
+    body: JSON.stringify({ profileId: profileId ?? '' }),
+  })
+}
+
+export async function retryBatch(
+  batchId: string
+): Promise<{ batchId: string; jobIds: string[] }> {
+  return apiFetch(`/batches/${batchId}/retry`, {
+    method: 'POST',
+  })
+}
+
 // ── Profiles ─────────────────────────────────────────────────────────────────
 
 export async function getProfiles(): Promise<CapabilityProfile[]> {
@@ -278,4 +367,177 @@ export async function updateProfile(
 
 export async function deleteProfile(id: string): Promise<void> {
   return apiFetch(`/profiles/${id}`, { method: 'DELETE' })
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export async function getProjects(q?: string, archived?: boolean): Promise<Project[]> {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (archived !== undefined) params.set('archived', String(archived))
+  const qs = params.toString()
+  return apiFetch<Project[]>(`/projects${qs ? `?${qs}` : ''}`)
+}
+
+export async function getProject(id: string): Promise<Project> {
+  return apiFetch<Project>(`/projects/${id}`)
+}
+
+export async function createProject(data: {
+  name: string
+  description?: string
+  customerRef?: string
+}): Promise<Project> {
+  return apiFetch('/projects', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateProject(
+  id: string,
+  data: Partial<{ name: string; description: string; customerRef: string }>
+): Promise<Project> {
+  return apiFetch(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function archiveProject(id: string): Promise<Project> {
+  return apiFetch(`/projects/${id}`, { method: 'DELETE' })
+}
+
+export async function getProjectSubmissions(projectId: string): Promise<Submission[]> {
+  return apiFetch<Submission[]>(`/projects/${projectId}/submissions`)
+}
+
+// ── Share Links ──────────────────────────────────────────────────────────────
+
+export interface ShareLink {
+  id: string
+  orgId: string
+  token: string
+  projectId?: string | null
+  jobId?: string | null
+  createdBy: string
+  expiresAt?: string | null
+  allowUpload: boolean
+  active: boolean
+  label: string
+  createdAt: string
+  shareUrl?: string
+}
+
+export interface ShareUpload {
+  id: string
+  shareLinkId: string
+  submissionId: string
+  uploaderName: string
+  uploaderEmail: string
+  createdAt: string
+}
+
+export interface ShareInfo {
+  id: string
+  label: string
+  allowUpload: boolean
+  expiresAt?: string | null
+  orgName: string
+  orgLogoUrl: string
+  shareType: 'project' | 'job'
+  projectId?: string
+  jobId?: string
+  job?: {
+    id: string
+    status: string
+    mfgScore: number
+    mfgGrade: string
+    completedAt?: string
+  }
+}
+
+export async function createShareLink(data: {
+  projectId?: string
+  jobId?: string
+  label: string
+  expiresAt?: string
+  allowUpload?: boolean
+}): Promise<ShareLink> {
+  return apiFetch('/share-links', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function getShareLinks(): Promise<ShareLink[]> {
+  return apiFetch<ShareLink[]>('/share-links')
+}
+
+export async function deactivateShareLink(id: string): Promise<{ id: string; active: boolean }> {
+  return apiFetch(`/share-links/${id}`, { method: 'DELETE' })
+}
+
+export async function getShareUploads(linkId: string): Promise<ShareUpload[]> {
+  return apiFetch<ShareUpload[]>(`/share-links/${linkId}/uploads`)
+}
+
+// ── Public share fetch (no auth) ─────────────────────────────────────────────
+
+async function shareFetch<T>(token: string, path: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(`${API_URL}/shared/${token}${path}`, {
+    ...init,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(init?.headers ?? {}),
+    },
+  })
+  if (!res.ok) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(`Share API ${path}: ${res.status} ${text}`)
+  }
+  if (res.status === 204) return undefined as T
+  return res.json()
+}
+
+export async function getShareInfo(token: string): Promise<ShareInfo> {
+  return shareFetch<ShareInfo>(token, '')
+}
+
+export async function getSharedSubmissions(token: string): Promise<Submission[]> {
+  return shareFetch<Submission[]>(token, '/submissions')
+}
+
+export async function getSharedJob(token: string, jobId: string): Promise<AnalysisJob> {
+  return shareFetch<AnalysisJob>(token, `/jobs/${jobId}`)
+}
+
+export async function getSharedViolations(token: string, jobId: string): Promise<Violation[]> {
+  return shareFetch<Violation[]>(token, `/jobs/${jobId}/violations`)
+}
+
+export async function getSharedBoardData(token: string, jobId: string): Promise<BoardData> {
+  return shareFetch<BoardData>(token, `/jobs/${jobId}/board`)
+}
+
+export async function sharedUpload(
+  token: string,
+  data: { filename: string; fileType: string; uploaderName?: string; uploaderEmail?: string }
+): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
+  return shareFetch(token, '/upload', { method: 'POST', body: JSON.stringify(data) })
+}
+
+// ── Compare ──────────────────────────────────────────────────────────────────
+
+export interface ComparisonJobSummary {
+  id: string
+  mfgScore: number
+  mfgGrade: string
+  filename: string
+  completedAt: string | null
+}
+
+export interface ComparisonResult {
+  jobA: ComparisonJobSummary
+  jobB: ComparisonJobSummary
+  scoreDelta: number
+  summary: { fixedCount: number; newCount: number; unchangedCount: number }
+  fixed: Violation[]
+  new: Violation[]
+  unchanged: Array<{ a: Violation; b: Violation }>
+}
+
+export async function compareJobs(jobAId: string, jobBId: string): Promise<ComparisonResult> {
+  return apiFetch<ComparisonResult>(`/compare?jobA=${encodeURIComponent(jobAId)}&jobB=${encodeURIComponent(jobBId)}`)
 }

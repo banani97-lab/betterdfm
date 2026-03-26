@@ -53,11 +53,41 @@ type ProfileRules struct {
 	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 }
 
+// Project groups related submissions
+type Project struct {
+	ID          string    `gorm:"primaryKey" json:"id"`
+	OrgID       string    `gorm:"index" json:"orgId"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CustomerRef string    `json:"customerRef"`
+	CreatedBy   string    `json:"createdBy"`
+	Archived    bool      `gorm:"default:false" json:"archived"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+// Batch groups multiple submissions uploaded together
+type Batch struct {
+	ID        string    `gorm:"primaryKey" json:"id"`
+	OrgID     string    `gorm:"index" json:"orgId"`
+	ProjectID *string   `json:"projectId"`
+	UserID    string    `json:"userId"`
+	ProfileID *string   `json:"profileId"`
+	Status    string    `gorm:"default:PENDING" json:"status"` // PENDING | PROCESSING | DONE | PARTIAL_FAIL
+	Total     int       `json:"total"`
+	Completed int       `gorm:"default:0" json:"completed"`
+	Failed    int       `gorm:"default:0" json:"failed"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 // Submission is an uploaded Gerber or ODB++ file
 type Submission struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
 	OrgID     string    `json:"orgId"`
 	UserID    string    `json:"userId"`
+	ProjectID *string   `json:"projectId"`
+	BatchID   *string   `json:"batchId"`
 	Filename  string    `json:"filename"`
 	FileType  string    `json:"fileType"` // GERBER | ODB_PLUS_PLUS
 	FileKey   string    `json:"fileKey"`  // S3 key
@@ -79,6 +109,31 @@ type AnalysisJob struct {
 	BoardData    datatypes.JSON `json:"boardData" gorm:"type:jsonb"`
 	MfgScore     int            `json:"mfgScore"`
 	MfgGrade     string         `json:"mfgGrade"`
+}
+
+// ShareLink is a token-based share link for customer portal access
+type ShareLink struct {
+	ID          string     `gorm:"primaryKey" json:"id"`
+	OrgID       string     `gorm:"index" json:"orgId"`
+	Token       string     `gorm:"uniqueIndex" json:"token"`
+	ProjectID   *string    `json:"projectId"`   // nullable — share a whole project
+	JobID       *string    `json:"jobId"`        // nullable — share a single job
+	CreatedBy   string     `json:"createdBy"`
+	ExpiresAt   *time.Time `json:"expiresAt"`
+	AllowUpload bool       `gorm:"default:false" json:"allowUpload"`
+	Active      bool       `gorm:"default:true" json:"active"`
+	Label       string     `json:"label"`
+	CreatedAt   time.Time  `json:"createdAt"`
+}
+
+// ShareUpload tracks files uploaded by customers through a share link
+type ShareUpload struct {
+	ID            string    `gorm:"primaryKey" json:"id"`
+	ShareLinkID   string    `json:"shareLinkId"`
+	SubmissionID  string    `json:"submissionId"`
+	UploaderName  string    `json:"uploaderName"`
+	UploaderEmail string    `json:"uploaderEmail"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 // Violation is a single DFM issue found.

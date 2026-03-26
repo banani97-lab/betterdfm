@@ -42,9 +42,13 @@ func main() {
 		&db.Organization{},
 		&db.User{},
 		&db.CapabilityProfile{},
+		&db.Project{},
+		&db.Batch{},
 		&db.Submission{},
 		&db.AnalysisJob{},
 		&db.Violation{},
+		&db.ShareLink{},
+		&db.ShareUpload{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
@@ -88,10 +92,14 @@ func main() {
 	// Route handlers
 	authHandler := routes.NewAuthHandler(database)
 	submissionsHandler := routes.NewSubmissionsHandler(database, awsClients)
+	batchesHandler := routes.NewBatchesHandler(database, awsClients)
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
+	compareHandler := routes.NewCompareHandler(database)
 	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
+	projectsHandler := routes.NewProjectsHandler(database, awsClients)
+	shareHandler := routes.NewShareHandler(database, awsClients)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
@@ -102,22 +110,47 @@ func main() {
 	read := e.Group("", jwtMW.Middleware())
 	read.GET("/submissions", submissionsHandler.ListSubmissions)
 	read.GET("/submissions/:id", submissionsHandler.GetSubmission)
+	read.GET("/batches/:id", batchesHandler.GetBatch)
 	read.GET("/jobs/:id", jobsHandler.GetJob)
 	read.GET("/jobs/:id/violations", jobsHandler.GetViolations)
 	read.GET("/jobs/:id/board", jobsHandler.GetBoardData)
 	read.GET("/jobs/:id/report.pdf", reportHandler.GetJobReport)
+	read.GET("/projects", projectsHandler.ListProjects)
+	read.GET("/projects/:id", projectsHandler.GetProject)
+	read.GET("/projects/:id/submissions", projectsHandler.ListProjectSubmissions)
 	read.GET("/profiles", profilesHandler.ListProfiles)
 	read.GET("/profiles/:id", profilesHandler.GetProfile)
+	read.GET("/compare", compareHandler.Compare)
 
 	// Write routes — ANALYST + ADMIN only
 	write := e.Group("", jwtMW.Middleware(), lib.RequireRole("ANALYST", "ADMIN"))
 	write.POST("/submissions", submissionsHandler.CreateSubmission)
 	write.POST("/submissions/:id/analyze", submissionsHandler.StartAnalysis)
+	write.POST("/batches", batchesHandler.CreateBatch)
+	write.POST("/batches/:id/analyze", batchesHandler.AnalyzeBatch)
+	write.POST("/batches/:id/retry", batchesHandler.RetryBatch)
 	write.PATCH("/violations/:id", jobsHandler.UpdateViolation)
 	write.PATCH("/jobs/:id/violations/by-layer", jobsHandler.BulkIgnoreLayerViolations)
+	write.POST("/projects", projectsHandler.CreateProject)
+	write.PUT("/projects/:id", projectsHandler.UpdateProject)
+	write.DELETE("/projects/:id", projectsHandler.ArchiveProject)
+	write.POST("/projects/:id/submissions", projectsHandler.MoveSubmissionToProject)
 	write.POST("/profiles", profilesHandler.CreateProfile)
 	write.PUT("/profiles/:id", profilesHandler.UpdateProfile)
 	write.DELETE("/profiles/:id", profilesHandler.DeleteProfile)
+	write.POST("/share-links", shareHandler.CreateShareLink)
+	write.GET("/share-links", shareHandler.ListShareLinks)
+	write.DELETE("/share-links/:id", shareHandler.DeactivateShareLink)
+	write.GET("/share-links/:id/uploads", shareHandler.ListShareUploads)
+
+	// Public shared routes (token-based auth, no JWT)
+	shared := e.Group("/shared/:token", shareHandler.TokenMiddleware())
+	shared.GET("", shareHandler.GetShareInfo)
+	shared.GET("/submissions", shareHandler.GetSharedSubmissions)
+	shared.GET("/jobs/:jobId", shareHandler.GetSharedJob)
+	shared.GET("/jobs/:jobId/violations", shareHandler.GetSharedViolations)
+	shared.GET("/jobs/:jobId/board", shareHandler.GetSharedBoardData)
+	shared.POST("/upload", shareHandler.SharedUpload)
 
 	// Admin routes (separate JWT audience)
 	adminAPI := e.Group("/admin", adminJWTMW.AdminMiddleware())

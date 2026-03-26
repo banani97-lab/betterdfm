@@ -7,6 +7,12 @@ import type { Violation, BoardData } from '@/lib/api'
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+export interface BoardViewerTransform {
+  offsetX: number
+  offsetY: number
+  scale: number
+}
+
 interface BoardViewerProps {
   violations: Violation[]
   boardData?: BoardData | null
@@ -17,6 +23,12 @@ interface BoardViewerProps {
   violationLayers?: Set<string>       // layers that have at least one violation
   allIgnoredLayers?: Set<string>      // layers where every violation is ignored
   onIgnoreLayer?: (name: string, ignored: boolean, severity?: string) => void
+  /** When provided, the viewer uses this transform instead of its own internal state. */
+  externalTransform?: BoardViewerTransform
+  /** Called whenever the user pans/zooms. Parent can sync to another viewer. */
+  onTransformChange?: (transform: BoardViewerTransform) => void
+  /** Optional label displayed at top-left of the board viewer. */
+  label?: string
 }
 
 interface Bounds {
@@ -618,6 +630,9 @@ export function BoardViewer({
   violationLayers,
   allIgnoredLayers,
   onIgnoreLayer,
+  externalTransform,
+  onTransformChange,
+  label,
 }: BoardViewerProps) {
   const canvasRef    = useRef<HTMLCanvasElement>(null)
   const zoomRef      = useRef(1)
@@ -642,6 +657,26 @@ export function BoardViewer({
   const [zoomPct,           setZoomPct]           = useState(100)
   const [rotation,          setRotation]          = useState(0)
   const [openDropdownLayer, setOpenDropdownLayer] = useState<string | null>(null)
+
+  // ── External transform synchronization ────────────────────────────────────
+  // When controlled externally, sync refs from the prop so draw() uses them.
+  useEffect(() => {
+    if (!externalTransform) return
+    zoomRef.current = externalTransform.scale
+    panRef.current  = { x: externalTransform.offsetX, y: externalTransform.offsetY }
+    setZoomPct(Math.round(externalTransform.scale * 100))
+    draw()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalTransform?.offsetX, externalTransform?.offsetY, externalTransform?.scale])
+
+  /** Notify parent of transform changes (no-op when uncontrolled). */
+  const notifyTransform = useCallback(() => {
+    onTransformChange?.({
+      offsetX: panRef.current.x,
+      offsetY: panRef.current.y,
+      scale: zoomRef.current,
+    })
+  }, [onTransformChange])
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
@@ -778,11 +813,12 @@ export function BoardViewer({
       panRef.current.y = my - (my - panRef.current.y) * (newZoom / zoomRef.current)
       zoomRef.current  = newZoom
       setZoomPct(Math.round(newZoom * 100))
+      notifyTransform()
       draw()
     }
     canvas.addEventListener('wheel', handler, { passive: false })
     return () => canvas.removeEventListener('wheel', handler)
-  }, [draw])
+  }, [draw, notifyTransform])
 
   // Touch gestures: one-finger pan and two-finger pinch zoom.
   useEffect(() => {
@@ -826,6 +862,7 @@ export function BoardViewer({
             x: panRef.current.x + point.x - last.x,
             y: panRef.current.y + point.y - last.y,
           }
+          notifyTransform()
           draw()
         }
         lastTouchRef.current = point
@@ -856,6 +893,7 @@ export function BoardViewer({
       }
       zoomRef.current = nextZoom
       setZoomPct(Math.round(nextZoom * 100))
+      notifyTransform()
       draw()
       e.preventDefault()
     }
@@ -883,7 +921,7 @@ export function BoardViewer({
       canvas.removeEventListener('touchend', onTouchEnd)
       canvas.removeEventListener('touchcancel', onTouchEnd)
     }
-  }, [draw])
+  }, [draw, notifyTransform])
 
   // ── Zoom / reset controls ───────────────────────────────────────────────────
 
@@ -904,8 +942,9 @@ export function BoardViewer({
     panRef.current.y = cy - (cy - panRef.current.y) * (newZoom / zoomRef.current)
     zoomRef.current  = newZoom
     setZoomPct(Math.round(newZoom * 100))
+    notifyTransform()
     draw()
-  }, [draw])
+  }, [draw, notifyTransform])
 
   const resetView = useCallback(() => {
     const canvas = canvasRef.current
@@ -918,8 +957,9 @@ export function BoardViewer({
     rotationRef.current = 0
     setZoomPct(Math.round(z * 100))
     setRotation(0)
+    notifyTransform()
     draw()
-  }, [draw])
+  }, [draw, notifyTransform])
 
   // ── Mouse event handlers ────────────────────────────────────────────────────
 
@@ -938,6 +978,7 @@ export function BoardViewer({
         y: panRef.current.y + e.clientY - lastMouseRef.current.y,
       }
       lastMouseRef.current = { x: e.clientX, y: e.clientY }
+      notifyTransform()
       draw()
     }
 
@@ -954,7 +995,7 @@ export function BoardViewer({
         y: maxY - (vy - offY) / s,
       })
     }
-  }, [bounds, draw])
+  }, [bounds, draw, notifyTransform])
 
   const onMouseUp = useCallback(() => {
     draggingRef.current = false; setDragging(false)
@@ -999,6 +1040,13 @@ export function BoardViewer({
 
   return (
     <div className="relative flex flex-col h-full bg-gray-900 rounded-lg overflow-hidden">
+
+      {/* Label (e.g. "Rev A (Before)") */}
+      {label && (
+        <div className="absolute top-2 left-2 z-20 px-2 py-1 bg-black/60 rounded text-xs text-white font-medium select-none">
+          {label}
+        </div>
+      )}
 
       {/* Toolbar */}
       <div className="absolute top-2 right-2 z-20 flex items-center gap-1">

@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, Cog, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
-import { getSubmissions, getViolations, startAnalysis, type Submission } from '@/lib/api'
+import { AlertCircle, AlertTriangle, Cog, FolderOpen, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
 import { clearToken, canWrite, isLoggedIn } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
@@ -77,6 +77,7 @@ function applyBackground(background: BackgroundStyle) {
 export default function DashboardPage() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
@@ -87,8 +88,12 @@ export default function DashboardPage() {
 
   const fetchSubmissions = useCallback(async () => {
     try {
-      const data = await getSubmissions()
+      const [data, projectData] = await Promise.all([
+        getSubmissions(),
+        getProjects(undefined, false),
+      ])
       setSubmissions(data ?? [])
+      setProjects(projectData ?? [])
       setError(null)
     } catch (e: unknown) {
       if (e instanceof Error) setError(e.message)
@@ -240,6 +245,23 @@ export default function DashboardPage() {
             </span>
           </Button>
 
+          <Link href="/projects">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
+              aria-label="Projects"
+              title="Projects"
+            >
+              <span className="flex items-center justify-center w-full">
+                <FolderOpen className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
+                <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
+                  Projects
+                </span>
+              </span>
+            </Button>
+          </Link>
+
           {canWrite() && (
             <Link href="/upload">
               <Button
@@ -261,6 +283,45 @@ export default function DashboardPage() {
       </header>
 
       <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4 sm:px-5' : 'max-w-7xl px-4 sm:px-6')}>
+        {/* Projects section */}
+        {projects.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-semibold text-foreground">Projects</h2>
+              <Link href="/projects">
+                <Button variant="ghost" size="sm" className="text-sm">
+                  View all <FolderOpen className="h-4 w-4 ml-1" />
+                </Button>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+              {projects.slice(0, 6).map((p) => (
+                <Link key={p.id} href={`/projects/${p.id}`}>
+                  <div className="rounded-xl border border-border/70 bg-card/55 p-4 hover:bg-card/70 hover:-translate-y-0.5 hover:shadow-md transition-all duration-200 cursor-pointer">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="text-sm font-semibold text-foreground truncate">{p.name}</h3>
+                      {p.latestGrade && p.avgScore > 0 && (
+                        <div
+                          className="inline-flex items-center rounded px-1.5 py-0.5 font-mono text-xs font-bold text-white shrink-0"
+                          style={{ background: scoreColor(p.avgScore) }}
+                        >
+                          {Math.round(p.avgScore)}{p.latestGrade}
+                        </div>
+                      )}
+                    </div>
+                    {p.customerRef && (
+                      <p className="text-xs font-mono text-muted-foreground mb-1">{p.customerRef}</p>
+                    )}
+                    <p className="text-xs text-muted-foreground">
+                      {p.submissionCount} submission{p.submissionCount === 1 ? '' : 's'}
+                    </p>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Submissions</h1>
