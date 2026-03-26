@@ -61,8 +61,12 @@ function isOutlineLayer(n: string): boolean {
   return n.includes('outline') || n.includes('gko') || n.includes('edge') ||
          n.includes('board') || n === 'rout'
 }
+function isDrillLayer(n: string): boolean {
+  return n.includes('drill') || n.includes('drl') || n.includes('xln') ||
+         n.includes('exc') || n.includes('ncd') || n === 'drills'
+}
 function isCopperLayer(n: string): boolean {
-  return !isSilkLayer(n) && !isMaskLayer(n) && !isOutlineLayer(n)
+  return !isSilkLayer(n) && !isMaskLayer(n) && !isOutlineLayer(n) && !isDrillLayer(n)
 }
 
 function getSilkColor(n: string): string {
