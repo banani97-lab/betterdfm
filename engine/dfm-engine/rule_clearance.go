@@ -211,8 +211,8 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 							b.t.StartX, b.t.StartY, b.t.EndX, b.t.EndY,
 						)
 						clearance := dist - (a.t.WidthMM+b.t.WidthMM)/2
-						if clearance < 0 {
-							continue // overlapping copper — DRC issue, not DFM
+						if clearance <= 0 {
+							continue // touching/overlapping copper is connected, not a clearance issue
 						}
 						if clearance < minC-geomEps {
 							msg, sug := msgClearanceTraceTooClose(clearance, minC)
@@ -275,8 +275,8 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				// P2.1: closest-point + padEdgeDist for shape-aware clearance.
 				cpX, cpY := closestPointOnSeg(p.X, p.Y, t.StartX, t.StartY, t.EndX, t.EndY)
 				clearance := padEdgeDist(cpX, cpY, p) - t.WidthMM/2
-				if clearance < 0 {
-					continue // overlapping copper -- DRC issue, not DFM
+				if clearance <= 0 {
+					continue // touching/overlapping copper is connected, not a clearance issue
 				}
 				if clearance < minC-geomEps {
 					msg, sug := msgClearancePadTooClose(clearance, minC)
