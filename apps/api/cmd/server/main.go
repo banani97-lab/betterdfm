@@ -151,6 +151,7 @@ func main() {
 	shared.GET("/jobs/:jobId/violations", shareHandler.GetSharedViolations)
 	shared.GET("/jobs/:jobId/board", shareHandler.GetSharedBoardData)
 	shared.POST("/upload", shareHandler.SharedUpload)
+	shared.POST("/analyze/:submissionId", shareHandler.SharedAnalyze)
 
 	// Admin routes (separate JWT audience)
 	adminAPI := e.Group("/admin", adminJWTMW.AdminMiddleware())

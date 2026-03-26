@@ -518,6 +518,13 @@ export async function sharedUpload(
   return shareFetch(token, '/upload', { method: 'POST', body: JSON.stringify(data) })
 }
 
+export async function sharedAnalyze(
+  token: string,
+  submissionId: string
+): Promise<{ jobId: string }> {
+  return shareFetch(token, `/analyze/${submissionId}`, { method: 'POST' })
+}
+
 // ── Compare ──────────────────────────────────────────────────────────────────
 
 export interface ComparisonJobSummary {

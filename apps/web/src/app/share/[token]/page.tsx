@@ -10,6 +10,7 @@ import {
   getSharedBoardData,
   getSharedSubmissions,
   sharedUpload,
+  sharedAnalyze,
   uploadToS3,
   type ShareInfo,
   type AnalysisJob,
@@ -166,6 +167,8 @@ export default function SharedPage() {
       if (result.presignedUrl) {
         await uploadToS3(result.presignedUrl, file, setUploadProgress)
       }
+      // Trigger analysis AFTER S3 upload completes
+      await sharedAnalyze(token, result.submissionId)
       setUploadProgress(100)
       setUploadSuccess(true)
       // Refresh submissions list to show the new upload

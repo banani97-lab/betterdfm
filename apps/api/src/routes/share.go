@@ -421,26 +421,6 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	// Auto-trigger analysis using org's default profile
-	var profile db.CapabilityProfile
-	jobID := ""
-	if err := h.db.Where("org_id = ? AND is_default = ?", link.OrgID, true).First(&profile).Error; err == nil {
-		job := db.AnalysisJob{
-			ID:           uuid.New().String(),
-			OrgID:        link.OrgID,
-			SubmissionID: submissionID,
-			ProfileID:    profile.ID,
-			Status:       "PENDING",
-		}
-		if err := h.db.Create(&job).Error; err == nil {
-			jobID = job.ID
-			h.db.Model(&submission).Update("status", "ANALYZING")
-			if err := h.aws.EnqueueJob(c.Request().Context(), job.ID); err != nil {
-				log.Printf("WARNING: SQS enqueue failed for shared upload job %s: %v", job.ID, err)
-			}
-		}
-	}
-
 	contentType := "application/zip"
 	presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 	if err != nil {
@@ -448,7 +428,6 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 			"submissionId": submissionID,
 			"presignedUrl": "",
 			"fileKey":      fileKey,
-			"jobId":        jobID,
 		})
 	}
 
@@ -456,7 +435,52 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 		"submissionId": submissionID,
 		"presignedUrl": presignedURL,
 		"fileKey":      fileKey,
-		"jobId":        jobID,
+	})
+}
+
+// SharedAnalyze POST /shared/:token/analyze/:submissionId
+// Triggers analysis for a submission uploaded through a share link.
+// Called by the frontend AFTER the S3 upload completes.
+func (h *ShareHandler) SharedAnalyze(c echo.Context) error {
+	link := getShareLink(c)
+	if !link.AllowUpload {
+		return echo.NewHTTPError(http.StatusForbidden, "uploads are not allowed on this share link")
+	}
+
+	submissionID := c.Param("submissionId")
+	var submission db.Submission
+	if err := h.db.Where("id = ? AND org_id = ?", submissionID, link.OrgID).First(&submission).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "submission not found")
+	}
+	if submission.Status != "UPLOADED" {
+		return echo.NewHTTPError(http.StatusBadRequest, "submission already analyzed")
+	}
+
+	// Use org's default profile
+	var profile db.CapabilityProfile
+	if err := h.db.Where("org_id = ? AND is_default = ?", link.OrgID, true).First(&profile).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "no default capability profile configured")
+	}
+
+	job := db.AnalysisJob{
+		ID:           uuid.New().String(),
+		OrgID:        link.OrgID,
+		SubmissionID: submissionID,
+		ProfileID:    profile.ID,
+		Status:       "PENDING",
+	}
+	if err := h.db.Create(&job).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	h.db.Model(&submission).Update("status", "ANALYZING")
+
+	if err := h.aws.EnqueueJob(c.Request().Context(), job.ID); err != nil {
+		log.Printf("WARNING: SQS enqueue failed for shared analyze job %s: %v", job.ID, err)
+	}
+
+	return c.JSON(http.StatusOK, map[string]string{
+		"jobId": job.ID,
 	})
 }
 
