@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams } from 'next/navigation'
-import { AlertCircle, AlertTriangle, Info, Upload, ListFilter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle, Info, Upload, ListFilter, ChevronDown, ChevronUp, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
   getShareInfo,
   getSharedJob,
@@ -56,6 +56,7 @@ export default function SharedPage() {
   const [uploadName, setUploadName] = useState('')
   const [uploadEmail, setUploadEmail] = useState('')
   const [dragOver, setDragOver] = useState(false)
+  const [uploadSuccess, setUploadSuccess] = useState(false)
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -153,6 +154,7 @@ export default function SharedPage() {
     if (!shareInfo?.allowUpload) return
     setUploading(true)
     setUploadProgress(0)
+    setUploadSuccess(false)
     try {
       const fileType = file.name.toLowerCase().endsWith('.zip') || file.name.toLowerCase().endsWith('.tgz')
         ? (file.name.toLowerCase().includes('odb') ? 'ODB_PLUS_PLUS' : 'GERBER')
@@ -167,6 +169,9 @@ export default function SharedPage() {
         await uploadToS3(result.presignedUrl, file, setUploadProgress)
       }
       setUploadProgress(100)
+      setUploadSuccess(true)
+      // Refresh submissions list to show the new upload
+      getSharedSubmissions(token).then(subs => setSubmissions(subs ?? [])).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Upload failed')
     } finally {
@@ -260,41 +265,57 @@ export default function SharedPage() {
                 if (file) handleFileUpload(file)
               }}
             >
-              <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm font-medium mb-1">Upload a revised design</p>
-              <p className="text-xs text-muted-foreground mb-3">Drag and drop a file here, or click to browse</p>
-              <div className="flex gap-2 mb-3 max-w-sm mx-auto">
-                <input
-                  type="text"
-                  placeholder="Your name"
-                  value={uploadName}
-                  onChange={(e) => setUploadName(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
-                />
-                <input
-                  type="email"
-                  placeholder="Your email"
-                  value={uploadEmail}
-                  onChange={(e) => setUploadEmail(e.target.value)}
-                  className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
-                />
-              </div>
-              <input
-                type="file"
-                accept=".zip,.tgz,.tar.gz"
-                disabled={uploading}
-                onChange={(e) => {
-                  const file = e.target.files?.[0]
-                  if (file) handleFileUpload(file)
-                }}
-                className="text-sm"
-              />
-              {uploading && (
-                <div className="mt-2">
-                  <div className="w-full bg-muted rounded-full h-2">
-                    <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
-                  </div>
+              {uploadSuccess ? (
+                <div className="py-2">
+                  <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
+                  <p className="text-sm font-medium text-green-600">Upload successful!</p>
+                  <p className="text-xs text-muted-foreground mt-1">Your file has been submitted for analysis. Results will appear below when ready.</p>
+                  <button
+                    onClick={() => setUploadSuccess(false)}
+                    className="mt-3 text-xs text-blue-500 hover:text-blue-400 underline"
+                  >
+                    Upload another file
+                  </button>
                 </div>
+              ) : (
+                <>
+                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                  <p className="text-sm font-medium mb-1">Upload a revised design</p>
+                  <p className="text-xs text-muted-foreground mb-3">Drag and drop a file here, or click to browse</p>
+                  <div className="flex gap-2 mb-3 max-w-sm mx-auto">
+                    <input
+                      type="text"
+                      placeholder="Your name"
+                      value={uploadName}
+                      onChange={(e) => setUploadName(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
+                    />
+                    <input
+                      type="email"
+                      placeholder="Your email"
+                      value={uploadEmail}
+                      onChange={(e) => setUploadEmail(e.target.value)}
+                      className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
+                    />
+                  </div>
+                  <input
+                    type="file"
+                    accept=".zip,.tgz,.tar,.tar.gz"
+                    disabled={uploading}
+                    onChange={(e) => {
+                      const file = e.target.files?.[0]
+                      if (file) handleFileUpload(file)
+                    }}
+                    className="text-sm"
+                  />
+                  {uploading && (
+                    <div className="mt-2">
+                      <div className="w-full bg-muted rounded-full h-2">
+                        <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                      </div>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           </div>
