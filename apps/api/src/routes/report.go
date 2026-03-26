@@ -472,8 +472,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.SetFont("Arial", "B", 9)
 	f.SetTextColor(40, 40, 40)
 	f.CellFormat(pW-imgW-4, 6, "Verdict", "", 1, "L", false, 0, "")
-	f.SetX(15 + imgW + 4)
 	f.Ln(1)
+	f.SetX(15 + imgW + 4)
 
 	gradeLabels := map[string]string{
 		"A": "no significant", "B": "minor", "C": "moderate", "D": "significant", "F": "critical",
@@ -504,11 +504,12 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	}
 	f.SetFont("Arial", "", 8.5)
 	f.SetTextColor(50, 50, 50)
+	f.SetX(15 + imgW + 4)
 	f.MultiCell(pW-imgW-4, 5.5, tr(verdictText), "1", "L", false)
 
 	if len(groups) > 0 {
-		f.SetX(15 + imgW + 4)
 		f.Ln(4)
+		f.SetX(15 + imgW + 4)
 		f.SetFont("Arial", "I", 7.5)
 		f.SetTextColor(110, 110, 110)
 		f.MultiCell(pW-imgW-4, 4.5,
@@ -655,7 +656,7 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	// Design rules table
 	f.SetFont("Arial", "B", 9)
 	f.SetTextColor(40, 40, 40)
-	f.CellFormat(pW, 6, "Capability Profile — "+tr(profile.Name), "", 1, "L", false, 0, "")
+	f.CellFormat(pW, 6, tr("Capability Profile - "+profile.Name), "", 1, "L", false, 0, "")
 	f.Ln(1)
 
 	f.SetFillColor(22, 101, 52)
