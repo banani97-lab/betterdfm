@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle, XCircle } from 'lucide-react'
 import {
@@ -25,6 +25,8 @@ const STEPS = ['select', 'uploading', 'analyzing', 'done']
 
 export default function UploadPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('projectId') || undefined
   const [file, setFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<'GERBER' | 'ODB_PLUS_PLUS'>('GERBER')
   const [profiles, setProfiles] = useState<CapabilityProfile[]>([])
@@ -49,7 +51,7 @@ export default function UploadPage() {
     setStep('uploading')
     setErrorMsg('')
     try {
-      const { submissionId, presignedUrl } = await createSubmission(file.name, fileType)
+      const { submissionId, presignedUrl } = await createSubmission(file.name, fileType, projectId)
       await uploadToS3(presignedUrl, file, setProgress)
       setStep('analyzing')
       const newJob = await startAnalysis(submissionId, profileId || undefined)

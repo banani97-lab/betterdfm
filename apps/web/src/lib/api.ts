@@ -12,9 +12,26 @@ export interface Submission {
   createdAt: string
   orgId: string
   userId: string
+  projectId?: string
   latestJobId?: string
   mfgScore: number
   mfgGrade: string
+}
+
+export interface Project {
+  id: string
+  orgId: string
+  name: string
+  description: string
+  customerRef: string
+  createdBy: string
+  archived: boolean
+  createdAt: string
+  updatedAt: string
+  submissionCount: number
+  avgScore: number
+  latestGrade: string
+  lastActivityAt?: string
 }
 
 export interface Organization {
@@ -155,11 +172,12 @@ export async function getSubmissions(): Promise<Submission[]> {
 
 export async function createSubmission(
   filename: string,
-  fileType: string
+  fileType: string,
+  projectId?: string
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return apiFetch('/submissions', {
     method: 'POST',
-    body: JSON.stringify({ filename, fileType }),
+    body: JSON.stringify({ filename, fileType, ...(projectId ? { projectId } : {}) }),
   })
 }
 
@@ -276,4 +294,41 @@ export async function updateProfile(
 
 export async function deleteProfile(id: string): Promise<void> {
   return apiFetch(`/profiles/${id}`, { method: 'DELETE' })
+}
+
+// ── Projects ──────────────────────────────────────────────────────────────────
+
+export async function getProjects(q?: string, archived?: boolean): Promise<Project[]> {
+  const params = new URLSearchParams()
+  if (q) params.set('q', q)
+  if (archived !== undefined) params.set('archived', String(archived))
+  const qs = params.toString()
+  return apiFetch<Project[]>(`/projects${qs ? `?${qs}` : ''}`)
+}
+
+export async function getProject(id: string): Promise<Project> {
+  return apiFetch<Project>(`/projects/${id}`)
+}
+
+export async function createProject(data: {
+  name: string
+  description?: string
+  customerRef?: string
+}): Promise<Project> {
+  return apiFetch('/projects', { method: 'POST', body: JSON.stringify(data) })
+}
+
+export async function updateProject(
+  id: string,
+  data: Partial<{ name: string; description: string; customerRef: string }>
+): Promise<Project> {
+  return apiFetch(`/projects/${id}`, { method: 'PUT', body: JSON.stringify(data) })
+}
+
+export async function archiveProject(id: string): Promise<Project> {
+  return apiFetch(`/projects/${id}`, { method: 'DELETE' })
+}
+
+export async function getProjectSubmissions(projectId: string): Promise<Submission[]> {
+  return apiFetch<Submission[]>(`/projects/${projectId}/submissions`)
 }

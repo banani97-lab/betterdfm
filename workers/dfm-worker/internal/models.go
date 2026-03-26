@@ -19,13 +19,14 @@ type AnalysisJob struct {
 }
 
 type Submission struct {
-	ID       string `gorm:"primaryKey"`
-	OrgID    string
-	UserID   string
-	Filename string
-	FileType string
-	FileKey  string
-	Status   string
+	ID        string  `gorm:"primaryKey"`
+	OrgID     string
+	UserID    string
+	ProjectID *string
+	Filename  string
+	FileType  string
+	FileKey   string
+	Status    string
 }
 
 type CapabilityProfile struct {
