@@ -391,8 +391,15 @@ def _build_features(
     warnings: list[str] | None = None,
     drill_attr_values: dict | None = None,
     polygons: list | None = None,
+    *,
+    net_index: _NetIndex | None = None,
+    refdes_index: _RefdesIndex | None = None,
 ) -> None:
     """Build geometry from a token list produced by _tokenize_features."""
+    if net_index is None and net_points:
+        net_index = _NetIndex(net_points)
+    if refdes_index is None and components:
+        refdes_index = _RefdesIndex(components)
     in_surface = False
     in_island = False
     island_flag: str = "I"  # "I" = outer island, "H" = hole
@@ -526,7 +533,7 @@ def _build_features(
                 sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
                 mid_x = (x1 + x2) / 2
                 mid_y = (y1 + y2) / 2
-                net = _attr_net(raw) or _net_lookup(mid_x, mid_y, net_points)
+                net = _attr_net(raw) or (net_index.lookup(mid_x, mid_y) if net_index else "")
                 traces.append(Trace(layer=layer_name, widthMM=max(0.01, sym["w"]),
                                     startX=x1, startY=y1, endX=x2, endY=y2,
                                     netName=net))
@@ -543,8 +550,8 @@ def _build_features(
                 # sym_num is at parts[3]; parts[5] is rotation (not sym_num)
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
-                net = _attr_net(raw) or _net_lookup(x, y, net_points)
-                ref, pkg_class = _refdes_lookup(x, y, components)
+                net = _attr_net(raw) or (net_index.lookup(x, y) if net_index else "")
+                ref, pkg_class = refdes_index.lookup(x, y) if refdes_index else ("", "")
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
                     hole_diam = max(0.01, sym["w"])
@@ -591,7 +598,7 @@ def _build_features(
                 cw = parts[7].upper() == "Y"
                 sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
                 w = max(0.01, sym["w"])
-                net = _attr_net(raw) or _net_lookup(xc, yc, net_points)
+                net = _attr_net(raw) or (net_index.lookup(xc, yc) if net_index else "")
                 segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw)
                 for sx1, sy1, sx2, sy2 in segs:
                     traces.append(Trace(layer=layer_name, widthMM=w,
@@ -710,6 +717,43 @@ def _parse_netlist(netlist_path: Path, units: str) -> tuple[dict, list]:
             pass
 
     return coord_map, points
+
+
+class _NetIndex:
+    """Grid-based spatial index for fast net point lookups.
+
+    Instead of scanning all net points for every feature (O(n*m)),
+    points are hashed into grid cells so lookups only check a 3x3
+    neighbourhood (effectively O(1) per query).
+    """
+
+    __slots__ = ("_grid", "_cell_size")
+
+    def __init__(self, points: list, cell_size: float = 0.5) -> None:
+        self._cell_size = cell_size
+        self._grid: dict[tuple[int, int], list[tuple[float, float, str]]] = {}
+        for px, py, name in points:
+            key = (int(math.floor(px / cell_size)), int(math.floor(py / cell_size)))
+            self._grid.setdefault(key, []).append((px, py, name))
+
+    def lookup(self, x: float, y: float, tol: float = 0.05) -> str:
+        """Return net name of nearest indexed point within *tol* mm, else ''."""
+        cs = self._cell_size
+        cx = int(math.floor(x / cs))
+        cy = int(math.floor(y / cs))
+        best_name = ""
+        best_dist = tol * tol
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                bucket = self._grid.get((cx + dx, cy + dy))
+                if bucket is None:
+                    continue
+                for px, py, name in bucket:
+                    d2 = (x - px) ** 2 + (y - py) ** 2
+                    if d2 <= best_dist:
+                        best_dist = d2
+                        best_name = name
+        return best_name
 
 
 def _net_lookup(x: float, y: float, points: list, tol: float = 0.05) -> str:
@@ -871,6 +915,41 @@ def _parse_components(
             pass
 
     return components
+
+
+class _RefdesIndex:
+    """Grid-based spatial index for fast component/refdes lookups."""
+
+    __slots__ = ("_grid", "_cell_size")
+
+    def __init__(self, components: list, cell_size: float = 2.0) -> None:
+        # cell_size=2.0 is 2x the default tolerance of 1.0mm
+        self._cell_size = cell_size
+        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str]]] = {}
+        for cx, cy, refdes, part_name in components:
+            key = (int(math.floor(cx / cell_size)), int(math.floor(cy / cell_size)))
+            self._grid.setdefault(key, []).append((cx, cy, refdes, part_name))
+
+    def lookup(self, x: float, y: float, tol: float = 1.0) -> tuple[str, str]:
+        """Return (refdes, packageClass) for nearest component within *tol* mm."""
+        cs = self._cell_size
+        gx = int(math.floor(x / cs))
+        gy = int(math.floor(y / cs))
+        best_name = ""
+        best_pkg = ""
+        best_dist = tol * tol
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                bucket = self._grid.get((gx + dx, gy + dy))
+                if bucket is None:
+                    continue
+                for cx, cy, refdes, part_name in bucket:
+                    d2 = (x - cx) ** 2 + (y - cy) ** 2
+                    if d2 <= best_dist:
+                        best_dist = d2
+                        best_name = refdes
+                        best_pkg = _classify_package(part_name)
+        return best_name, best_pkg
 
 
 def _refdes_lookup(x: float, y: float, components: list, tol: float = 1.0) -> tuple[str, str]:
