@@ -66,12 +66,28 @@ type Project struct {
 	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
+// Batch groups multiple submissions uploaded together
+type Batch struct {
+	ID        string    `gorm:"primaryKey" json:"id"`
+	OrgID     string    `gorm:"index" json:"orgId"`
+	ProjectID *string   `json:"projectId"`
+	UserID    string    `json:"userId"`
+	ProfileID *string   `json:"profileId"`
+	Status    string    `gorm:"default:PENDING" json:"status"` // PENDING | PROCESSING | DONE | PARTIAL_FAIL
+	Total     int       `json:"total"`
+	Completed int       `gorm:"default:0" json:"completed"`
+	Failed    int       `gorm:"default:0" json:"failed"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
 // Submission is an uploaded Gerber or ODB++ file
 type Submission struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
 	OrgID     string    `json:"orgId"`
 	UserID    string    `json:"userId"`
 	ProjectID *string   `json:"projectId"`
+	BatchID   *string   `json:"batchId"`
 	Filename  string    `json:"filename"`
 	FileType  string    `json:"fileType"` // GERBER | ODB_PLUS_PLUS
 	FileKey   string    `json:"fileKey"`  // S3 key
