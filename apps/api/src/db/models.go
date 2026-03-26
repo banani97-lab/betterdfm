@@ -111,6 +111,31 @@ type AnalysisJob struct {
 	MfgGrade     string         `json:"mfgGrade"`
 }
 
+// ShareLink is a token-based share link for customer portal access
+type ShareLink struct {
+	ID          string     `gorm:"primaryKey" json:"id"`
+	OrgID       string     `gorm:"index" json:"orgId"`
+	Token       string     `gorm:"uniqueIndex" json:"token"`
+	ProjectID   *string    `json:"projectId"`   // nullable — share a whole project
+	JobID       *string    `json:"jobId"`        // nullable — share a single job
+	CreatedBy   string     `json:"createdBy"`
+	ExpiresAt   *time.Time `json:"expiresAt"`
+	AllowUpload bool       `gorm:"default:false" json:"allowUpload"`
+	Active      bool       `gorm:"default:true" json:"active"`
+	Label       string     `json:"label"`
+	CreatedAt   time.Time  `json:"createdAt"`
+}
+
+// ShareUpload tracks files uploaded by customers through a share link
+type ShareUpload struct {
+	ID            string    `gorm:"primaryKey" json:"id"`
+	ShareLinkID   string    `json:"shareLinkId"`
+	SubmissionID  string    `json:"submissionId"`
+	UploaderName  string    `json:"uploaderName"`
+	UploaderEmail string    `json:"uploaderEmail"`
+	CreatedAt     time.Time `json:"createdAt"`
+}
+
 // Violation is a single DFM issue found.
 type Violation struct {
 	ID         string  `gorm:"primaryKey" json:"id"`

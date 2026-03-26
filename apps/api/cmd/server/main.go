@@ -47,6 +47,8 @@ func main() {
 		&db.Submission{},
 		&db.AnalysisJob{},
 		&db.Violation{},
+		&db.ShareLink{},
+		&db.ShareUpload{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
@@ -96,6 +98,7 @@ func main() {
 	profilesHandler := routes.NewProfilesHandler(database)
 	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
 	projectsHandler := routes.NewProjectsHandler(database, awsClients)
+	shareHandler := routes.NewShareHandler(database, awsClients)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
@@ -133,6 +136,19 @@ func main() {
 	write.POST("/profiles", profilesHandler.CreateProfile)
 	write.PUT("/profiles/:id", profilesHandler.UpdateProfile)
 	write.DELETE("/profiles/:id", profilesHandler.DeleteProfile)
+	write.POST("/share-links", shareHandler.CreateShareLink)
+	write.GET("/share-links", shareHandler.ListShareLinks)
+	write.DELETE("/share-links/:id", shareHandler.DeactivateShareLink)
+	write.GET("/share-links/:id/uploads", shareHandler.ListShareUploads)
+
+	// Public shared routes (token-based auth, no JWT)
+	shared := e.Group("/shared/:token", shareHandler.TokenMiddleware())
+	shared.GET("", shareHandler.GetShareInfo)
+	shared.GET("/submissions", shareHandler.GetSharedSubmissions)
+	shared.GET("/jobs/:jobId", shareHandler.GetSharedJob)
+	shared.GET("/jobs/:jobId/violations", shareHandler.GetSharedViolations)
+	shared.GET("/jobs/:jobId/board", shareHandler.GetSharedBoardData)
+	shared.POST("/upload", shareHandler.SharedUpload)
 
 	// Admin routes (separate JWT audience)
 	adminAPI := e.Group("/admin", adminJWTMW.AdminMiddleware())
