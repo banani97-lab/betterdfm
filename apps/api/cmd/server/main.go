@@ -1,4 +1,4 @@
-package main
+package main // betterdfm API server
 
 import (
 	"context"
