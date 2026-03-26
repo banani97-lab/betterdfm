@@ -55,6 +55,7 @@ export default function SharedPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadName, setUploadName] = useState('')
   const [uploadEmail, setUploadEmail] = useState('')
+  const [dragOver, setDragOver] = useState(false)
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -245,9 +246,23 @@ export default function SharedPage() {
         {/* Upload section */}
         {shareInfo.allowUpload && (
           <div className="max-w-2xl mx-auto mt-6 px-4">
-            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+            <div
+              className={cn(
+                "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
+                dragOver ? "border-blue-500 bg-blue-500/10" : "border-border"
+              )}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={(e) => {
+                e.preventDefault()
+                setDragOver(false)
+                const file = e.dataTransfer.files?.[0]
+                if (file) handleFileUpload(file)
+              }}
+            >
               <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-              <p className="text-sm font-medium mb-3">Upload a revised design</p>
+              <p className="text-sm font-medium mb-1">Upload a revised design</p>
+              <p className="text-xs text-muted-foreground mb-3">Drag and drop a file here, or click to browse</p>
               <div className="flex gap-2 mb-3 max-w-sm mx-auto">
                 <input
                   type="text"

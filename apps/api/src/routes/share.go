@@ -220,10 +220,9 @@ func (h *ShareHandler) GetSharedSubmissions(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "this share link does not include a project")
 	}
 
-	// For project shares, list submissions that belong to the org
-	// (projectId maps to a submission concept in this codebase)
+	// For project shares, list only submissions belonging to this project
 	var submissions []db.Submission
-	if err := h.db.Where("org_id = ?", link.OrgID).Order("created_at desc").Find(&submissions).Error; err != nil {
+	if err := h.db.Where("org_id = ? AND project_id = ?", link.OrgID, *link.ProjectID).Order("created_at desc").Find(&submissions).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
