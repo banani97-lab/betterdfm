@@ -391,6 +391,7 @@ def _build_features(
     warnings: list[str] | None = None,
     drill_attr_values: dict | None = None,
     polygons: list | None = None,
+    attr_names: dict[int, str] | None = None,
     *,
     net_index: _NetIndex | None = None,
     refdes_index: _RefdesIndex | None = None,
@@ -400,6 +401,14 @@ def _build_features(
         net_index = _NetIndex(net_points)
     if refdes_index is None and components:
         refdes_index = _RefdesIndex(components)
+
+    # Find the attribute index for .pad_usage to detect fiducials
+    _pad_usage_idx: int | None = None
+    if attr_names:
+        for idx, name in attr_names.items():
+            if name == ".pad_usage":
+                _pad_usage_idx = idx
+                break
     in_surface = False
     in_island = False
     island_flag: str = "I"  # "I" = outer island, "H" = hole
@@ -572,12 +581,24 @@ def _build_features(
                                    outerDiamMM=sym["w"], drillDiamMM=sym["inner"],
                                    netName=net))
                 else:
+                    is_fid = False
+                    if _pad_usage_idx is not None:
+                        # Check attrs like ";0=2" where 0 is pad_usage idx, 2=g_fiducial, 3=l_fiducial
+                        attrs_str = raw[raw.find(";"):] if ";" in raw else ""
+                        for seg in attrs_str.split(";"):
+                            seg = seg.strip()
+                            if seg.startswith(f"{_pad_usage_idx}="):
+                                val = seg.split("=", 1)[1].split(",")[0]
+                                if val in ("2", "3"):  # g_fiducial or l_fiducial
+                                    is_fid = True
+                                break
                     pads.append(Pad(layer=layer_name, x=x, y=y,
                                    widthMM=max(0.01, sym["w"]),
                                    heightMM=max(0.01, sym["h"]),
                                    shape=sym["shape"],
                                    netName=net, refDes=ref,
-                                   packageClass=pkg_class))
+                                   packageClass=pkg_class,
+                                   isFiducial=is_fid))
             except (ValueError, IndexError):
                 pass
 
@@ -639,14 +660,13 @@ def _parse_features(
     symbols = _parse_symbol_table(lines, units, warnings=warnings, layer_name=layer_name)
     tokens = _tokenize_features(lines)
 
-    attr_values: dict[int, str] = {}
-    if ltype == "DRILL":
-        _attr_names, attr_values = _parse_attr_tables(lines)
+    attr_names, attr_values = _parse_attr_tables(lines)
 
     _build_features(tokens, layer_name, ltype, units, symbols,
                     net_points, components, drills, traces, pads, vias,
                     warnings=warnings,
-                    drill_attr_values=attr_values,
+                    drill_attr_values=attr_values if ltype == "DRILL" else None,
+                    attr_names=attr_names,
                     polygons=polygons)
 
 

@@ -213,6 +213,7 @@ func ruleDisplayName(id string) string {
 		"drill-to-copper":   "Drill-to-Copper Spacing",
 		"copper-sliver":     "Copper Sliver",
 		"silkscreen-on-pad": "Silkscreen on Pad",
+		"fiducial-count":    "Fiducial Count",
 	}
 	if n, ok := names[id]; ok {
 		return n

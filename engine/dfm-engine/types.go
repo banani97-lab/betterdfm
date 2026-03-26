@@ -45,6 +45,7 @@ type Pad struct {
 	RefDes       string  `json:"refDes"`
 	PackageClass string  `json:"packageClass,omitempty"` // e.g. "0201", "0402", "0603"
 	Contour      []Point `json:"contour,omitempty"`      // polygon contour points when Shape == "POLYGON"
+	IsFiducial   bool    `json:"isFiducial,omitempty"`
 }
 
 type Via struct {

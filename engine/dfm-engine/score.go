@@ -46,6 +46,8 @@ func ruleWeight(id string) float64 {
 		return 2.0
 	case "trace-imbalance":
 		return 1.5
+	case "fiducial-count":
+		return 1.0
 	default:
 		return 1.0
 	}
@@ -135,6 +137,8 @@ func ruleMaxContribution(id string) float64 {
 		return 3.0
 	case "silkscreen-on-pad":
 		return 2.0
+	case "fiducial-count":
+		return 3.0
 	default:
 		return 3.0
 	}

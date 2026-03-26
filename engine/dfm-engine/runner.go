@@ -27,6 +27,7 @@ func NewRunner() *Runner {
 			&TombstoningRiskRule{},
 			&PackageCapabilityRule{},
 			&TraceImbalanceRule{},
+			&FiducialRule{},
 		},
 	}
 }
