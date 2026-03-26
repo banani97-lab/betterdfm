@@ -42,6 +42,7 @@ func main() {
 		&db.Organization{},
 		&db.User{},
 		&db.CapabilityProfile{},
+		&db.Batch{},
 		&db.Submission{},
 		&db.AnalysisJob{},
 		&db.Violation{},
@@ -88,6 +89,7 @@ func main() {
 	// Route handlers
 	authHandler := routes.NewAuthHandler(database)
 	submissionsHandler := routes.NewSubmissionsHandler(database, awsClients)
+	batchesHandler := routes.NewBatchesHandler(database, awsClients)
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
@@ -102,6 +104,7 @@ func main() {
 	read := e.Group("", jwtMW.Middleware())
 	read.GET("/submissions", submissionsHandler.ListSubmissions)
 	read.GET("/submissions/:id", submissionsHandler.GetSubmission)
+	read.GET("/batches/:id", batchesHandler.GetBatch)
 	read.GET("/jobs/:id", jobsHandler.GetJob)
 	read.GET("/jobs/:id/violations", jobsHandler.GetViolations)
 	read.GET("/jobs/:id/board", jobsHandler.GetBoardData)
@@ -113,6 +116,9 @@ func main() {
 	write := e.Group("", jwtMW.Middleware(), lib.RequireRole("ANALYST", "ADMIN"))
 	write.POST("/submissions", submissionsHandler.CreateSubmission)
 	write.POST("/submissions/:id/analyze", submissionsHandler.StartAnalysis)
+	write.POST("/batches", batchesHandler.CreateBatch)
+	write.POST("/batches/:id/analyze", batchesHandler.AnalyzeBatch)
+	write.POST("/batches/:id/retry", batchesHandler.RetryBatch)
 	write.PATCH("/violations/:id", jobsHandler.UpdateViolation)
 	write.PATCH("/jobs/:id/violations/by-layer", jobsHandler.BulkIgnoreLayerViolations)
 	write.POST("/profiles", profilesHandler.CreateProfile)

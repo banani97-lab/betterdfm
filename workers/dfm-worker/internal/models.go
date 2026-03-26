@@ -2,6 +2,21 @@ package internal
 
 import "time"
 
+// Batch groups multiple submissions uploaded together
+type Batch struct {
+	ID        string    `gorm:"primaryKey"`
+	OrgID     string
+	ProjectID *string
+	UserID    string
+	ProfileID *string
+	Status    string `gorm:"default:PENDING"`
+	Total     int
+	Completed int `gorm:"default:0"`
+	Failed    int `gorm:"default:0"`
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
 // DB models mirroring the API's models
 type AnalysisJob struct {
 	ID           string     `gorm:"primaryKey"`
@@ -22,6 +37,7 @@ type Submission struct {
 	ID       string `gorm:"primaryKey"`
 	OrgID    string
 	UserID   string
+	BatchID  *string
 	Filename string
 	FileType string
 	FileKey  string

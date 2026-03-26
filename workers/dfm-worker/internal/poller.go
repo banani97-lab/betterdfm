@@ -52,10 +52,7 @@ func (w *Worker) Poll(ctx context.Context) {
 			log.Printf("processing job %s", payload.JobID)
 			if err := w.ProcessJob(ctx, payload.JobID); err != nil {
 				log.Printf("job %s failed: %v", payload.JobID, err)
-				w.db.Model(&AnalysisJob{}).Where("id = ?", payload.JobID).Updates(map[string]interface{}{
-					"status":    "FAILED",
-					"error_msg": err.Error(),
-				})
+				w.markJobFailedWithBatch(payload.JobID, err)
 			}
 			_, delErr := w.sqsClient.DeleteMessage(ctx, &sqs.DeleteMessageInput{
 				QueueUrl:      aws.String(w.sqsQueueURL),
@@ -127,10 +124,7 @@ func (w *Worker) pollDB(ctx context.Context) {
 		log.Printf("[dev] processing job %s", job.ID)
 		if err := w.ProcessJob(ctx, job.ID); err != nil {
 			log.Printf("[dev] job %s failed: %v", job.ID, err)
-			w.db.Model(&AnalysisJob{}).Where("id = ?", job.ID).Updates(map[string]interface{}{
-				"status":    "FAILED",
-				"error_msg": err.Error(),
-			})
+			w.markJobFailedWithBatch(job.ID, err)
 		}
 	}
 }

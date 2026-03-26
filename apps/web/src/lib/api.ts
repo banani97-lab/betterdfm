@@ -253,6 +253,77 @@ export async function patchViolation(
   return apiFetch(`/violations/${id}`, { method: 'PATCH', body: JSON.stringify(patch) })
 }
 
+// ── Batches ──────────────────────────────────────────────────────────────────
+
+export interface BatchSubmission extends Submission {
+  latestJobId: string
+  jobStatus: string
+  mfgScore: number
+  mfgGrade: string
+}
+
+export interface Batch {
+  id: string
+  orgId: string
+  projectId?: string
+  userId: string
+  profileId?: string
+  status: 'PENDING' | 'PROCESSING' | 'DONE' | 'PARTIAL_FAIL'
+  total: number
+  completed: number
+  failed: number
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BatchDetail {
+  batch: Batch
+  submissions: BatchSubmission[]
+  avgScore: number | null
+}
+
+export interface CreateBatchResponse {
+  batchId: string
+  submissions: Array<{
+    submissionId: string
+    filename: string
+    presignedUrl: string
+  }>
+}
+
+export async function createBatch(
+  files: Array<{ filename: string; fileType: string }>,
+  projectId?: string,
+  profileId?: string
+): Promise<CreateBatchResponse> {
+  return apiFetch('/batches', {
+    method: 'POST',
+    body: JSON.stringify({ files, projectId, profileId }),
+  })
+}
+
+export async function getBatch(batchId: string): Promise<BatchDetail> {
+  return apiFetch<BatchDetail>(`/batches/${batchId}`)
+}
+
+export async function analyzeBatch(
+  batchId: string,
+  profileId?: string
+): Promise<{ batchId: string; jobIds: string[] }> {
+  return apiFetch(`/batches/${batchId}/analyze`, {
+    method: 'POST',
+    body: JSON.stringify({ profileId: profileId ?? '' }),
+  })
+}
+
+export async function retryBatch(
+  batchId: string
+): Promise<{ batchId: string; jobIds: string[] }> {
+  return apiFetch(`/batches/${batchId}/retry`, {
+    method: 'POST',
+  })
+}
+
 // ── Profiles ─────────────────────────────────────────────────────────────────
 
 export async function getProfiles(): Promise<CapabilityProfile[]> {

@@ -172,7 +172,66 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 
 	// Update submission status
 	w.db.Model(&Submission{}).Where("id = ?", submission.ID).Update("status", "DONE")
+
+	// Update batch counters if this submission belongs to a batch
+	w.updateBatchProgress(submission.BatchID, "completed")
+
 	return nil
+}
+
+// updateBatchProgress atomically increments the completed or failed counter on
+// the parent batch (if any) and finalises the batch status when all submissions
+// have been processed.
+func (w *Worker) updateBatchProgress(batchID *string, field string) {
+	if batchID == nil || *batchID == "" {
+		return
+	}
+	bid := *batchID
+
+	// Atomically increment the appropriate counter
+	if err := w.db.Model(&Batch{}).Where("id = ?", bid).
+		Update(field, gorm.Expr(field+" + 1")).Error; err != nil {
+		log.Printf("WARN: failed to increment batch %s %s: %v", bid, field, err)
+		return
+	}
+
+	// Check if all submissions are now processed
+	var batch Batch
+	if err := w.db.First(&batch, "id = ?", bid).Error; err != nil {
+		log.Printf("WARN: failed to fetch batch %s: %v", bid, err)
+		return
+	}
+
+	if batch.Completed+batch.Failed >= batch.Total {
+		newStatus := "DONE"
+		if batch.Failed > 0 {
+			newStatus = "PARTIAL_FAIL"
+		}
+		w.db.Model(&batch).Update("status", newStatus)
+		log.Printf("batch %s finalised: status=%s completed=%d failed=%d", bid, newStatus, batch.Completed, batch.Failed)
+	}
+}
+
+// markJobFailedWithBatch marks a job as FAILED, updates the submission status,
+// and increments the batch failed counter.
+func (w *Worker) markJobFailedWithBatch(jobID string, jobErr error) {
+	w.db.Model(&AnalysisJob{}).Where("id = ?", jobID).Updates(map[string]interface{}{
+		"status":    "FAILED",
+		"error_msg": jobErr.Error(),
+	})
+
+	// Update submission status and batch counter
+	var job AnalysisJob
+	if err := w.db.First(&job, "id = ?", jobID).Error; err != nil {
+		return
+	}
+	w.db.Model(&Submission{}).Where("id = ?", job.SubmissionID).Update("status", "FAILED")
+
+	var sub Submission
+	if err := w.db.First(&sub, "id = ?", job.SubmissionID).Error; err != nil {
+		return
+	}
+	w.updateBatchProgress(sub.BatchID, "failed")
 }
 
 // sanitizeBoard drops degenerate geometry and warns when the outline looks invalid.
