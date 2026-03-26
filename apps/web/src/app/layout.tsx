@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { ThemeInit } from '@/components/ui/ThemeInit'
 import './globals.css'
 
 export const metadata: Metadata = {
@@ -38,6 +39,7 @@ export default function RootLayout({
         />
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
+        <ThemeInit />
         {children}
       </body>
     </html>
