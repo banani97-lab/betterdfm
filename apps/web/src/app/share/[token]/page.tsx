@@ -248,82 +248,130 @@ export default function SharedPage() {
 
         {/* Upload section */}
         {shareInfo.allowUpload && (
-          <div className="max-w-2xl mx-auto mt-6 px-4">
-            <div
-              className={cn(
-                "border-2 border-dashed rounded-lg p-6 text-center transition-colors",
-                dragOver ? "border-blue-500 bg-blue-500/10" : "border-border"
-              )}
-              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
-              onDragLeave={() => setDragOver(false)}
-              onDrop={(e) => {
-                e.preventDefault()
-                setDragOver(false)
-                const file = e.dataTransfer.files?.[0]
-                if (file) handleFileUpload(file)
-              }}
-            >
+          <div className="max-w-2xl mx-auto mt-8 px-4">
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+              <div className="px-5 py-4 border-b border-border">
+                <h3 className="text-sm font-semibold">Submit a Revision</h3>
+                <p className="text-xs text-muted-foreground mt-0.5">Upload an updated design file for DFM analysis</p>
+              </div>
+
               {uploadSuccess ? (
-                <div className="py-2">
-                  <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
-                  <p className="text-sm font-medium text-green-600">Upload successful!</p>
-                  <p className="text-xs text-muted-foreground mt-1">Your file has been submitted for analysis. Results will appear below when ready.</p>
+                <div className="px-5 py-10 text-center">
+                  <CheckCircle className="h-12 w-12 mx-auto text-green-500 mb-3" />
+                  <p className="text-base font-semibold text-green-600">Upload successful</p>
+                  <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
+                    Your file has been submitted for analysis. Results will appear in the list below once processing completes.
+                  </p>
                   <button
                     onClick={() => setUploadSuccess(false)}
-                    className="mt-3 text-xs text-blue-500 hover:text-blue-400 underline"
+                    className="mt-4 inline-flex items-center gap-1.5 text-sm text-primary hover:text-primary/80 font-medium transition-colors"
                   >
+                    <Upload className="h-3.5 w-3.5" />
                     Upload another file
                   </button>
                 </div>
               ) : (
-                <>
-                  <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="text-sm font-medium mb-1">Upload a revised design</p>
-                  <p className="text-xs text-muted-foreground mb-3">Drag and drop a file here, or click to browse</p>
-                  <div className="flex gap-2 mb-3 max-w-sm mx-auto">
-                    <input
-                      type="text"
-                      placeholder="Your name"
-                      value={uploadName}
-                      onChange={(e) => setUploadName(e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
-                    />
-                    <input
-                      type="email"
-                      placeholder="Your email"
-                      value={uploadEmail}
-                      onChange={(e) => setUploadEmail(e.target.value)}
-                      className="flex-1 px-3 py-1.5 text-sm border rounded bg-background"
-                    />
+                <div className="p-5 space-y-4">
+                  {/* Contact info */}
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your name</label>
+                      <input
+                        type="text"
+                        placeholder="Jane Smith"
+                        value={uploadName}
+                        onChange={(e) => setUploadName(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your email</label>
+                      <input
+                        type="email"
+                        placeholder="jane@company.com"
+                        value={uploadEmail}
+                        onChange={(e) => setUploadEmail(e.target.value)}
+                        className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
+                      />
+                    </div>
                   </div>
-                  <div className="mb-3 max-w-sm mx-auto">
-                    <select
-                      value={uploadFileType}
-                      onChange={(e) => setUploadFileType(e.target.value as 'GERBER' | 'ODB_PLUS_PLUS')}
-                      className="w-full px-3 py-1.5 text-sm border rounded bg-background"
-                    >
-                      <option value="GERBER">Gerber</option>
-                      <option value="ODB_PLUS_PLUS">ODB++</option>
-                    </select>
+
+                  {/* File type */}
+                  <div>
+                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">File format</label>
+                    <div className="flex gap-2">
+                      {([['GERBER', 'Gerber'], ['ODB_PLUS_PLUS', 'ODB++']] as const).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setUploadFileType(value)}
+                          className={cn(
+                            'flex-1 py-2 text-sm font-medium rounded-lg border transition-all',
+                            uploadFileType === value
+                              ? 'border-primary bg-primary/10 text-primary'
+                              : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                          )}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                  <input
-                    type="file"
-                    accept=".zip,.tgz,.tar,.tar.gz"
-                    disabled={uploading}
-                    onChange={(e) => {
-                      const file = e.target.files?.[0]
+
+                  {/* Drop zone */}
+                  <label
+                    className={cn(
+                      "flex flex-col items-center justify-center gap-2 py-8 rounded-lg border-2 border-dashed cursor-pointer transition-all",
+                      dragOver
+                        ? "border-primary bg-primary/5"
+                        : "border-border hover:border-primary/40 hover:bg-muted/30"
+                    )}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={(e) => {
+                      e.preventDefault()
+                      setDragOver(false)
+                      const file = e.dataTransfer.files?.[0]
                       if (file) handleFileUpload(file)
                     }}
-                    className="text-sm"
-                  />
+                  >
+                    <div className={cn(
+                      "h-10 w-10 rounded-full flex items-center justify-center transition-colors",
+                      dragOver ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
+                    )}>
+                      <Upload className="h-5 w-5" />
+                    </div>
+                    <div className="text-center">
+                      <span className="text-sm font-medium">
+                        {dragOver ? 'Drop file here' : 'Drag and drop your file here'}
+                      </span>
+                      <p className="text-xs text-muted-foreground mt-0.5">or click to browse (.zip, .tar, .tgz)</p>
+                    </div>
+                    <input
+                      type="file"
+                      accept=".zip,.tgz,.tar,.tar.gz"
+                      disabled={uploading}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0]
+                        if (file) handleFileUpload(file)
+                      }}
+                      className="sr-only"
+                    />
+                  </label>
+
+                  {/* Progress bar */}
                   {uploading && (
-                    <div className="mt-2">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between text-xs text-muted-foreground">
+                        <span>Uploading...</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
                       <div className="w-full bg-muted rounded-full h-2">
-                        <div className="bg-blue-600 h-2 rounded-full transition-all" style={{ width: `${uploadProgress}%` }} />
+                        <div className="bg-primary h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }} />
                       </div>
                     </div>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
