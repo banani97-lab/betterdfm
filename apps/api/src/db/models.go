@@ -53,11 +53,25 @@ type ProfileRules struct {
 	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 }
 
+// Project groups related submissions
+type Project struct {
+	ID          string    `gorm:"primaryKey" json:"id"`
+	OrgID       string    `gorm:"index" json:"orgId"`
+	Name        string    `json:"name"`
+	Description string    `json:"description"`
+	CustomerRef string    `json:"customerRef"`
+	CreatedBy   string    `json:"createdBy"`
+	Archived    bool      `gorm:"default:false" json:"archived"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
 // Submission is an uploaded Gerber or ODB++ file
 type Submission struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
 	OrgID     string    `json:"orgId"`
 	UserID    string    `json:"userId"`
+	ProjectID *string   `json:"projectId"`
 	Filename  string    `json:"filename"`
 	FileType  string    `json:"fileType"` // GERBER | ODB_PLUS_PLUS
 	FileKey   string    `json:"fileKey"`  // S3 key

@@ -42,6 +42,7 @@ func main() {
 		&db.Organization{},
 		&db.User{},
 		&db.CapabilityProfile{},
+		&db.Project{},
 		&db.Submission{},
 		&db.AnalysisJob{},
 		&db.Violation{},
@@ -92,6 +93,7 @@ func main() {
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
 	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
+	projectsHandler := routes.NewProjectsHandler(database, awsClients)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
@@ -106,6 +108,9 @@ func main() {
 	read.GET("/jobs/:id/violations", jobsHandler.GetViolations)
 	read.GET("/jobs/:id/board", jobsHandler.GetBoardData)
 	read.GET("/jobs/:id/report.pdf", reportHandler.GetJobReport)
+	read.GET("/projects", projectsHandler.ListProjects)
+	read.GET("/projects/:id", projectsHandler.GetProject)
+	read.GET("/projects/:id/submissions", projectsHandler.ListProjectSubmissions)
 	read.GET("/profiles", profilesHandler.ListProfiles)
 	read.GET("/profiles/:id", profilesHandler.GetProfile)
 
@@ -115,6 +120,10 @@ func main() {
 	write.POST("/submissions/:id/analyze", submissionsHandler.StartAnalysis)
 	write.PATCH("/violations/:id", jobsHandler.UpdateViolation)
 	write.PATCH("/jobs/:id/violations/by-layer", jobsHandler.BulkIgnoreLayerViolations)
+	write.POST("/projects", projectsHandler.CreateProject)
+	write.PUT("/projects/:id", projectsHandler.UpdateProject)
+	write.DELETE("/projects/:id", projectsHandler.ArchiveProject)
+	write.POST("/projects/:id/submissions", projectsHandler.MoveSubmissionToProject)
 	write.POST("/profiles", profilesHandler.CreateProfile)
 	write.PUT("/profiles/:id", profilesHandler.UpdateProfile)
 	write.DELETE("/profiles/:id", profilesHandler.DeleteProfile)

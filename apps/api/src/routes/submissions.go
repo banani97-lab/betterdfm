@@ -84,8 +84,9 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 	user := lib.GetUser(c)
 
 	var req struct {
-		Filename string `json:"filename"`
-		FileType string `json:"fileType"` // GERBER | ODB_PLUS_PLUS
+		Filename  string  `json:"filename"`
+		FileType  string  `json:"fileType"` // GERBER | ODB_PLUS_PLUS
+		ProjectID *string `json:"projectId"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -104,10 +105,19 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 	}
 	fileKey := fmt.Sprintf("submissions/%s/%s%s", user.OrgID, submissionID, ext)
 
+	// Validate projectId if provided
+	if req.ProjectID != nil && *req.ProjectID != "" {
+		var project db.Project
+		if err := h.db.Where("id = ? AND org_id = ?", *req.ProjectID, user.OrgID).First(&project).Error; err != nil {
+			return echo.NewHTTPError(http.StatusBadRequest, "project not found")
+		}
+	}
+
 	submission := db.Submission{
 		ID:        submissionID,
 		OrgID:     user.OrgID,
 		UserID:    user.Sub,
+		ProjectID: req.ProjectID,
 		Filename:  req.Filename,
 		FileType:  req.FileType,
 		FileKey:   fileKey,
