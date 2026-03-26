@@ -425,6 +425,7 @@ export default function SharedPage() {
             onViolationClick={(v) => setSelectedId(v?.id)}
             hiddenLayers={hiddenLayers}
             onToggleLayer={toggleLayer}
+            onSetHiddenLayers={setHiddenLayers}
             violationLayers={violationLayers}
             allIgnoredLayers={allIgnoredLayers}
           />

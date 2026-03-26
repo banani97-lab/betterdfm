@@ -20,6 +20,7 @@ interface BoardViewerProps {
   onViolationClick?: (v: Violation | null) => void
   hiddenLayers: Set<string>
   onToggleLayer: (name: string) => void
+  onSetHiddenLayers?: (layers: Set<string>) => void
   violationLayers?: Set<string>       // layers that have at least one violation
   allIgnoredLayers?: Set<string>      // layers where every violation is ignored
   onIgnoreLayer?: (name: string, ignored: boolean, severity?: string) => void
@@ -631,6 +632,7 @@ export function BoardViewer({
   onViolationClick,
   hiddenLayers,
   onToggleLayer,
+  onSetHiddenLayers,
   violationLayers,
   allIgnoredLayers,
   onIgnoreLayer,
@@ -1086,7 +1088,34 @@ export function BoardViewer({
           className="absolute top-2 left-2 z-20 bg-black/70 backdrop-blur-sm border border-white/10 rounded-lg p-2 min-w-[160px] max-h-[80%] overflow-y-auto"
           onClick={() => setOpenDropdownLayer(null)}
         >
-          <p className="text-xs text-gray-500 font-semibold mb-2 px-1 uppercase tracking-wider">Layers</p>
+          <p className="text-xs text-gray-500 font-semibold mb-1 px-1 uppercase tracking-wider">Layers</p>
+          {onSetHiddenLayers && (
+            <div className="flex gap-1 mb-2 px-1 flex-wrap">
+              {[
+                { label: 'All', action: () => onSetHiddenLayers(new Set()) },
+                { label: 'None', action: () => onSetHiddenLayers(new Set(layers.map(l => l.name))) },
+                { label: 'Top', action: () => {
+                  const bottom = new Set(layers.filter(l => {
+                    const n = l.name.toLowerCase()
+                    return n.includes('bot') || n.includes('back') || n.includes('gbo') || n.includes('gbs') || n.includes('gbl') || n.includes('b.') || n.includes('_bot')
+                  }).map(l => l.name))
+                  onSetHiddenLayers(bottom)
+                }},
+                { label: 'Bottom', action: () => {
+                  const top = new Set(layers.filter(l => {
+                    const n = l.name.toLowerCase()
+                    return n.includes('top') || n.includes('front') || n.includes('gto') || n.includes('gts') || n.includes('gtl') || n.includes('f.') || n.includes('_top')
+                  }).map(l => l.name))
+                  onSetHiddenLayers(top)
+                }},
+              ].map(({ label, action }) => (
+                <button key={label} onClick={action}
+                  className="text-[10px] px-1.5 py-0.5 rounded border border-white/15 text-gray-400 hover:text-white hover:bg-white/10 transition-colors">
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
           {layers.map((layer) => {
             const color      = getLayerColor(layer.name)
             const hidden     = hiddenLayers.has(layer.name)
