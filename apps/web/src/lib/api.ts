@@ -517,3 +517,27 @@ export async function sharedUpload(
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return shareFetch(token, '/upload', { method: 'POST', body: JSON.stringify(data) })
 }
+
+// ── Compare ──────────────────────────────────────────────────────────────────
+
+export interface ComparisonJobSummary {
+  id: string
+  mfgScore: number
+  mfgGrade: string
+  filename: string
+  completedAt: string | null
+}
+
+export interface ComparisonResult {
+  jobA: ComparisonJobSummary
+  jobB: ComparisonJobSummary
+  scoreDelta: number
+  summary: { fixedCount: number; newCount: number; unchangedCount: number }
+  fixed: Violation[]
+  new: Violation[]
+  unchanged: Array<{ a: Violation; b: Violation }>
+}
+
+export async function compareJobs(jobAId: string, jobBId: string): Promise<ComparisonResult> {
+  return apiFetch<ComparisonResult>(`/compare?jobA=${encodeURIComponent(jobAId)}&jobB=${encodeURIComponent(jobBId)}`)
+}

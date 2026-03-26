@@ -96,6 +96,7 @@ func main() {
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database)
+	compareHandler := routes.NewCompareHandler(database)
 	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
 	projectsHandler := routes.NewProjectsHandler(database, awsClients)
 	shareHandler := routes.NewShareHandler(database, awsClients)
@@ -119,6 +120,7 @@ func main() {
 	read.GET("/projects/:id/submissions", projectsHandler.ListProjectSubmissions)
 	read.GET("/profiles", profilesHandler.ListProfiles)
 	read.GET("/profiles/:id", profilesHandler.GetProfile)
+	read.GET("/compare", compareHandler.Compare)
 
 	// Write routes — ANALYST + ADMIN only
 	write := e.Group("", jwtMW.Middleware(), lib.RequireRole("ANALYST", "ADMIN"))
