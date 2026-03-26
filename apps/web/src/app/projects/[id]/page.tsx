@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Check, Edit2, Plus, Upload } from 'lucide-react'
+import { ArrowLeft, Check, Edit2, Plus, Share2, Upload } from 'lucide-react'
 import {
   getProject,
   getProjectSubmissions,
@@ -15,6 +15,7 @@ import { isLoggedIn, canWrite } from '@/lib/auth'
 import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { ShareLinkModal } from '@/components/ui/ShareLinkModal'
 import { cn } from '@/lib/utils'
 
 function scoreColor(n: number): string {
@@ -52,6 +53,7 @@ export default function ProjectDetailPage() {
   const [editDesc, setEditDesc] = useState('')
   const [editingRef, setEditingRef] = useState(false)
   const [editRef, setEditRef] = useState('')
+  const [shareOpen, setShareOpen] = useState(false)
 
   const fetchData = useCallback(async () => {
     try {
@@ -119,11 +121,16 @@ export default function ProjectDetailPage() {
         </div>
         <div className="flex items-center gap-2">
           {canWrite() && (
-            <Link href={`/upload?projectId=${project.id}`}>
-              <Button>
-                <Upload className="h-4 w-4 mr-2" /> Upload to Project
+            <>
+              <Button variant="outline" onClick={() => setShareOpen(true)}>
+                <Share2 className="h-4 w-4 mr-2" /> Share
               </Button>
-            </Link>
+              <Link href={`/upload?projectId=${project.id}`}>
+                <Button>
+                  <Upload className="h-4 w-4 mr-2" /> Upload to Project
+                </Button>
+              </Link>
+            </>
           )}
         </div>
       </header>
@@ -387,6 +394,14 @@ export default function ProjectDetailPage() {
           </section>
         )}
       </main>
+
+      {project && (
+        <ShareLinkModal
+          projectId={project.id}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
     </div>
   )
 }
