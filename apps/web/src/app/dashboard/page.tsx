@@ -88,12 +88,12 @@ export default function DashboardPage() {
 
   const fetchSubmissions = useCallback(async () => {
     try {
-      const [data, projectData] = await Promise.all([
+      const [subsResult, projResult] = await Promise.allSettled([
         getSubmissions(),
         getProjects(undefined, false),
       ])
-      setSubmissions(data ?? [])
-      setProjects(projectData ?? [])
+      setSubmissions(subsResult.status === 'fulfilled' ? (subsResult.value ?? []) : [])
+      setProjects(projResult.status === 'fulfilled' ? (projResult.value ?? []) : [])
       setError(null)
     } catch (e: unknown) {
       if (e instanceof Error) setError(e.message)
