@@ -1,5 +1,7 @@
 package dfmengine
 
+import "math"
+
 // TraceImbalanceRule flags 2-pad components where the traces connected to each
 // pad differ in width by more than the configured ratio.
 type TraceImbalanceRule struct{}
@@ -96,16 +98,30 @@ func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLay
 		}
 	}
 
-	// Check if pad center is inside a copper polygon on the same layer.
-	// A polygon connection represents a large copper pour — use a synthetic
-	// width equal to the pad's largest dimension to indicate massive thermal
-	// coupling (always larger than a typical trace).
+	// Check if pad is connected to a copper polygon on the same layer.
+	// A polygon connection represents a large copper pour — thermal relief
+	// patterns mean the pad center may not be inside the polygon, so we also
+	// check if any polygon edge passes near the pad (within pad radius + 0.5mm).
+	padRadius := math.Max(pad.WidthMM, pad.HeightMM) / 2
+	proximity := padRadius + 0.5 // thermal relief spokes are typically within this range
 	for _, poly := range polygons {
 		if poly.Layer != pad.Layer || !copperLayers[poly.Layer] {
 			continue
 		}
-		if pointInPolygon(pad.X, pad.Y, poly.Points) {
-			pourWidth := 10.0 // synthetic large width for copper pour connection
+		connected := pointInPolygon(pad.X, pad.Y, poly.Points)
+		if !connected {
+			// Check if any polygon edge is near the pad
+			n := len(poly.Points)
+			for i := 0; i < n && !connected; i++ {
+				a := poly.Points[i]
+				b := poly.Points[(i+1)%n]
+				if ptToSegDist(pad.X, pad.Y, a.X, a.Y, b.X, b.Y) <= proximity {
+					connected = true
+				}
+			}
+		}
+		if connected {
+			pourWidth := 10.0
 			if pourWidth > maxWidth {
 				maxWidth = pourWidth
 			}
