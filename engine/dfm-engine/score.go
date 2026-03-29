@@ -28,24 +28,24 @@ func ruleWeight(id string) float64 {
 		return 2.0
 	case "drill-to-drill":
 		return 2.0
+	case "edge-clearance":
+		return 2.0
+	case "package-capability":
+		return 2.0
 	case "aspect-ratio":
 		return 1.5
-	case "edge-clearance":
+	case "trace-imbalance":
+		return 1.5
+	case "tombstoning-risk":
+		return 1.5
+	case "pad-size-for-package":
+		return 1.5
+	case "silkscreen-on-pad":
 		return 1.5
 	case "solder-mask-dam":
 		return 1.0
 	case "copper-sliver":
 		return 1.0
-	case "silkscreen-on-pad":
-		return 1.0
-	case "pad-size-for-package":
-		return 1.5
-	case "tombstoning-risk":
-		return 1.5
-	case "package-capability":
-		return 2.0
-	case "trace-imbalance":
-		return 1.5
 	case "fiducial-count":
 		return 1.0
 	default:
@@ -108,41 +108,41 @@ func ruleMaxContribution(id string) float64 {
 	// All caps must sum to exactly 100.
 	switch id {
 	case "clearance":
-		return 15.0 // was 17
+		return 14.0
 	case "trace-width":
-		return 13.0 // was 14
+		return 12.0
 	case "annular-ring":
-		return 9.0 // was 10
-	case "drill-size":
-		return 8.0 // was 9
-	case "drill-to-copper":
 		return 8.0
-	case "package-capability":
+	case "drill-size":
 		return 7.0
+	case "drill-to-copper":
+		return 7.0
+	case "edge-clearance":
+		return 7.0
+	case "package-capability":
+		return 6.0
 	case "drill-to-drill":
-		return 6.0 // was 7
+		return 6.0
+	case "aspect-ratio":
+		return 5.0
 	case "trace-imbalance":
 		return 5.0
-	case "aspect-ratio":
-		return 5.0 // was 6
-	case "edge-clearance":
-		return 5.0 // was 6
+	case "tombstoning-risk":
+		return 5.0
 	case "pad-size-for-package":
+		return 4.0
+	case "silkscreen-on-pad":
 		return 4.0
 	case "solder-mask-dam":
 		return 4.0
-	case "tombstoning-risk":
-		return 3.0
 	case "copper-sliver":
 		return 3.0
-	case "silkscreen-on-pad":
-		return 2.0
 	case "fiducial-count":
 		return 3.0
 	default:
 		return 3.0
 	}
-	// Sum: 15+13+9+8+8+7+6+5+5+5+4+4+3+3+2 = 100
+	// Sum: 14+12+8+7+7+7+6+6+5+5+5+4+4+4+3+3 = 100
 }
 
 // outlineBBox returns the width and height of the bounding box of outline points in mm.

@@ -19,7 +19,7 @@ func (r *AspectRatioRule) Run(board BoardData, profile ProfileRules) []Violation
 			msg, sug := msgAspectRatioExceeds(ratio, profile.MaxAspectRatio, board.BoardThicknessMM, diam)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      "drill",
 				X:          x,
 				Y:          y,

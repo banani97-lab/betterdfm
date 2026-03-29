@@ -12,8 +12,8 @@ func TestAspectRatio_Exceeds(t *testing.T) {
 	if len(viols) != 1 {
 		t.Fatalf("expected 1 violation, got %d", len(viols))
 	}
-	if viols[0].Severity != "WARNING" {
-		t.Errorf("expected WARNING severity, got %s", viols[0].Severity)
+	if viols[0].Severity != "ERROR" {
+		t.Errorf("expected ERROR severity, got %s", viols[0].Severity)
 	}
 }
 

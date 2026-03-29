@@ -55,7 +55,7 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, pad.WidthMM, expected.minW)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      pad.Layer,
 				X:          pad.X,
 				Y:          pad.Y,
@@ -92,7 +92,7 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, pad.HeightMM, expected.minH)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      pad.Layer,
 				X:          pad.X,
 				Y:          pad.Y,

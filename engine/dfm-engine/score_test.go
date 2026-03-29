@@ -28,8 +28,8 @@ func TestScore_SevereClearance(t *testing.T) {
 		}
 	}
 	result := ComputeScore(viols, rectOutline(60, 40))
-	if result.Score >= 86 {
-		t.Errorf("expected score < 86 with many clearance errors (cap=15), got %d", result.Score)
+	if result.Score >= 87 {
+		t.Errorf("expected score < 87 with many clearance errors (cap=14), got %d", result.Score)
 	}
 }
 

@@ -100,7 +100,7 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 				msg, sug := msgEdgeClearanceTraceBelow(copperEdgeDist, limit)
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),
-					Severity:   "WARNING",
+					Severity:   "ERROR",
 					Layer:      trace.Layer,
 					X:          ptX,
 					Y:          ptY,
@@ -132,7 +132,7 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 			msg, sug := msgEdgeClearancePadBelow(copperEdgeDist, limit)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      pad.Layer,
 				X:          pad.X,
 				Y:          pad.Y,
@@ -200,7 +200,7 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 						msg, sug := msgEdgeClearanceTraceBelow(copperEdgeDist, limit)
 						violations = append(violations, Violation{
 							RuleID:     r.ID(),
-							Severity:   "WARNING",
+							Severity:   "ERROR",
 							Layer:      poly.Layer,
 							X:          ptX,
 							Y:          ptY,

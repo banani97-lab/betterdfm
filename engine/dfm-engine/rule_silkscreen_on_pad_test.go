@@ -26,8 +26,8 @@ func TestSilkscreenOnPad_Violation(t *testing.T) {
 	if v.RuleID != "silkscreen-on-pad" {
 		t.Errorf("expected RuleID=silkscreen-on-pad, got %s", v.RuleID)
 	}
-	if v.Severity != "WARNING" {
-		t.Errorf("expected WARNING severity, got %s", v.Severity)
+	if v.Severity != "ERROR" {
+		t.Errorf("expected ERROR severity, got %s", v.Severity)
 	}
 	if v.RefDes != "U1" {
 		t.Errorf("expected RefDes=U1, got %s", v.RefDes)

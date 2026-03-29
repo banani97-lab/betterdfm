@@ -55,7 +55,7 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 		if ratio > maxRatio {
 			violations = append(violations, Violation{
 				RuleID:     "trace-imbalance",
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      pads[0].Layer,
 				X:          pads[0].X,
 				Y:          pads[0].Y,

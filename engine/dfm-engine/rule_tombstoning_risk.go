@@ -65,7 +65,7 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 			msg, sug := msgTombstoningRisk(refDes, vPad.PackageClass, ratio)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
-				Severity:   "WARNING",
+				Severity:   "ERROR",
 				Layer:      vPad.Layer,
 				X:          vPad.X,
 				Y:          vPad.Y,

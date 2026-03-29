@@ -158,7 +158,7 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 					scy := (silkBox.minY + silkBox.maxY) / 2
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
-						Severity:   "WARNING",
+						Severity:   "ERROR",
 						Layer:      silkLayer,
 						X:          scx,
 						Y:          scy,
