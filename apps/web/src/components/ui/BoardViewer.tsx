@@ -762,10 +762,30 @@ export function BoardViewer({
   // Redraw whenever data/settings change
   useEffect(() => { draw() }, [draw])
 
-  // ── RAF pulse for selected violation ────────────────────────────────────────
+  // ── Center + RAF pulse for selected violation ───────────────────────────────
 
   useEffect(() => {
     if (!selectedViolationId) { draw(); return }
+
+    // Center the viewport on the selected violation
+    const v = violations.find(vi => vi.id === selectedViolationId)
+    const canvas = canvasRef.current
+    if (v && bounds && canvas) {
+      const canvasX = (v.x - bounds.minX) * bounds.scale + bounds.offX
+      const canvasY = (bounds.maxY - v.y) * bounds.scale + bounds.offY
+      const rect = canvas.getBoundingClientRect()
+      const viewW = rect.width
+      const viewH = rect.height
+      // Zoom in to 3x for context, or keep current zoom if already zoomed in more
+      const targetZoom = Math.max(3, zoomRef.current)
+      zoomRef.current = targetZoom
+      panRef.current = {
+        x: viewW / 2 - canvasX * targetZoom,
+        y: viewH / 2 - canvasY * targetZoom,
+      }
+      onTransformChange?.({ offsetX: panRef.current.x, offsetY: panRef.current.y, scale: targetZoom })
+    }
+
     let raf: number
     const animate = () => { draw(); raf = requestAnimationFrame(animate) }
     raf = requestAnimationFrame(animate)
