@@ -36,10 +36,10 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 			continue
 		}
 
-		w0 := widestConnectedTrace(pads[0], board.Traces, copperLayers)
-		w1 := widestConnectedTrace(pads[1], board.Traces, copperLayers)
+		w0 := connectedCopperWidth(pads[0], board.Traces, board.Polygons, copperLayers)
+		w1 := connectedCopperWidth(pads[1], board.Traces, board.Polygons, copperLayers)
 
-		// Both pads must have at least one connected trace
+		// Both pads must have at least one copper connection
 		if w0 <= 0 || w1 <= 0 {
 			continue
 		}
@@ -62,7 +62,7 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 				X2:         pads[1].X,
 				Y2:         pads[1].Y,
 				Message:    msgTraceImbalance(refDes, wide, narrow, ratio),
-				Suggestion: "Balance trace widths entering component pads to reduce thermal and electrical asymmetry",
+				Suggestion: "Balance copper connections to component pads to reduce tombstoning risk from thermal asymmetry",
 				MeasuredMM: ratio,
 				LimitMM:    maxRatio,
 				Unit:       "ratio",
@@ -76,20 +76,43 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 	return dedupeViolations(violations, 2.0)
 }
 
-// widestConnectedTrace finds the widest trace that touches a pad.
-// A trace touches a pad if one of its endpoints falls within/on the pad boundary.
-func widestConnectedTrace(pad Pad, traces []Trace, copperLayers map[string]bool) float64 {
+// connectedCopperWidth returns an effective copper width connected to a pad.
+// It checks both traces (by endpoint proximity) and polygons (pad inside pour).
+// A pad sitting on a copper polygon returns a large synthetic width to represent
+// the thermal mass of the pour — this correctly flags imbalance when one pad
+// has a thin trace and the other sits on a ground/power plane.
+func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLayers map[string]bool) float64 {
 	var maxWidth float64
+
+	// Check traces
 	for _, t := range traces {
 		if !copperLayers[t.Layer] || t.Layer != pad.Layer {
 			continue
 		}
-		// Check if either endpoint of the trace touches the pad
 		if padEdgeDist(t.StartX, t.StartY, pad) <= 0.01 || padEdgeDist(t.EndX, t.EndY, pad) <= 0.01 {
 			if t.WidthMM > maxWidth {
 				maxWidth = t.WidthMM
 			}
 		}
 	}
+
+	// Check if pad center is inside a copper polygon on the same layer.
+	// A polygon connection represents a large copper pour — use a synthetic
+	// width equal to the pad's largest dimension to indicate massive thermal
+	// coupling (always larger than a typical trace).
+	for _, poly := range polygons {
+		if poly.Layer != pad.Layer || !copperLayers[poly.Layer] {
+			continue
+		}
+		if pointInPolygon(pad.X, pad.Y, poly.Points) {
+			pourWidth := 10.0 // synthetic large width for copper pour connection
+			if pourWidth > maxWidth {
+				maxWidth = pourWidth
+			}
+			break
+		}
+	}
+
 	return maxWidth
 }
+
