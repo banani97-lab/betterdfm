@@ -291,7 +291,7 @@ export default function AdminOrganizationsPage() {
                     >
                       <option value="STARTER">Starter ($799/mo)</option>
                       <option value="PROFESSIONAL">Professional ($1,999/mo)</option>
-                      <option value="ENTERPRISE">Enterprise ($2,899/mo)</option>
+                      <option value="ENTERPRISE">Enterprise (Custom)</option>
                     </select>
                   </div>
                   <div>

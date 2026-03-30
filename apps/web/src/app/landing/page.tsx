@@ -227,10 +227,10 @@ export default function LandingPage() {
       <section id="pricing" data-section="pricing" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-            Simple Pricing for Every Shop Size
+            Pricing That Scales With Your Shop
           </h2>
           <p className="text-slate-400 text-center max-w-xl mx-auto mb-16">
-            Per-organization, not per-seat. Your whole team uses it.
+            Model your manufacturing capabilities and catch issues before they reach the shop floor.
           </p>
           <div className="grid sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
@@ -238,7 +238,15 @@ export default function LandingPage() {
                 name: 'Starter',
                 price: '$799',
                 period: '/mo',
-                features: ['50 analyses/month', '3 users', '1 capability profile', 'PDF & CSV export'],
+                subtitle: 'For prototyping and light production validation',
+                features: [
+                  'Up to 50 design analyses per month',
+                  'Unlimited team access',
+                  '1 manufacturing line (capability profile)',
+                  'PDF & CSV export',
+                  'Interactive board viewer',
+                ],
+                roi: 'Ideal for single-process shops or early validation',
                 cta: 'Get Started',
                 highlight: false,
               },
@@ -246,16 +254,36 @@ export default function LandingPage() {
                 name: 'Professional',
                 price: '$1,999',
                 period: '/mo',
-                features: ['250 analyses/month', '10 users', '5 capability profiles', 'Customer portal', 'Batch upload', 'Design comparison'],
+                subtitle: 'Designed for production workflows',
+                features: [
+                  'Up to 250 design analyses per month',
+                  'Unlimited team access',
+                  'Up to 5 manufacturing lines (capability profiles)',
+                  'Customer portal with branded share links',
+                  'Bulk design processing',
+                  'Design comparison',
+                ],
+                roi: 'Standardize DFM across multiple manufacturing lines',
                 cta: 'Get Started',
                 highlight: true,
               },
               {
                 name: 'Enterprise',
-                price: '$2,899',
-                period: '/mo',
-                features: ['Unlimited analyses', 'Unlimited users', 'Unlimited profiles', 'Everything in Pro', 'Admin dashboard', 'API access'],
-                cta: 'Contact Us',
+                price: '',
+                period: '',
+                subtitle: 'Built for high-throughput CM operations',
+                features: [
+                  'Scaled for continuous intake workflows',
+                  'Unlimited team access',
+                  'Custom manufacturing lines',
+                  'Everything in Professional',
+                  'API access & automated intake',
+                  'Admin dashboard & analytics',
+                  'Priority processing',
+                  'Dedicated onboarding',
+                ],
+                roi: 'Automated intake workflows and multi-site operations',
+                cta: 'Talk to Sales',
                 highlight: false,
               },
             ].map((tier) => (
@@ -268,10 +296,18 @@ export default function LandingPage() {
                 }`}
               >
                 <h3 className="text-lg font-semibold">{tier.name}</h3>
-                <div className="mt-4 mb-6">
-                  <span className="text-4xl font-bold">{tier.price}</span>
-                  <span className="text-slate-400">{tier.period}</span>
+                <p className="text-xs text-slate-400 mt-1">{tier.subtitle}</p>
+                <div className="mt-4 mb-2">
+                  {tier.price ? (
+                    <>
+                      <span className="text-4xl font-bold">{tier.price}</span>
+                      <span className="text-slate-400">{tier.period}</span>
+                    </>
+                  ) : (
+                    <span className="text-2xl font-bold text-slate-300">Custom Pricing</span>
+                  )}
                 </div>
+                <p className="text-xs text-blue-400 mb-6">{tier.roi}</p>
                 <ul className="flex-1 space-y-3 mb-8">
                   {tier.features.map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm text-slate-300">
