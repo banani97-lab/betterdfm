@@ -1,4 +1,4 @@
-# BetterDFM
+# RapidDFM
 
 Design-for-manufacturability (DFM) analysis platform for PCB designs. Users upload Gerber or ODB++ files, the system parses board geometry, runs 11 manufacturing rule checks against a capability profile, and presents violations with a visual board viewer.
 

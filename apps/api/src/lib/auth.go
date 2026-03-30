@@ -197,7 +197,7 @@ func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 	}
 }
 
-// AdminMiddleware returns an Echo middleware that validates Cognito JWTs for BetterDFM admins.
+// AdminMiddleware returns an Echo middleware that validates Cognito JWTs for RapidDFM admins.
 // Admin tokens use a different Cognito app client (different audience) than app tokens.
 func (m *JWTMiddleware) AdminMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {

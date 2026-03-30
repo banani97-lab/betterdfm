@@ -1,8 +1,8 @@
-# BetterDFM — Architecture
+# RapidDFM — Architecture
 
 ## Overview
 
-BetterDFM is a SaaS PCB Design-for-Manufacturability (DFM) engine. Contract manufacturers (CMs) subscribe, define their shop's capability profile, and offer their customers a self-serve DFM analysis portal.
+RapidDFM is a SaaS PCB Design-for-Manufacturability (DFM) engine. Contract manufacturers (CMs) subscribe, define their shop's capability profile, and offer their customers a self-serve DFM analysis portal.
 
 ## Tech Stack
 
@@ -22,7 +22,7 @@ BetterDFM is a SaaS PCB Design-for-Manufacturability (DFM) engine. Contract manu
 ## Monorepo Structure
 
 ```
-betterdfm/
+rapiddfm/
 ├── apps/
 │   ├── web/                        # Next.js 14 TypeScript frontend
 │   └── api/                        # Go Echo API server
