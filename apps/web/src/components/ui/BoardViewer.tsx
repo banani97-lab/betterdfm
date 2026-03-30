@@ -1119,8 +1119,7 @@ export function BoardViewer({
                       backgroundColor: hidden ? 'transparent' : color,
                       boxShadow: hidden ? 'none' : `0 0 4px ${color}66`,
                     }} />
-                  <span className="text-xs truncate transition-opacity"
-                    style={{ color: hidden ? '#555' : '#ccc', opacity: hidden ? 0.5 : 1 }}>
+                  <span className={cn("text-xs truncate transition-colors", hidden ? "text-white/25 group-hover:text-white/70" : "text-[#ccc]")}>
                     {layer.name}
                   </span>
                 </button>
