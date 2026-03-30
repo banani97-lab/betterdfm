@@ -261,7 +261,7 @@ export default function LandingPage() {
                   'Up to 5 manufacturing lines (capability profiles)',
                   'Customer portal with branded share links',
                   'Bulk design processing',
-                  'Design comparison',
+                  'Revision-to-revision manufacturability tracking',
                 ],
                 roi: 'Standardize DFM across multiple manufacturing lines',
                 cta: 'Get Started',
