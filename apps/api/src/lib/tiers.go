@@ -16,7 +16,7 @@ type TierLimits struct {
 // Tiers maps subscription tier names to their limits.
 var Tiers = map[string]TierLimits{
 	"STARTER": {
-		AnalysesPerMonth: 50, MaxUsers: -1, MaxProfiles: 1,
+		AnalysesPerMonth: 30, MaxUsers: -1, MaxProfiles: 1,
 		MaxProjects: 10, MaxBatchFiles: 0, CompareEnabled: false,
 		MaxActiveShareLinks: 0, AdminDashboard: false, OverageRateCents: 200,
 	},

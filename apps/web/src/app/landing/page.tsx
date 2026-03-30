@@ -240,7 +240,7 @@ export default function LandingPage() {
                 period: '/mo',
                 subtitle: 'For prototyping and light production validation',
                 features: [
-                  'Up to 50 design analyses per month',
+                  'Up to 30 design analyses per month',
                   'Unlimited team access',
                   '1 manufacturing line (capability profile)',
                   'PDF & CSV export',
