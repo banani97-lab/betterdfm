@@ -8,54 +8,54 @@ import { ContactForm } from './ContactForm'
 const PORTAL_URL = 'https://portal.rapiddfm.com'
 
 const RULES = [
-  { name: 'Trace Width', desc: 'Minimum trace width compliance' },
-  { name: 'Clearance', desc: 'Copper-to-copper spacing' },
-  { name: 'Drill Size', desc: 'Hole diameter within bounds' },
-  { name: 'Annular Ring', desc: 'Copper ring around vias' },
-  { name: 'Aspect Ratio', desc: 'Board thickness vs drill diameter' },
-  { name: 'Edge Clearance', desc: 'Copper distance from board outline' },
-  { name: 'Solder Mask Dam', desc: 'Mask bridge between pads' },
-  { name: 'Copper Sliver', desc: 'Minimum copper feature width' },
-  { name: 'Silkscreen on Pad', desc: 'Ink overlapping exposed copper' },
-  { name: 'Drill-to-Drill', desc: 'Hole-to-hole spacing' },
-  { name: 'Drill-to-Copper', desc: 'Hole-to-trace clearance' },
-  { name: 'Trace Imbalance', desc: 'Copper asymmetry on component pads' },
-  { name: 'Tombstoning Risk', desc: 'Pad size asymmetry on small passives' },
-  { name: 'Package Capability', desc: 'Component size vs shop capability' },
-  { name: 'Fiducial Count', desc: 'Minimum fiducials for pick-and-place' },
-  { name: 'Pad Size', desc: 'Pad dimensions for package class' },
+  { name: 'Trace Width', desc: 'Catch underwidth traces before they cause opens' },
+  { name: 'Clearance', desc: 'Flag spacing violations that lead to shorts' },
+  { name: 'Drill Size', desc: 'Verify hole diameters match your drill inventory' },
+  { name: 'Annular Ring', desc: 'Ensure via pads meet registration tolerances' },
+  { name: 'Aspect Ratio', desc: 'Prevent drill breakage from high aspect holes' },
+  { name: 'Edge Clearance', desc: 'Avoid copper exposure at board edges after routing' },
+  { name: 'Solder Mask Dam', desc: 'Prevent solder bridging between tight-pitch pads' },
+  { name: 'Copper Sliver', desc: 'Detect thin copper features that flake during etch' },
+  { name: 'Silkscreen on Pad', desc: 'Stop ink contamination on solderable surfaces' },
+  { name: 'Drill-to-Drill', desc: 'Maintain spacing that prevents wall blowout' },
+  { name: 'Drill-to-Copper', desc: 'Protect trace integrity near drilled holes' },
+  { name: 'Trace Imbalance', desc: 'Flag thermal asymmetry that causes tombstoning' },
+  { name: 'Tombstoning Risk', desc: 'Detect uneven pads on small passives' },
+  { name: 'Package Capability', desc: 'Verify component sizes match your placement capability' },
+  { name: 'Fiducial Count', desc: 'Confirm alignment marks for pick-and-place' },
+  { name: 'Pad Size', desc: 'Validate pad geometry against IPC land patterns' },
 ]
 
 const FEATURES = [
   {
     icon: Upload,
-    title: 'Upload & Analyze in Seconds',
-    desc: 'Drop a Gerber or ODB++ file, select your capability profile, and get a full DFM report before your coffee cools.',
+    title: 'Replace Manual File Inspection',
+    desc: 'Drop a Gerber or ODB++ file and get a scored DFM report in seconds. No more opening every layer in your CAM tool to eyeball trace widths and clearances.',
   },
   {
     icon: Layers,
-    title: 'Interactive Board Viewer',
-    desc: 'Visualize every layer, click violations to zoom in, toggle layers on and off. See exactly where the problems are.',
+    title: 'Pinpoint Issues Instantly',
+    desc: 'Click any violation and the board viewer zooms to the exact location. Toggle layers, filter by rule, and resolve issues in minutes instead of hours.',
   },
   {
     icon: Share2,
-    title: 'Customer Portal',
-    desc: 'Share a branded link with your customer. They see the violations, upload a revision, and you track the improvement — no account needed.',
+    title: 'Eliminate Email Back-and-Forth',
+    desc: 'Send a branded share link to your customer. They see exactly what needs fixing, upload a revised design, and you track the improvement — no screenshots or phone calls.',
   },
   {
     icon: BarChart3,
-    title: 'Scored Reports',
-    desc: 'Every design gets a 0-100 manufacturability score and a letter grade. Export to PDF with your branding for customer-facing reports.',
+    title: 'Standardize Your DFM Output',
+    desc: 'Every design gets the same 16-rule check and a 0-100 manufacturability score. Export to PDF for a consistent, professional report — regardless of which engineer reviews it.',
   },
   {
     icon: Shield,
-    title: 'Your Shop, Your Rules',
-    desc: 'Configure capability profiles with your exact manufacturing limits. Different profiles for different processes — FR4, HDI, flex.',
+    title: 'Encode Your Shop Capabilities',
+    desc: 'Define manufacturing lines with your exact process limits — trace widths, drill sizes, clearances. Different profiles for FR4, HDI, flex. Your rules, applied automatically.',
   },
   {
     icon: Zap,
-    title: 'Batch Processing',
-    desc: 'Upload 50 files at once. Parallel analysis with per-file progress tracking. Process a week of designs in minutes.',
+    title: 'Process a Week of Designs in Minutes',
+    desc: 'Upload an entire batch of incoming jobs at once. Parallel analysis with per-file tracking. Screen dozens of designs before they reach your engineering queue.',
   },
 ]
 
@@ -111,13 +111,14 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section data-section="hero" className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
+        <p className="text-sm font-medium text-blue-400 mb-4 tracking-wide">Designed with CAM engineers in mind</p>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-          DFM Analysis Built for
+          Screen Incoming Designs
           <br />
-          <span className="text-blue-400">Contract Manufacturers</span>
+          <span className="text-blue-400">Before They Hit Your Engineers</span>
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          Upload Gerber or ODB++ files, check against your shop&apos;s capabilities, and share scored results with customers — in seconds, not hours.
+          RapidDFM replaces manual CAM review with automated manufacturability checks that run in seconds. Upload Gerber or ODB++ files, apply your shop&apos;s rules, and share results with customers — cutting first-pass review time and eliminating revision back-and-forth.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
@@ -125,7 +126,7 @@ export default function LandingPage() {
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
             data-track-click="hero-get-started"
           >
-            Get Started <ArrowRight className="h-5 w-5" />
+            Start Analyzing Designs <ArrowRight className="h-5 w-5" />
           </a>
           <a
             href="#features"
@@ -135,27 +136,27 @@ export default function LandingPage() {
             See How It Works
           </a>
         </div>
-        <p className="mt-6 text-sm text-slate-500">16 automated DFM checks. Gerber + ODB++ support. No installs.</p>
+        <p className="mt-6 text-sm text-slate-500">Start analyzing designs in minutes — no complex setup required.</p>
       </section>
 
-      {/* Social proof strip */}
+      {/* Stats strip */}
       <section data-section="stats" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-center">
           <div>
             <div className="text-3xl font-bold text-blue-400">16</div>
-            <div className="text-sm text-slate-400">DFM Rules</div>
-          </div>
-          <div>
-            <div className="text-3xl font-bold text-blue-400">2</div>
-            <div className="text-sm text-slate-400">File Formats</div>
+            <div className="text-sm text-slate-400">Automated Checks</div>
           </div>
           <div>
             <div className="text-3xl font-bold text-blue-400">&lt;30s</div>
-            <div className="text-sm text-slate-400">Analysis Time</div>
+            <div className="text-sm text-slate-400">Per Design</div>
+          </div>
+          <div>
+            <div className="text-3xl font-bold text-blue-400">Gerber + ODB++</div>
+            <div className="text-sm text-slate-400">Native Support</div>
           </div>
           <div>
             <div className="text-3xl font-bold text-blue-400">0-100</div>
-            <div className="text-sm text-slate-400">DFM Score</div>
+            <div className="text-sm text-slate-400">Manufacturability Score</div>
           </div>
         </div>
       </section>
@@ -163,10 +164,10 @@ export default function LandingPage() {
       {/* Features */}
       <section id="features" data-section="features" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-          Everything You Need to Review PCB Designs
+          Cut First-Pass Review Time. Standardize DFM Across Your Team.
         </h2>
-        <p className="text-slate-400 text-center max-w-xl mx-auto mb-16">
-          Replace manual DFM review with automated checks that run in seconds. Consistent results, every time, from every analyst.
+        <p className="text-slate-400 text-center max-w-2xl mx-auto mb-16">
+          Built for real PCB manufacturing workflows. Every feature replaces a manual step your engineers are doing today.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
           {FEATURES.map((f) => (
@@ -182,13 +183,13 @@ export default function LandingPage() {
       {/* How it works */}
       <section data-section="how-it-works" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">How It Works</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">From Upload to Customer Report in Under a Minute</h2>
           <div className="grid sm:grid-cols-4 gap-8 text-center">
             {[
-              { step: '1', title: 'Upload', desc: 'Drop your Gerber ZIP or ODB++ archive' },
-              { step: '2', title: 'Configure', desc: 'Select a capability profile for your shop' },
-              { step: '3', title: 'Analyze', desc: '16 rules check the design in seconds' },
-              { step: '4', title: 'Share', desc: 'Send a branded report link to your customer' },
+              { step: '1', title: 'Upload', desc: 'Drop Gerber or ODB++ files — no manual extraction or file prep needed' },
+              { step: '2', title: 'Apply Rules', desc: 'Your manufacturing limits are checked automatically against the design' },
+              { step: '3', title: 'Review Results', desc: 'See every violation scored, mapped to the board, and ready to act on' },
+              { step: '4', title: 'Share & Resolve', desc: 'Send results to your customer and track revisions until the design is fab-ready' },
             ].map((s) => (
               <div key={s.step}>
                 <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold text-lg mb-4">
@@ -205,10 +206,10 @@ export default function LandingPage() {
       {/* DFM Rules */}
       <section id="rules" data-section="rules" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-          16 Manufacturing Rule Checks
+          16 Checks Your Engineers Run Manually. Automated.
         </h2>
-        <p className="text-slate-400 text-center max-w-xl mx-auto mb-16">
-          Each design is checked against your configured manufacturing limits. Violations are scored by severity and mapped to exact board locations.
+        <p className="text-slate-400 text-center max-w-2xl mx-auto mb-16">
+          Every design gets the same checks, every time, regardless of who reviews it. No more missed issues from rushed reviews or inconsistent standards between shifts.
         </p>
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {RULES.map((r) => (
@@ -238,7 +239,7 @@ export default function LandingPage() {
                 name: 'Starter',
                 price: '$799',
                 period: '/mo',
-                subtitle: 'For prototyping and light production validation',
+                subtitle: 'Evaluate and validate before full adoption',
                 features: [
                   'Up to 30 design analyses per month',
                   'Unlimited team access',
@@ -246,7 +247,7 @@ export default function LandingPage() {
                   'PDF & CSV export',
                   'Interactive board viewer',
                 ],
-                roi: 'Ideal for single-process shops or early validation',
+                roi: 'Ideal for single-process shops or initial evaluation',
                 cta: 'Get Started',
                 highlight: false,
               },
@@ -254,7 +255,7 @@ export default function LandingPage() {
                 name: 'Professional',
                 price: '$2,499',
                 period: '/mo',
-                subtitle: 'Designed for production workflows',
+                subtitle: 'Automate first-pass DFM and reduce manual CAM review time',
                 features: [
                   'Up to 250 design analyses per month',
                   'Unlimited team access',
@@ -263,7 +264,7 @@ export default function LandingPage() {
                   'Bulk design processing',
                   'Revision-to-revision manufacturability tracking',
                 ],
-                roi: 'Standardize DFM across multiple manufacturing lines',
+                roi: 'Replace manual first-pass review across your production lines',
                 cta: 'Get Started',
                 highlight: true,
               },
@@ -271,7 +272,7 @@ export default function LandingPage() {
                 name: 'Enterprise',
                 price: '',
                 period: '',
-                subtitle: 'Built for high-throughput CM operations',
+                subtitle: 'Automatically screen incoming jobs before they reach your engineering team',
                 features: [
                   'Scaled for continuous intake workflows',
                   'Unlimited team access',
@@ -282,7 +283,7 @@ export default function LandingPage() {
                   'Priority processing',
                   'Dedicated onboarding',
                 ],
-                roi: 'Automated intake workflows and multi-site operations',
+                roi: 'Built for multi-site operations and automated job intake',
                 cta: 'Talk to Sales',
                 highlight: false,
               },
@@ -337,10 +338,10 @@ export default function LandingPage() {
       <section id="contact" data-section="contact" className="max-w-6xl mx-auto px-6 py-24">
         <div className="max-w-xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-            Get in Touch
+            See It On Your Own Designs
           </h2>
           <p className="text-slate-400 text-center mb-10">
-            Tell us about your shop and we&apos;ll show you how RapidDFM can streamline your DFM review process.
+            Tell us about your shop and we&apos;ll walk you through RapidDFM with your own board files. No generic demos — we&apos;ll show you what it catches on designs you&apos;ve already built.
           </p>
           <ContactForm />
         </div>
