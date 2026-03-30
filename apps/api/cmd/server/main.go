@@ -1,4 +1,4 @@
-package main // betterdfm API server
+package main // rapiddfm API server
 
 import (
 	"context"
@@ -86,7 +86,7 @@ func main() {
 	// JWT middleware for app users (validates audience against app client ID)
 	jwtMW := lib.NewJWTMiddleware(jwtIssuer, cognitoClientID)
 
-	// JWT middleware for BetterDFM admins (validates audience against admin client ID)
+	// JWT middleware for RapidDFM admins (validates audience against admin client ID)
 	adminJWTMW := lib.NewJWTMiddleware(jwtIssuer, adminCognitoClientID)
 
 	// Route handlers

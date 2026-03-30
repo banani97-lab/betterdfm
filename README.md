@@ -1,4 +1,4 @@
-# BetterDFM
+# RapidDFM
 
 A SaaS PCB Design-for-Manufacturability (DFM) analysis engine. Contract manufacturers define their shop's capability profile; their customers upload Gerber or ODB++ files and receive instant, visual, actionable feedback.
 
@@ -6,7 +6,7 @@ A SaaS PCB Design-for-Manufacturability (DFM) analysis engine. Contract manufact
 
 ### What is DFM Analysis?
 
-Design-for-Manufacturability (DFM) is the practice of checking a PCB design against a fabrication shop's physical constraints before sending it to production. Violations — traces too narrow, drills too small, copper too close to the board edge — caught early save time and money. BetterDFM automates this check.
+Design-for-Manufacturability (DFM) is the practice of checking a PCB design against a fabrication shop's physical constraints before sending it to production. Violations — traces too narrow, drills too small, copper too close to the board edge — caught early save time and money. RapidDFM automates this check.
 
 ### Who Uses It?
 
@@ -74,7 +74,7 @@ ECS Fargate Worker
 ### Monorepo Layout
 
 ```
-betterdfm/
+rapiddfm/
 ├── apps/
 │   ├── web/                  # Next.js 14 frontend
 │   └── api/                  # Go Echo API server
@@ -101,8 +101,8 @@ betterdfm/
 
 ```bash
 # 1. Clone and enter the repo
-git clone https://github.com/your-org/betterdfm.git
-cd betterdfm
+git clone https://github.com/your-org/rapiddfm.git
+cd rapiddfm
 
 # 2. Copy the environment file
 cp .env.example .env

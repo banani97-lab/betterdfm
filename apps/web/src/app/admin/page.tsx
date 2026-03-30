@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Building2, LogOut, BarChart3, FileText, Users, AlertTriangle, CheckCircle, XCircle, Info } from 'lucide-react'
 import { isAdminLoggedIn, clearAdminToken, adminApiFetch } from '@/lib/adminAuth'
 import { Button } from '@/components/ui/button'
+import { ADMIN_APP_NAME } from '@/lib/branding'
 
 interface PlatformStats {
   totalOrgs: number
@@ -80,7 +81,7 @@ export default function AdminDashboardPage() {
               <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-xl font-semibold text-white">BetterDFM Admin</h1>
+          <h1 className="text-xl font-semibold text-white">{ADMIN_APP_NAME}</h1>
         </div>
         <Button variant="ghost" size="sm" onClick={handleLogout} className="text-slate-400 hover:text-white">
           <LogOut className="h-4 w-4 mr-1" /> Logout

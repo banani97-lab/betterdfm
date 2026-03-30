@@ -1,23 +1,28 @@
-const ADMIN_CLIENT_ID = process.env.NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID || ''
-const ADMIN_TOKEN_KEY = 'betterdfm_admin_token'
-
 import { API_URL } from './api'
+import {
+  ADMIN_TOKEN_STORAGE_KEY,
+  clearStoredValue,
+  getStoredValue,
+  LEGACY_ADMIN_TOKEN_STORAGE_KEY,
+  setStoredValue,
+} from './branding'
+
+const ADMIN_CLIENT_ID = process.env.NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID || ''
 
 export function isAdminDevMode(): boolean {
   return !ADMIN_CLIENT_ID
 }
 
 export function getAdminToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(ADMIN_TOKEN_KEY)
+  return getStoredValue(ADMIN_TOKEN_STORAGE_KEY, LEGACY_ADMIN_TOKEN_STORAGE_KEY)
 }
 
 export function setAdminToken(token: string): void {
-  localStorage.setItem(ADMIN_TOKEN_KEY, token)
+  setStoredValue(ADMIN_TOKEN_STORAGE_KEY, token, LEGACY_ADMIN_TOKEN_STORAGE_KEY)
 }
 
 export function clearAdminToken(): void {
-  localStorage.removeItem(ADMIN_TOKEN_KEY)
+  clearStoredValue(ADMIN_TOKEN_STORAGE_KEY, LEGACY_ADMIN_TOKEN_STORAGE_KEY)
 }
 
 export function isAdminTokenValid(): boolean {

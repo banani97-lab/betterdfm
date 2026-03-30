@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
-import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
+import { RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from 'lucide-react'
 import { getBatch, retryBatch, type BatchDetail, type BatchSubmission } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 
 function gradeColor(grade: string): string {
@@ -96,14 +96,14 @@ export default function BatchDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
-        <BetterDFMLogo />
+        <RapidDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Batch Results</h1>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
-        <Link href="/dashboard" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground mb-6">
-          <ArrowLeft className="h-4 w-4" /> Back to Dashboard
-        </Link>
+        <div className="mb-6">
+          <AppBackButton href="/dashboard" label="Dashboard" />
+        </div>
 
         {loading && (
           <div className="text-center py-20">

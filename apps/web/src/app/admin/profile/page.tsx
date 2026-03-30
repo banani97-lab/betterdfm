@@ -12,8 +12,9 @@ import {
   type ProfileRules,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -137,11 +138,15 @@ export default function AdminProfilePage() {
   return (
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
-        <BetterDFMLogo />
+        <RapidDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">
+        <div className="col-span-3">
+          <AppBackButton href="/dashboard" label="Dashboard" />
+        </div>
+
         {/* Profile list */}
         <div className="col-span-1">
           <div className="bg-card rounded-lg border p-4">

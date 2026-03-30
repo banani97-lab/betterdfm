@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ODB++ / Gerber sidecar parser for BetterDFM (gerbonara).
+"""ODB++ / Gerber sidecar parser for RapidDFM (gerbonara).
 
 Parse pipeline (ODB++):
     parse_odb(file_path)
@@ -33,7 +33,7 @@ from parser_gerber import parse_gerber
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="BetterDFM Gerbonara Sidecar", version="0.1.0")
+app = FastAPI(title="RapidDFM Gerbonara Sidecar", version="0.1.0")
 
 
 # ── Routes ───────────────────────────────────────────────────────────────────
