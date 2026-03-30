@@ -229,7 +229,7 @@ export default function LandingPage() {
             {[
               {
                 name: 'Starter',
-                price: '$199',
+                price: '$799',
                 period: '/mo',
                 features: ['50 analyses/month', '3 users', '1 capability profile', 'PDF & CSV export'],
                 cta: 'Get Started',
@@ -237,7 +237,7 @@ export default function LandingPage() {
               },
               {
                 name: 'Professional',
-                price: '$499',
+                price: '$1,999',
                 period: '/mo',
                 features: ['250 analyses/month', '10 users', '5 capability profiles', 'Customer portal', 'Batch upload', 'Design comparison'],
                 cta: 'Get Started',
@@ -245,8 +245,8 @@ export default function LandingPage() {
               },
               {
                 name: 'Enterprise',
-                price: 'Custom',
-                period: '',
+                price: '$2,899',
+                period: '/mo',
                 features: ['Unlimited analyses', 'Unlimited users', 'Unlimited profiles', 'Everything in Pro', 'Admin dashboard', 'API access'],
                 cta: 'Contact Us',
                 highlight: false,
