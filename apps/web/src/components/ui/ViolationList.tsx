@@ -29,6 +29,8 @@ interface ViolationListProps {
   filter: SeverityFilter
   onFilterChange: (f: SeverityFilter) => void
   onIgnore?: (v: Violation, ignored: boolean) => void
+  ruleFilter?: Set<string>
+  onRuleFilterChange?: (rules: Set<string>) => void
 }
 
 const severityIcon = {
@@ -43,10 +45,12 @@ const severityBadgeVariant: Record<string, 'destructive' | 'warning' | 'info'> =
   INFO: 'info',
 }
 
-export function ViolationList({ violations, allViolations, selectedId, onSelect, filter, onFilterChange, onIgnore }: ViolationListProps) {
+export function ViolationList({ violations, allViolations, selectedId, onSelect, filter, onFilterChange, onIgnore, ruleFilter: externalRuleFilter, onRuleFilterChange }: ViolationListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const [showIgnored, setShowIgnored] = useState(false)
-  const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
+  const [internalRuleFilter, setInternalRuleFilter] = useState<Set<string>>(new Set())
+  const ruleFilter = externalRuleFilter ?? internalRuleFilter
+  const setRuleFilter = onRuleFilterChange ?? setInternalRuleFilter
 
   useEffect(() => {
     if (!selectedId || !listRef.current) return
@@ -80,11 +84,9 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
   }, [violations])
 
   const toggleRule = (ruleId: string) => {
-    setRuleFilter((prev) => {
-      const next = new Set(prev)
-      if (next.has(ruleId)) next.delete(ruleId); else next.add(ruleId)
-      return next
-    })
+    const next = new Set(ruleFilter)
+    if (next.has(ruleId)) next.delete(ruleId); else next.add(ruleId)
+    setRuleFilter(next)
   }
 
   // Apply rule filter then ignored filter

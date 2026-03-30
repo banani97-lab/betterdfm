@@ -33,6 +33,7 @@ export default function ResultsPage() {
   const [error, setError] = useState<string | null>(null)
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set())
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ERROR')
+  const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
   const [isPortraitMobile, setIsPortraitMobile] = useState(false)
   const [violationsOpen, setViolationsOpen] = useState(true)
   const [compareOpen, setCompareOpen] = useState(false)
@@ -312,7 +313,7 @@ export default function ResultsPage() {
       <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>
         <div className={cn('order-1 flex-1 min-h-0 min-w-0 overflow-hidden', collapseToBottom ? 'p-2 sm:p-3' : 'p-2 sm:p-3 md:p-4')}>
           <BoardViewer
-            violations={visibleViolations.filter((v) => !v.ignored)}
+            violations={visibleViolations.filter((v) => !v.ignored && (ruleFilter.size === 0 || ruleFilter.has(v.ruleId)))}
             boardData={boardData}
             selectedViolationId={selectedId}
             onViolationClick={(v) => setSelectedId(v?.id)}
@@ -382,6 +383,8 @@ export default function ResultsPage() {
                 onSelect={(v) => setSelectedId(prev => prev === v.id ? undefined : v.id)}
                 filter={severityFilter}
                 onFilterChange={setSeverityFilter}
+                ruleFilter={ruleFilter}
+                onRuleFilterChange={setRuleFilter}
                 onIgnore={canWrite() ? handleIgnore : undefined}
               />
             </div>
