@@ -8,7 +8,6 @@ export const THEME_STORAGE_KEY = 'rapiddfm-theme'
 export const LEGACY_THEME_STORAGE_KEY = 'betterdfm-theme'
 
 export const UI_SETTINGS_STORAGE_KEY = 'rapiddfm-ui-settings'
-export const LEGACY_UI_SETTINGS_STORAGE_KEY = 'betterdfm-ui-settings'
 
 export const TOKEN_STORAGE_KEY = 'rapiddfm_token'
 export const LEGACY_TOKEN_STORAGE_KEY = 'betterdfm_token'

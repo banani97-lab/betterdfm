@@ -7,8 +7,8 @@ import { FolderOpen, Plus, Search, X } from 'lucide-react'
 import { getProjects, createProject, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -95,12 +95,15 @@ export default function ProjectsPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Projects</h1>
-            <p className="text-sm text-muted-foreground mt-2">
-              {projects.length} project{projects.length === 1 ? '' : 's'}
-            </p>
+        <div className="mb-8 flex flex-col gap-5">
+          <AppBackButton href="/dashboard" label="Dashboard" />
+          <div className="flex flex-wrap items-end justify-between gap-4">
+            <div>
+              <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground">Projects</h1>
+              <p className="text-sm text-muted-foreground mt-2">
+                {projects.length} project{projects.length === 1 ? '' : 's'}
+              </p>
+            </div>
           </div>
         </div>
 

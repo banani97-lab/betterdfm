@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { Save, Plus, Building2, BarChart3, XCircle, AlertTriangle, Info, CheckCircle, UserPlus, Trash2 } from 'lucide-react'
 import { isAdminLoggedIn, adminApiFetch } from '@/lib/adminAuth'
 import type { Organization, User } from '@/lib/api'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -194,7 +195,7 @@ export default function AdminOrganizationsPage() {
           </div>
           <h1 className="text-xl font-semibold text-white">Organizations</h1>
         </div>
-        <a href="/admin" className="text-sm text-slate-400 hover:text-white">Back to Dashboard</a>
+        <AppBackButton href="/admin" label="Dashboard" tone="inverse" />
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-8 grid grid-cols-4 gap-6">

@@ -10,7 +10,7 @@ import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { getStoredValue, LEGACY_UI_SETTINGS_STORAGE_KEY, setStoredValue, UI_SETTINGS_STORAGE_KEY } from '@/lib/branding'
+import { UI_SETTINGS_STORAGE_KEY } from '@/lib/branding'
 import { cn } from '@/lib/utils'
 
 type BackgroundStyle = 'spotlight' | 'studio' | 'grid' | 'aurora'
@@ -111,7 +111,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     try {
-      const raw = getStoredValue(UI_SETTINGS_STORAGE_KEY, LEGACY_UI_SETTINGS_STORAGE_KEY)
+      const raw = localStorage.getItem(UI_SETTINGS_STORAGE_KEY)
       if (!raw) {
         applyBackground(DEFAULT_UI_SETTINGS.background)
         return
@@ -140,7 +140,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     applyBackground(settings.background)
-    setStoredValue(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings), LEGACY_UI_SETTINGS_STORAGE_KEY)
+    localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
   }, [settings])
 
   // Auto-refresh when any submission is ANALYZING

@@ -2,10 +2,10 @@
 
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
@@ -202,6 +202,8 @@ export default function ResultsPage() {
   const warningCount = violations.filter((v) => v.severity === 'WARNING' && !v.ignored).length
   const infoCount = violations.filter((v) => v.severity === 'INFO' && !v.ignored).length
   const collapseToBottom = isPortraitMobile
+  const backHref = currentProjectId ? `/projects/${currentProjectId}` : '/dashboard'
+  const backLabel = currentProjectId ? 'Project' : 'Dashboard'
 
   if (loading) {
     return (
@@ -216,7 +218,7 @@ export default function ResultsPage() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <AlertCircle className="h-12 w-12 text-red-400" />
         <p className="text-muted-foreground">{error}</p>
-        <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
+        <AppBackButton href={backHref} label={backLabel} />
       </div>
     )
   }
@@ -232,7 +234,8 @@ export default function ResultsPage() {
             <p className="text-xs text-muted-foreground font-mono truncate">{jobId}</p>
           </div>
         </div>
-        <div className="order-2 md:order-3 ml-auto flex items-center gap-2">
+        <div className="order-2 md:order-3 ml-auto flex flex-wrap items-center justify-end gap-2">
+          <AppBackButton href={backHref} label={backLabel} />
           {currentProjectId && <div className="relative">
             <Button variant="outline" className="h-10 px-3 md:h-11 md:px-4" onClick={() => setCompareOpen(o => !o)}>
               <GitCompareArrows className="h-4 w-4 mr-1" />Compare

@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import { AlertCircle, AlertTriangle, ArrowRight, ArrowUp, ArrowDown, Check, Info, Plus, Minus } from 'lucide-react'
 import {
   compareJobs,
@@ -12,6 +11,7 @@ import {
   type BoardData,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BoardViewer, type BoardViewerTransform } from '@/components/ui/BoardViewer'
@@ -77,6 +77,8 @@ function ComparePageInner() {
   const router = useRouter()
   const jobAId = searchParams.get('jobA') ?? ''
   const jobBId = searchParams.get('jobB') ?? ''
+  const backHref = jobAId ? `/results/${jobAId}` : '/dashboard'
+  const backLabel = jobAId ? 'Results' : 'Dashboard'
 
   const [result, setResult] = useState<ComparisonResult | null>(null)
   const [loading, setLoading] = useState(true)
@@ -167,7 +169,7 @@ function ComparePageInner() {
       <div className="flex flex-col items-center justify-center min-h-screen gap-4">
         <AlertCircle className="h-12 w-12 text-red-400" />
         <p className="text-muted-foreground">{error ?? 'No data'}</p>
-        <Link href="/dashboard"><Button variant="outline">Back to Dashboard</Button></Link>
+        <AppBackButton href={backHref} label={backLabel} />
       </div>
     )
   }
@@ -186,12 +188,10 @@ function ComparePageInner() {
     <div className="flex flex-col min-h-screen h-[100dvh] bg-background">
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="bg-card border-b px-4 py-3 md:px-6 md:py-4 flex-shrink-0">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex flex-wrap items-center gap-3 mb-3">
           <RapidDFMLogo className="shrink-0" />
           <h1 className="text-lg font-semibold text-foreground">Design Comparison</h1>
-          <Link href="/dashboard" className="ml-auto">
-            <Button variant="outline" size="sm">Back to Dashboard</Button>
-          </Link>
+          <AppBackButton href={backHref} label={backLabel} className="ml-auto shrink-0" />
         </div>
 
         {/* Comparison header: Job A → delta → Job B */}

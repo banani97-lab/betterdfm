@@ -6,7 +6,6 @@ import {
   APP_DESCRIPTION,
   APP_TITLE,
   LEGACY_THEME_STORAGE_KEY,
-  LEGACY_UI_SETTINGS_STORAGE_KEY,
   THEME_STORAGE_KEY,
   UI_SETTINGS_STORAGE_KEY,
 } from '@/lib/branding'
@@ -44,7 +43,6 @@ export default function RootLayout({
   const key = '${THEME_STORAGE_KEY}';
   const legacyKey = '${LEGACY_THEME_STORAGE_KEY}';
   const uiSettingsKey = '${UI_SETTINGS_STORAGE_KEY}';
-  const legacyUiSettingsKey = '${LEGACY_UI_SETTINGS_STORAGE_KEY}';
   const stored = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
   if (stored !== null) {
     localStorage.setItem(key, stored);
@@ -54,11 +52,7 @@ export default function RootLayout({
   const useDark = stored ? stored === 'dark' : prefersDark;
   document.documentElement.classList.toggle('dark', useDark);
   try {
-    const uiSettingsRaw = localStorage.getItem(uiSettingsKey) ?? localStorage.getItem(legacyUiSettingsKey);
-    if (uiSettingsRaw !== null) {
-      localStorage.setItem(uiSettingsKey, uiSettingsRaw);
-      localStorage.removeItem(legacyUiSettingsKey);
-    }
+    const uiSettingsRaw = localStorage.getItem(uiSettingsKey);
     const uiSettings = uiSettingsRaw ? JSON.parse(uiSettingsRaw) : null;
     const background = uiSettings?.background;
     const normalized = background === 'default' ? 'spotlight' : background;
