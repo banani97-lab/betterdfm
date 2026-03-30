@@ -1,6 +1,10 @@
 import type { Metadata } from 'next'
+import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
 
 export const metadata: Metadata = {
+  icons: {
+    icon: darkFavicon.src,
+  },
   title: 'RapidDFM — Automated PCB DFM Analysis for Contract Manufacturers',
   description:
     'Upload Gerber or ODB++ files and get instant design-for-manufacturability analysis against your shop\'s capabilities. 16 automated rule checks, scored reports, and a customer portal. Built for small to mid-tier PCB contract manufacturers.',
