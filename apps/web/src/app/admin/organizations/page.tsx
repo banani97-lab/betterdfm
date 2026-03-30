@@ -290,7 +290,7 @@ export default function AdminOrganizationsPage() {
                       className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                     >
                       <option value="STARTER">Starter ($799/mo)</option>
-                      <option value="PROFESSIONAL">Professional ($1,999/mo)</option>
+                      <option value="PROFESSIONAL">Professional ($2,499/mo)</option>
                       <option value="ENTERPRISE">Enterprise (Custom)</option>
                     </select>
                   </div>

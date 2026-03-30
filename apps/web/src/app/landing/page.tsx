@@ -252,7 +252,7 @@ export default function LandingPage() {
               },
               {
                 name: 'Professional',
-                price: '$1,999',
+                price: '$2,499',
                 period: '/mo',
                 subtitle: 'Designed for production workflows',
                 features: [
