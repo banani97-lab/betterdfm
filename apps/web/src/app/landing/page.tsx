@@ -2,6 +2,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import logoDark from '@/app/dashboard/RapidDFM Dark Mode Logo New.png'
 import { CheckCircle, Upload, Shield, Share2, BarChart3, Layers, Zap, ArrowRight } from 'lucide-react'
+import { LandingAnalytics } from './LandingAnalytics'
 
 const PORTAL_URL = 'https://portal.rapiddfm.com'
 
@@ -60,6 +61,7 @@ const FEATURES = [
 export default function LandingPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+      <LandingAnalytics />
       {/* Structured data for SEO */}
       <script
         type="application/ld+json"
@@ -97,6 +99,7 @@ export default function LandingPage() {
             <Link
               href={`${PORTAL_URL}/login`}
               className="text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+              data-track-click="nav-sign-in"
             >
               Sign In
             </Link>
@@ -105,7 +108,7 @@ export default function LandingPage() {
       </nav>
 
       {/* Hero */}
-      <section className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
+      <section data-section="hero" className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
           DFM Analysis Built for
           <br />
@@ -118,12 +121,14 @@ export default function LandingPage() {
           <Link
             href={`${PORTAL_URL}/login`}
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
+            data-track-click="hero-get-started"
           >
             Get Started <ArrowRight className="h-5 w-5" />
           </Link>
           <a
             href="#features"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl border border-white/20 hover:border-white/40 text-white font-medium text-lg transition-colors"
+            data-track-click="hero-see-how"
           >
             See How It Works
           </a>
@@ -132,7 +137,7 @@ export default function LandingPage() {
       </section>
 
       {/* Social proof strip */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
+      <section data-section="stats" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-center">
           <div>
             <div className="text-3xl font-bold text-blue-400">16</div>
@@ -154,7 +159,7 @@ export default function LandingPage() {
       </section>
 
       {/* Features */}
-      <section id="features" className="max-w-6xl mx-auto px-6 py-24">
+      <section id="features" data-section="features" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
           Everything You Need to Review PCB Designs
         </h2>
@@ -173,7 +178,7 @@ export default function LandingPage() {
       </section>
 
       {/* How it works */}
-      <section className="border-y border-white/10 bg-white/[0.02]">
+      <section data-section="how-it-works" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">How It Works</h2>
           <div className="grid sm:grid-cols-4 gap-8 text-center">
@@ -196,7 +201,7 @@ export default function LandingPage() {
       </section>
 
       {/* DFM Rules */}
-      <section id="rules" className="max-w-6xl mx-auto px-6 py-24">
+      <section id="rules" data-section="rules" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
           16 Manufacturing Rule Checks
         </h2>
@@ -217,7 +222,7 @@ export default function LandingPage() {
       </section>
 
       {/* Pricing */}
-      <section id="pricing" className="border-y border-white/10 bg-white/[0.02]">
+      <section id="pricing" data-section="pricing" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
             Simple Pricing for Every Shop Size
@@ -275,6 +280,7 @@ export default function LandingPage() {
                 </ul>
                 <Link
                   href={`${PORTAL_URL}/login`}
+                  data-track-click={`pricing-${tier.name.toLowerCase()}`}
                   className={`block text-center py-3 rounded-xl font-semibold transition-colors ${
                     tier.highlight
                       ? 'bg-blue-600 hover:bg-blue-500 text-white'
@@ -290,7 +296,7 @@ export default function LandingPage() {
       </section>
 
       {/* CTA */}
-      <section className="max-w-6xl mx-auto px-6 py-24 text-center">
+      <section data-section="cta" className="max-w-6xl mx-auto px-6 py-24 text-center">
         <h2 className="text-3xl sm:text-4xl font-bold mb-4">
           Stop Reviewing Designs Manually
         </h2>
@@ -300,6 +306,7 @@ export default function LandingPage() {
         <Link
           href={`${PORTAL_URL}/login`}
           className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
+          data-track-click="cta-start-analyzing"
         >
           Start Analyzing <ArrowRight className="h-5 w-5" />
         </Link>
