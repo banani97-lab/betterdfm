@@ -1095,12 +1095,24 @@ def parse_odb(file_path: str) -> BoardData:
                 logger.info("ODB++ eda/data: %d packages", len(eda_pkgs))
 
             components: list = []
-            for comp_file in ["top", "bot"]:
-                cp = step_root / "components" / comp_file
+            # ODB++ components can be at steps/<step>/components/{top,bot}
+            # or steps/<step>/layers/comp_+_{top,bot}/components
+            comp_search_paths = [
+                (step_root / "components" / "top", "components/top"),
+                (step_root / "components" / "bot", "components/bot"),
+            ]
+            layers_dir_tmp = step_root / "layers"
+            if layers_dir_tmp.exists():
+                for d in layers_dir_tmp.iterdir():
+                    if d.is_dir() and d.name.lower().startswith("comp"):
+                        cfile = d / "components"
+                        if cfile.exists():
+                            comp_search_paths.append((cfile, f"layers/{d.name}/components"))
+            for cp, label in comp_search_paths:
                 if cp.exists():
                     c = _parse_components(cp, units, eda_pkgs=eda_pkgs)
                     components.extend(c)
-                    logger.info("ODB++ components/%s: %d components", comp_file, len(c))
+                    logger.info("ODB++ %s: %d components", label, len(c))
 
             layers_dir = step_root / "layers"
             outline_layer_name: str | None = None
