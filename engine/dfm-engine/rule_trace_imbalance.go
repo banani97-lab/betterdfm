@@ -22,21 +22,27 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 		}
 	}
 
-	// Group pads by RefDes (only components with exactly 2 pads)
-	padsByRef := map[string][]Pad{}
+	// Group pads by RefDes + Layer. A 2-pad component may have pads on multiple
+	// layers; we check each layer independently to avoid counting 4+ pads total.
+	type refLayer struct{ ref, layer string }
+	padsByRefLayer := map[refLayer][]Pad{}
 	for _, p := range board.Pads {
 		if p.RefDes == "" || !copperLayers[p.Layer] {
 			continue
 		}
-		padsByRef[p.RefDes] = append(padsByRef[p.RefDes], p)
+		key := refLayer{p.RefDes, p.Layer}
+		padsByRefLayer[key] = append(padsByRefLayer[key], p)
 	}
 
+	// Also track which refDes we've already flagged to avoid duplicates across layers
+	flagged := map[string]bool{}
 	var violations []Violation
 
-	for refDes, pads := range padsByRef {
-		if len(pads) != 2 {
+	for key, pads := range padsByRefLayer {
+		if len(pads) != 2 || flagged[key.ref] {
 			continue
 		}
+		refDes := key.ref
 
 		w0 := connectedCopperWidth(pads[0], board.Traces, board.Polygons, copperLayers)
 		w1 := connectedCopperWidth(pads[1], board.Traces, board.Polygons, copperLayers)
@@ -55,6 +61,7 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 
 		ratio := wide / narrow
 		if ratio > maxRatio {
+			flagged[refDes] = true
 			violations = append(violations, Violation{
 				RuleID:     "trace-imbalance",
 				Severity:   "ERROR",
