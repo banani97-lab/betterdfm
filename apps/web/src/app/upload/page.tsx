@@ -116,6 +116,31 @@ function UploadPageInner() {
     setFiles([])
   }
 
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragOver(false)
+    const dropped = e.dataTransfer.files
+    if (!dropped || dropped.length === 0) return
+
+    if (dropped.length === 1 || !batchAllowed) {
+      setFile(dropped[0])
+      setFiles([])
+      return
+    }
+
+    setFile(null)
+    const capped = Array.from(dropped).slice(0, maxBatchFiles)
+    const entries: FileEntry[] = capped.map((f) => ({
+      file: f,
+      fileType: inferFileType(f.name),
+      status: 'pending' as const,
+      progress: 0,
+    }))
+    setFiles(entries)
+  }
+
   // Single-file upload (existing flow)
   const handleSingleUpload = async () => {
     if (!file) return
@@ -264,12 +289,15 @@ function UploadPageInner() {
             <div
               className={cn(
                 'relative flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer transition-colors',
-                'border-border hover:border-ring bg-muted/40'
+                dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-ring bg-muted/40'
               )}
+              onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+              onDragLeave={() => setDragOver(false)}
+              onDrop={handleDrop}
             >
               <input
                 type="file"
-                accept=".zip,.gbr,.ger,.drl,.exc"
+                accept=".zip,.tar,.tgz,.tar.gz,.gbr,.ger,.drl,.exc"
                 multiple={batchAllowed}
                 onChange={handleFilesSelected}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
