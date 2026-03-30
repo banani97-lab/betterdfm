@@ -2,7 +2,7 @@ export const APP_NAME = 'RapidDFM'
 export const COMPANY_NAME = 'Saturn Solutions'
 export const APP_TITLE = `${APP_NAME} by ${COMPANY_NAME}`
 export const ADMIN_APP_NAME = `${APP_NAME} Admin`
-export const APP_DESCRIPTION = `PCB Design-for-Manufacturability Analysis by ${COMPANY_NAME}`
+export const APP_DESCRIPTION = `PCB Design-for-Manufacturability Analysis by ${COMPANY_NAME}` // release
 
 export const THEME_STORAGE_KEY = 'rapiddfm-theme'
 export const LEGACY_THEME_STORAGE_KEY = 'betterdfm-theme'
