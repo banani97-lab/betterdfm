@@ -1,4 +1,4 @@
-# RapidDFM gerbonara sidecar
+# RapidDFM gerbonara sidecar — SHA-pinned deploy
 FROM python:3.11-slim
 
 WORKDIR /app
