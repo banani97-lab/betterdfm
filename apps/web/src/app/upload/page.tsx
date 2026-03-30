@@ -19,7 +19,7 @@ import {
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { FileUploader } from '@/components/ui/FileUploader'
 import { Button } from '@/components/ui/button'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 
 type Step = 'select' | 'uploading' | 'analyzing' | 'done' | 'error'
@@ -215,7 +215,7 @@ function UploadPageInner() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
-        <BetterDFMLogo />
+        <RapidDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Upload & Analyze</h1>
       </header>
 

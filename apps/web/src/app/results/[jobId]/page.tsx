@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
 import { BoardViewer } from '@/components/ui/BoardViewer'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 
 function scoreColor(n: number): string {
@@ -225,7 +225,7 @@ export default function ResultsPage() {
     <div className="flex flex-col min-h-screen h-[100dvh] md:h-screen bg-background">
       {/* Header */}
       <header className="bg-card border-b px-4 py-3 md:px-6 md:py-5 flex flex-wrap md:flex-nowrap items-center gap-3 md:gap-4 flex-shrink-0">
-        <BetterDFMLogo className="shrink-0" />
+        <RapidDFMLogo className="shrink-0" />
         <div className="flex items-center gap-4 flex-1 min-w-0">
           <div className="min-w-0">
             <h1 className="text-lg font-semibold text-foreground">DFM Results</h1>

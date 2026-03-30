@@ -1,10 +1,18 @@
 import type { Metadata } from 'next'
 import { ThemeInit } from '@/components/ui/ThemeInit'
+import {
+  APP_DESCRIPTION,
+  APP_TITLE,
+  LEGACY_THEME_STORAGE_KEY,
+  LEGACY_UI_SETTINGS_STORAGE_KEY,
+  THEME_STORAGE_KEY,
+  UI_SETTINGS_STORAGE_KEY,
+} from '@/lib/branding'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'BetterDFM',
-  description: 'PCB Design-for-Manufacturability Analysis',
+  title: APP_TITLE,
+  description: APP_DESCRIPTION,
 }
 
 export default function RootLayout({
@@ -18,14 +26,24 @@ export default function RootLayout({
         <script
           dangerouslySetInnerHTML={{
             __html: `(() => {
-  const key = 'betterdfm-theme';
-  const uiSettingsKey = 'betterdfm-ui-settings';
-  const stored = localStorage.getItem(key);
+  const key = '${THEME_STORAGE_KEY}';
+  const legacyKey = '${LEGACY_THEME_STORAGE_KEY}';
+  const uiSettingsKey = '${UI_SETTINGS_STORAGE_KEY}';
+  const legacyUiSettingsKey = '${LEGACY_UI_SETTINGS_STORAGE_KEY}';
+  const stored = localStorage.getItem(key) ?? localStorage.getItem(legacyKey);
+  if (stored !== null) {
+    localStorage.setItem(key, stored);
+    localStorage.removeItem(legacyKey);
+  }
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const useDark = stored ? stored === 'dark' : prefersDark;
   document.documentElement.classList.toggle('dark', useDark);
   try {
-    const uiSettingsRaw = localStorage.getItem(uiSettingsKey);
+    const uiSettingsRaw = localStorage.getItem(uiSettingsKey) ?? localStorage.getItem(legacyUiSettingsKey);
+    if (uiSettingsRaw !== null) {
+      localStorage.setItem(uiSettingsKey, uiSettingsRaw);
+      localStorage.removeItem(legacyUiSettingsKey);
+    }
     const uiSettings = uiSettingsRaw ? JSON.parse(uiSettingsRaw) : null;
     const background = uiSettings?.background;
     const normalized = background === 'default' ? 'spotlight' : background;

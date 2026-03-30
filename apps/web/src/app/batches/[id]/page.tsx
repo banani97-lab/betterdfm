@@ -7,7 +7,7 @@ import { ArrowLeft, RefreshCw, CheckCircle, XCircle, Clock, Loader2 } from 'luci
 import { getBatch, retryBatch, type BatchDetail, type BatchSubmission } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 
 function gradeColor(grade: string): string {
@@ -96,7 +96,7 @@ export default function BatchDetailPage() {
   return (
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
-        <BetterDFMLogo />
+        <RapidDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Batch Results</h1>
       </header>
 

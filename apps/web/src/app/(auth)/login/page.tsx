@@ -6,6 +6,7 @@ import { signIn, completeNewPassword, forgotPassword, resetPassword, isLoggedIn,
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { COMPANY_NAME, APP_NAME } from '@/lib/branding'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -114,8 +115,8 @@ export default function LoginPage() {
               <path d="M7 8h10M7 12h6M7 16h8" strokeLinecap="round" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white">BetterDFM</h1>
-          <p className="text-blue-300 mt-1 text-sm">PCB Design-for-Manufacturability</p>
+          <h1 className="text-3xl font-bold text-white">{APP_NAME}</h1>
+          <p className="text-blue-300 mt-1 text-sm">PCB Design-for-Manufacturability by {COMPANY_NAME}</p>
         </div>
 
         {/* Card */}

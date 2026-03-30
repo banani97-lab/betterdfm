@@ -6,10 +6,11 @@ import Link from 'next/link'
 import { AlertCircle, AlertTriangle, Cog, FolderOpen, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
 import { clearToken, canWrite, isLoggedIn } from '@/lib/auth'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
+import { getStoredValue, LEGACY_UI_SETTINGS_STORAGE_KEY, setStoredValue, UI_SETTINGS_STORAGE_KEY } from '@/lib/branding'
 import { cn } from '@/lib/utils'
 
 type BackgroundStyle = 'spotlight' | 'studio' | 'grid' | 'aurora'
@@ -19,8 +20,6 @@ interface UiSettings {
   background: BackgroundStyle
   tableDensity: TableDensity
 }
-
-const UI_SETTINGS_KEY = 'betterdfm-ui-settings'
 
 const DEFAULT_UI_SETTINGS: UiSettings = {
   background: 'studio',
@@ -112,7 +111,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     try {
-      const raw = localStorage.getItem(UI_SETTINGS_KEY)
+      const raw = getStoredValue(UI_SETTINGS_STORAGE_KEY, LEGACY_UI_SETTINGS_STORAGE_KEY)
       if (!raw) {
         applyBackground(DEFAULT_UI_SETTINGS.background)
         return
@@ -141,7 +140,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     applyBackground(settings.background)
-    localStorage.setItem(UI_SETTINGS_KEY, JSON.stringify(settings))
+    setStoredValue(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings), LEGACY_UI_SETTINGS_STORAGE_KEY)
   }, [settings])
 
   // Auto-refresh when any submission is ANALYZING
@@ -209,7 +208,7 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen">
       <header className="group/taskbar bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 md:gap-4 sticky top-0 z-30">
-        <BetterDFMLogo className="shrink-0" />
+        <RapidDFMLogo className="shrink-0" />
         <div className="flex w-full md:w-auto flex-wrap md:flex-nowrap items-center justify-end gap-2">
           <ThemeToggle className="h-11 w-11" />
 

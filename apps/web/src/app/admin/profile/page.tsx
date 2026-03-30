@@ -13,7 +13,7 @@ import {
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -137,7 +137,7 @@ export default function AdminProfilePage() {
   return (
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
-        <BetterDFMLogo />
+        <RapidDFMLogo />
         <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
       </header>
 

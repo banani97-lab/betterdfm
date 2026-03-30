@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ArrowLeft, FolderOpen, Plus, Search, X } from 'lucide-react'
 import { getProjects, createProject, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -85,7 +85,7 @@ export default function ProjectsPage() {
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 sticky top-0 z-30">
         <div className="flex items-center gap-4">
-          <BetterDFMLogo className="shrink-0" />
+          <RapidDFMLogo className="shrink-0" />
           <Link href="/dashboard">
             <Button variant="ghost" size="icon" className="h-10 w-10" aria-label="Back to dashboard">
               <ArrowLeft className="h-5 w-5" />

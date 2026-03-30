@@ -15,7 +15,7 @@ import { isLoggedIn } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BoardViewer, type BoardViewerTransform } from '@/components/ui/BoardViewer'
-import { BetterDFMLogo } from '@/components/ui/betterdfm-logo'
+import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ function ComparePageInner() {
       {/* ── Header ─────────────────────────────────────────────────── */}
       <header className="bg-card border-b px-4 py-3 md:px-6 md:py-4 flex-shrink-0">
         <div className="flex items-center gap-3 mb-3">
-          <BetterDFMLogo className="shrink-0" />
+          <RapidDFMLogo className="shrink-0" />
           <h1 className="text-lg font-semibold text-foreground">Design Comparison</h1>
           <Link href="/dashboard" className="ml-auto">
             <Button variant="outline" size="sm">Back to Dashboard</Button>

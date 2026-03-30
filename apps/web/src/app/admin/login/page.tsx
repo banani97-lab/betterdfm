@@ -6,6 +6,7 @@ import { adminSignIn, isAdminLoggedIn, isAdminDevMode } from '@/lib/adminAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ADMIN_APP_NAME, COMPANY_NAME } from '@/lib/branding'
 
 export default function AdminLoginPage() {
   const router = useRouter()
@@ -41,8 +42,8 @@ export default function AdminLoginPage() {
               <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </div>
-          <h1 className="text-3xl font-bold text-white">BetterDFM Admin</h1>
-          <p className="text-slate-400 mt-1 text-sm">Internal administration</p>
+          <h1 className="text-3xl font-bold text-white">{ADMIN_APP_NAME}</h1>
+          <p className="text-slate-400 mt-1 text-sm">Internal administration for {COMPANY_NAME}</p>
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
@@ -68,7 +69,7 @@ export default function AdminLoginPage() {
                 id="email"
                 type="email"
                 autoComplete="email"
-                placeholder="admin@betterdfm.com"
+                placeholder="admin@rapiddfm.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required

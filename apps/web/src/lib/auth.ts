@@ -1,6 +1,12 @@
-const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
+import {
+  clearStoredValue,
+  getStoredValue,
+  LEGACY_TOKEN_STORAGE_KEY,
+  setStoredValue,
+  TOKEN_STORAGE_KEY,
+} from './branding'
 
-const TOKEN_KEY = 'betterdfm_token'
+const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 
 // ── Dev mode ──────────────────────────────────────────────────────────────────
 
@@ -11,16 +17,15 @@ export function isDevMode(): boolean {
 // ── Token storage ─────────────────────────────────────────────────────────────
 
 export function getStoredToken(): string | null {
-  if (typeof window === 'undefined') return null
-  return localStorage.getItem(TOKEN_KEY)
+  return getStoredValue(TOKEN_STORAGE_KEY, LEGACY_TOKEN_STORAGE_KEY)
 }
 
 export function setStoredToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token)
+  setStoredValue(TOKEN_STORAGE_KEY, token, LEGACY_TOKEN_STORAGE_KEY)
 }
 
 export function clearToken(): void {
-  localStorage.removeItem(TOKEN_KEY)
+  clearStoredValue(TOKEN_STORAGE_KEY, LEGACY_TOKEN_STORAGE_KEY)
 }
 
 export function isTokenValid(): boolean {
