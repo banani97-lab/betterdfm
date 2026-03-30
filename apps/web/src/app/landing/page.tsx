@@ -30,7 +30,7 @@ const FEATURES = [
   {
     icon: Upload,
     title: 'Replace Manual File Inspection',
-    desc: 'Drop a Gerber or ODB++ file and get a scored DFM report in seconds. No more opening every layer in your CAM tool to eyeball trace widths and clearances.',
+    desc: 'Drop a Gerber or ODB++ file and get a scored DFM report in seconds. No more opening layers manually to inspect traces and clearances.',
   },
   {
     icon: Layers,
@@ -111,7 +111,7 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section data-section="hero" className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        <p className="text-sm font-medium text-blue-400 mb-4 tracking-wide">Designed with CAM engineers in mind</p>
+        <p className="text-sm font-medium text-blue-400 mb-4 tracking-wide">Built for real PCB manufacturing workflows</p>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
           Screen Incoming Designs
           <br />
@@ -183,7 +183,7 @@ export default function LandingPage() {
       {/* How it works */}
       <section data-section="how-it-works" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">From Upload to Customer Report in Under a Minute</h2>
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">From File Upload to Customer-Ready Report in Under a Minute</h2>
           <div className="grid sm:grid-cols-4 gap-8 text-center">
             {[
               { step: '1', title: 'Upload', desc: 'Drop Gerber or ODB++ files — no manual extraction or file prep needed' },
