@@ -42,6 +42,7 @@ export default function AdminOrganizationsPage() {
   const [statsLoading, setStatsLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])
   const [usersLoading, setUsersLoading] = useState(false)
+  const [tier, setTier] = useState('STARTER')
   const [newEmail, setNewEmail] = useState('')
   const [newRole, setNewRole] = useState<string>('ANALYST')
   const [inviting, setInviting] = useState(false)
@@ -66,6 +67,7 @@ export default function AdminOrganizationsPage() {
     setName(org.name)
     setSlug(org.slug)
     setLogoUrl(org.logoUrl || '')
+    setTier(org.subscriptionTier || 'STARTER')
     loadStats(org.id)
     loadUsers(org.id)
   }
@@ -147,7 +149,7 @@ export default function AdminOrganizationsPage() {
     try {
       const updated = await adminApiFetch<Organization>(`/admin/organizations/${selected.id}`, {
         method: 'PUT',
-        body: JSON.stringify({ name, slug, logoUrl }),
+        body: JSON.stringify({ name, slug, logoUrl, subscriptionTier: tier }),
       })
       setSelected(updated)
       await loadOrgs()
@@ -279,6 +281,18 @@ export default function AdminOrganizationsPage() {
                       placeholder="https://..."
                       className="bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
                     />
+                  </div>
+                  <div>
+                    <Label className="mb-1 block text-sm text-slate-300">Subscription Tier</Label>
+                    <select
+                      value={tier}
+                      onChange={(e) => setTier(e.target.value)}
+                      className="w-full h-10 px-3 rounded-md bg-slate-800 border border-slate-700 text-white text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                    >
+                      <option value="STARTER">Starter ($799/mo)</option>
+                      <option value="PROFESSIONAL">Professional ($1,999/mo)</option>
+                      <option value="ENTERPRISE">Enterprise ($2,899/mo)</option>
+                    </select>
                   </div>
                   <div>
                     <Label className="mb-1 block text-sm text-slate-300">Organization ID</Label>

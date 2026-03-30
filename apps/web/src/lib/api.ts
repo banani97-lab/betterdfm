@@ -39,6 +39,7 @@ export interface Organization {
   slug: string
   name: string
   logoUrl: string
+  subscriptionTier: string
   createdAt: string
 }
 
