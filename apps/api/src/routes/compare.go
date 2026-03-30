@@ -122,6 +122,9 @@ func (h *CompareHandler) Compare(c echo.Context) error {
 		completedAtB = &s
 	}
 
+	scoreDelta := jobB.MfgScore - jobA.MfgScore
+	lib.Track("Comparison Viewed", user.OrgID, map[string]any{"orgId": user.OrgID, "scoreDelta": scoreDelta})
+
 	return c.JSON(http.StatusOK, comparisonResponse{
 		JobA: comparisonJobSummary{
 			ID:          jobA.ID,
@@ -137,7 +140,7 @@ func (h *CompareHandler) Compare(c echo.Context) error {
 			Filename:    filenameB,
 			CompletedAt: completedAtB,
 		},
-		ScoreDelta: jobB.MfgScore - jobA.MfgScore,
+		ScoreDelta: scoreDelta,
 		Summary: comparisonSummary{
 			FixedCount:     len(fixed),
 			NewCount:       len(newViolations),

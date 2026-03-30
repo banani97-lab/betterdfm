@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { COMPANY_NAME, APP_NAME } from '@/lib/branding'
+import { track } from '@/lib/analytics'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -37,10 +38,13 @@ export default function LoginPage() {
       if (result.kind === 'new_password_required') {
         setNewPasswordSession(result.session)
       } else {
+        track('Session Created', { email })
         router.replace('/dashboard')
       }
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Sign in failed')
+      const message = err instanceof Error ? err.message : 'Sign in failed'
+      track('Session Failed', { email, reason: message })
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -53,6 +57,7 @@ export default function LoginPage() {
     try {
       await forgotPassword(resetEmail || email)
       if (!resetEmail) setResetEmail(email)
+      track('Password Requested')
       setForgotStep('code')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to send reset code')
@@ -71,6 +76,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await resetPassword(resetEmail, resetCode, resetNewPassword)
+      track('Password Completed')
       setResetSuccess(true)
       setTimeout(() => {
         setForgotStep('off')
@@ -80,7 +86,9 @@ export default function LoginPage() {
         setResetConfirm('')
       }, 2000)
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : 'Failed to reset password')
+      const message = err instanceof Error ? err.message : 'Failed to reset password'
+      track('Password Failed', { reason: message })
+      setError(message)
     } finally {
       setLoading(false)
     }
@@ -96,6 +104,7 @@ export default function LoginPage() {
     setLoading(true)
     try {
       await completeNewPassword(email, newPassword, newPasswordSession!)
+      track('Password Updated', { email })
       router.replace('/dashboard')
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to set new password')

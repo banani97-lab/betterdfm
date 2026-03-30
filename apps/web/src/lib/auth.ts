@@ -5,6 +5,7 @@ import {
   setStoredValue,
   TOKEN_STORAGE_KEY,
 } from './branding'
+import { identify, reset as analyticsReset } from './analytics'
 
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 
@@ -26,6 +27,7 @@ export function setStoredToken(token: string): void {
 
 export function clearToken(): void {
   clearStoredValue(TOKEN_STORAGE_KEY, LEGACY_TOKEN_STORAGE_KEY)
+  analyticsReset()
 }
 
 export function isTokenValid(): boolean {
@@ -96,6 +98,10 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   }
 
   setStoredToken(data.token)
+  try {
+    const payload = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    identify(payload.sub, { email: payload.email, orgId: payload['custom:orgId'], role: payload['custom:role'] })
+  } catch { /* ignore parse errors */ }
   return { kind: 'ok' }
 }
 

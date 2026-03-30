@@ -67,6 +67,13 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("submission not found: %w", err)
 	}
 
+	Track("Analysis Started", submission.OrgID, map[string]any{
+		"jobId":        job.ID,
+		"submissionId": submission.ID,
+		"orgId":        submission.OrgID,
+		"fileType":     submission.FileType,
+	})
+
 	// 4. Fetch capability profile
 	var profile CapabilityProfile
 	if err := w.db.First(&profile, "id = ?", job.ProfileID).Error; err != nil {
@@ -170,6 +177,18 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 		return fmt.Errorf("failed to finalize job: %w", err)
 	}
 
+	Track("Analysis Completed", submission.OrgID, map[string]any{
+		"jobId":          job.ID,
+		"submissionId":   submission.ID,
+		"orgId":          submission.OrgID,
+		"fileType":       submission.FileType,
+		"status":         "DONE",
+		"durationMs":     time.Since(now).Milliseconds(),
+		"score":          job.MfgScore,
+		"grade":          job.MfgGrade,
+		"violationCount": len(dbViolations),
+	})
+
 	// Update submission status
 	w.db.Model(&Submission{}).Where("id = ?", submission.ID).Update("status", "DONE")
 
@@ -231,6 +250,15 @@ func (w *Worker) markJobFailedWithBatch(jobID string, jobErr error) {
 	if err := w.db.First(&sub, "id = ?", job.SubmissionID).Error; err != nil {
 		return
 	}
+
+	Track("Analysis Completed", sub.OrgID, map[string]any{
+		"jobId":        job.ID,
+		"submissionId": sub.ID,
+		"orgId":        sub.OrgID,
+		"status":       "FAILED",
+		"errorMsg":     truncate(jobErr.Error(), 200),
+	})
+
 	w.updateBatchProgress(sub.BatchID, "failed")
 }
 
@@ -280,4 +308,12 @@ func sanitizeBoard(board dfmengine.BoardData, jobID string) dfmengine.BoardData 
 	}
 
 	return board
+}
+
+// truncate returns the first n characters of s, or all of s if shorter.
+func truncate(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	return s[:n]
 }

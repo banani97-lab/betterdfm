@@ -21,6 +21,7 @@ import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
+import { track } from '@/lib/analytics'
 
 type Step = 'select' | 'uploading' | 'analyzing' | 'done' | 'error'
 
@@ -117,8 +118,10 @@ function UploadPageInner() {
     try {
       const { submissionId, presignedUrl } = await createSubmission(file.name, fileType, projectId)
       await uploadToS3(presignedUrl, file, setProgress)
+      track('Submission Created', { fileType, projectId })
       setStep('analyzing')
       const newJob = await startAnalysis(submissionId, profileId || undefined)
+      track('Analysis Requested', { submissionId, profileId })
       setJob(newJob)
 
       let jobData = newJob
@@ -143,6 +146,7 @@ function UploadPageInner() {
     if (files.length === 0) return
     setStep('uploading')
     setErrorMsg('')
+    track('Batch Started', { fileCount: files.length, projectId })
     try {
       // 1. Create batch and get presigned URLs
       const batchFiles = files.map((f) => ({

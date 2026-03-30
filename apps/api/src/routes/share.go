@@ -71,6 +71,12 @@ func (h *ShareHandler) CreateShareLink(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
+	shareType := "job"
+	if req.ProjectID != nil {
+		shareType = "project"
+	}
+	lib.Track("ShareLink Created", user.OrgID, map[string]any{"orgId": user.OrgID, "shareType": shareType, "allowUpload": req.AllowUpload, "hasExpiry": req.ExpiresAt != nil})
+
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"id":          link.ID,
 		"token":       link.Token,
@@ -111,6 +117,8 @@ func (h *ShareHandler) DeactivateShareLink(c echo.Context) error {
 	if err := h.db.Model(&link).Update("active", false).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	lib.Track("ShareLink Deleted", user.OrgID, map[string]any{"orgId": user.OrgID})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":     link.ID,
@@ -210,6 +218,12 @@ func (h *ShareHandler) GetShareInfo(c echo.Context) error {
 			}
 		}
 	}
+
+	infoShareType := "job"
+	if link.ProjectID != nil {
+		infoShareType = "project"
+	}
+	lib.Track("SharePage Viewed", link.OrgID, map[string]any{"orgId": link.OrgID, "shareType": infoShareType})
 
 	return c.JSON(http.StatusOK, result)
 }
@@ -421,6 +435,8 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
+	lib.Track("SharePage Uploaded", link.OrgID, map[string]any{"orgId": link.OrgID, "fileType": req.FileType})
+
 	contentType := "application/zip"
 	presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 	if err != nil {
@@ -478,6 +494,8 @@ func (h *ShareHandler) SharedAnalyze(c echo.Context) error {
 	if err := h.aws.EnqueueJob(c.Request().Context(), job.ID); err != nil {
 		log.Printf("WARNING: SQS enqueue failed for shared analyze job %s: %v", job.ID, err)
 	}
+
+	lib.Track("SharePage Requested", link.OrgID, map[string]any{"orgId": link.OrgID, "submissionId": submissionID})
 
 	return c.JSON(http.StatusOK, map[string]string{
 		"jobId": job.ID,

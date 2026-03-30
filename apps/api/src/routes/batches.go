@@ -130,6 +130,8 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
+	lib.Track("Batch Created", user.OrgID, map[string]any{"orgId": user.OrgID, "fileCount": len(req.Files), "projectId": req.ProjectID})
+
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"batchId":     batchID,
 		"submissions": outputs,
@@ -286,6 +288,8 @@ func (h *BatchesHandler) AnalyzeBatch(c echo.Context) error {
 		}
 		jobIDs = append(jobIDs, job.ID)
 	}
+
+	lib.Track("Batch Requested", user.OrgID, map[string]any{"orgId": user.OrgID, "batchId": batchID})
 
 	return c.JSON(http.StatusCreated, map[string]interface{}{
 		"batchId": batchID,
