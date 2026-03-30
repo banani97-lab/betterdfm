@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, FolderOpen, Plus, Search, X } from 'lucide-react'
+import { FolderOpen, Plus, Search, X } from 'lucide-react'
 import { getProjects, createProject, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -84,14 +84,7 @@ export default function ProjectsPage() {
   return (
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <RapidDFMLogo className="shrink-0" />
-          <Link href="/dashboard">
-            <Button variant="ghost" size="icon" className="h-10 w-10" aria-label="Back to dashboard">
-              <ArrowLeft className="h-5 w-5" />
-            </Button>
-          </Link>
-        </div>
+        <RapidDFMLogo className="shrink-0" />
         <div className="flex items-center gap-2">
           {canWrite() && (
             <Button onClick={() => setShowCreate(true)}>

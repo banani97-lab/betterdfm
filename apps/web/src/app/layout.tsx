@@ -1,5 +1,7 @@
 import type { Metadata } from 'next'
 import { ThemeInit } from '@/components/ui/ThemeInit'
+import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
+import lightFavicon from '@/app/dashboard/RapidDFM Light Mode Favicon.png'
 import {
   APP_DESCRIPTION,
   APP_TITLE,
@@ -23,6 +25,19 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" type="image/png" href={lightFavicon.src} />
+        <link
+          rel="icon"
+          type="image/png"
+          href={lightFavicon.src}
+          media="(prefers-color-scheme: light)"
+        />
+        <link
+          rel="icon"
+          type="image/png"
+          href={darkFavicon.src}
+          media="(prefers-color-scheme: dark)"
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `(() => {
