@@ -12,6 +12,7 @@ import {
   type ProfileRules,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Input } from '@/components/ui/input'
@@ -142,6 +143,10 @@ export default function AdminProfilePage() {
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">
+        <div className="col-span-3">
+          <AppBackButton href="/dashboard" label="Dashboard" />
+        </div>
+
         {/* Profile list */}
         <div className="col-span-1">
           <div className="bg-card rounded-lg border p-4">

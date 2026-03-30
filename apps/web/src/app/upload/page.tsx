@@ -17,7 +17,7 @@ import {
   type AnalysisJob,
 } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
-import { FileUploader } from '@/components/ui/FileUploader'
+import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
@@ -51,6 +51,8 @@ function UploadPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const projectId = searchParams.get('projectId') || undefined
+  const backHref = projectId ? `/projects/${projectId}` : '/dashboard'
+  const backLabel = projectId ? 'Project' : 'Dashboard'
   // Single-file state (existing flow)
   const [file, setFile] = useState<File | null>(null)
   const [fileType, setFileType] = useState<'GERBER' | 'ODB_PLUS_PLUS'>('GERBER')
@@ -220,6 +222,10 @@ function UploadPageInner() {
       </header>
 
       <main className="max-w-2xl mx-auto px-6 py-10">
+        <div className="mb-6">
+          <AppBackButton href={backHref} label={backLabel} />
+        </div>
+
         {/* Step indicator */}
         <div className="flex items-center justify-center mb-10">
           {['Select File', 'Uploading', 'Analyzing', 'Done'].map((label, i) => (
