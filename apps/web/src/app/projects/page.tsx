@@ -9,6 +9,7 @@ import { isLoggedIn, canWrite } from '@/lib/auth'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
+import { track } from '@/lib/analytics'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -69,6 +70,7 @@ export default function ProjectsPage() {
         description: newDesc.trim() || undefined,
         customerRef: newRef.trim() || undefined,
       })
+      track('Project Created', { projectName: newName.trim() })
       setShowCreate(false)
       setNewName('')
       setNewDesc('')

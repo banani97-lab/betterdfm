@@ -195,6 +195,9 @@ func (h *ProjectsHandler) CreateProject(c echo.Context) error {
 	if err := h.db.Create(&project).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	lib.Track("Project Created", user.OrgID, map[string]any{"orgId": user.OrgID, "projectName": req.Name})
+
 	return c.JSON(http.StatusCreated, project)
 }
 
@@ -252,6 +255,9 @@ func (h *ProjectsHandler) ArchiveProject(c echo.Context) error {
 	if err := h.db.Save(&project).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	lib.Track("Project Deleted", user.OrgID, map[string]any{"orgId": user.OrgID})
+
 	return c.JSON(http.StatusOK, project)
 }
 

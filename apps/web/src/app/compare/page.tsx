@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { BoardViewer, type BoardViewerTransform } from '@/components/ui/BoardViewer'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
+import { track } from '@/lib/analytics'
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -141,6 +142,7 @@ function ComparePageInner() {
           getBoardData(jobBId).then(setBoardDataB).catch(() => {}),
         ])
         setResult(comparisonData)
+        track('Comparison Viewed', { jobAId, jobBId, scoreDelta: comparisonData.scoreDelta })
         // Default to tab with most items
         if (comparisonData.summary.newCount > 0 && comparisonData.summary.newCount >= comparisonData.summary.fixedCount) {
           setActiveTab('new')

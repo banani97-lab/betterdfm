@@ -13,6 +13,8 @@ import (
 )
 
 func main() {
+	internal.InitAnalytics()
+
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
 		dbURL = "postgres://postgres:secret@localhost:5432/betterdfm"

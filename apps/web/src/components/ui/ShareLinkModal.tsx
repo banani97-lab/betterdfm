@@ -9,6 +9,7 @@ import {
   deactivateShareLink,
   type ShareLink,
 } from '@/lib/api'
+import { track } from '@/lib/analytics'
 
 interface ShareLinkModalProps {
   /** If provided, creates project-scoped share links */
@@ -74,6 +75,7 @@ export function ShareLinkModal({ projectId, jobId, open, onClose }: ShareLinkMod
         allowUpload,
       })
       const fullUrl = `${window.location.origin}/share/${result.token}`
+      track('ShareLink Created', { projectId, allowUpload, hasExpiry: !!expiresIn })
       setNewShareUrl(fullUrl)
       setLabel('')
       setExpiresIn('7')

@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
 import { BoardViewer } from '@/components/ui/BoardViewer'
 import { cn } from '@/lib/utils'
+import { track } from '@/lib/analytics'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -74,6 +75,8 @@ export default function SharedPage() {
       try {
         const info = await getShareInfo(token)
         setShareInfo(info)
+
+        track('SharePage Viewed', { token: token.slice(0, 8), shareType: info.shareType })
 
         if (info.shareType === 'job' && info.jobId) {
           // Load job data directly
@@ -169,6 +172,7 @@ export default function SharedPage() {
       }
       // Trigger analysis AFTER S3 upload completes
       await sharedAnalyze(token, result.submissionId)
+      track('SharePage Uploaded', { fileType: uploadFileType })
       setUploadProgress(100)
       setUploadSuccess(true)
       // Refresh submissions list to show the new upload

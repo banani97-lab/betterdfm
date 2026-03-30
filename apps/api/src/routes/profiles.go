@@ -68,6 +68,9 @@ func (h *ProfilesHandler) CreateProfile(c echo.Context) error {
 	if err := h.db.Create(&profile).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	lib.Track("Profile Created", user.OrgID, map[string]any{"orgId": user.OrgID, "profileName": req.Name})
+
 	return c.JSON(http.StatusCreated, profile)
 }
 
@@ -122,6 +125,9 @@ func (h *ProfilesHandler) UpdateProfile(c echo.Context) error {
 	if err := h.db.Save(&profile).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
+
+	lib.Track("Profile Updated", user.OrgID, map[string]any{"orgId": user.OrgID, "profileName": profile.Name})
+
 	return c.JSON(http.StatusOK, profile)
 }
 
@@ -133,5 +139,8 @@ func (h *ProfilesHandler) DeleteProfile(c echo.Context) error {
 	if result.RowsAffected == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "profile not found")
 	}
+
+	lib.Track("Profile Deleted", user.OrgID, map[string]any{"orgId": user.OrgID})
+
 	return c.NoContent(http.StatusNoContent)
 }

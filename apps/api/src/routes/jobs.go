@@ -83,6 +83,8 @@ func (h *JobsHandler) UpdateViolation(c echo.Context) error {
 	sr := computeReportScore(activeViolations, board)
 	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
 
+	lib.Track("Violation Ignored", user.OrgID, map[string]any{"orgId": user.OrgID, "ruleId": v.RuleID, "severity": v.Severity, "ignored": body.Ignored})
+
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"id":       v.ID,
 		"ignored":  body.Ignored,
@@ -131,6 +133,8 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 
 	sr := computeReportScore(activeViolations, board)
 	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
+
+	lib.Track("Violation Ignored", user.OrgID, map[string]any{"orgId": user.OrgID, "layer": body.Layer, "severity": body.Severity, "bulk": true})
 
 	return c.JSON(http.StatusOK, map[string]interface{}{
 		"layer":    body.Layer,

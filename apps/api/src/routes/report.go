@@ -755,6 +755,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		jobID, dateStr,
 	)), "T", 1, "C", false, 0, "")
 
+	lib.Track("Report Exported", user.OrgID, map[string]any{"orgId": user.OrgID, "jobId": jobID, "format": "pdf"})
+
 	c.Response().Header().Set("Content-Type", "application/pdf")
 	c.Response().Header().Set("Content-Disposition",
 		`attachment; filename="dfm-report-`+jobID+`.pdf"`)

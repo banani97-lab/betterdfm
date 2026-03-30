@@ -12,6 +12,7 @@ import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationLis
 import { BoardViewer } from '@/components/ui/BoardViewer'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
+import { track } from '@/lib/analytics'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -113,6 +114,7 @@ export default function ResultsPage() {
         ])
         setJob(jobData)
         setViolations(violationsData ?? [])
+        track('Analysis Viewed', { jobId, score: jobData.mfgScore, grade: jobData.mfgGrade })
         getBoardData(jobId).then(setBoardData).catch(() => {})
         // Find the current submission's projectId for compare scoping
         getSubmissions().then(subs => {
@@ -167,6 +169,7 @@ export default function ResultsPage() {
   }, [isPortraitMobile])
 
   const downloadPDF = async () => {
+    track('Report Exported', { jobId, format: 'pdf' })
     const token = getStoredToken()
     const res = await fetch(`${API_URL}/jobs/${jobId}/report.pdf`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
@@ -182,6 +185,7 @@ export default function ResultsPage() {
   }
 
   const exportCSV = () => {
+    track('Report Exported', { jobId, format: 'csv' })
     const header = 'id,ruleId,severity,layer,x,y,message,suggestion,measuredMM,limitMM,unit,netName,refDes,x2,y2\n'
     const rows = violations
       .map((v) =>

@@ -12,31 +12,32 @@
     "coverage": "vitest run --coverage"
   },
   "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.600.0",
+    "class-variance-authority": "^0.7.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.378.0",
+    "mixpanel-browser": "^2.77.0",
     "next": "14.2.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "lucide-react": "^0.378.0",
-    "clsx": "^2.1.1",
-    "tailwind-merge": "^2.3.0",
-    "class-variance-authority": "^0.7.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.600.0"
+    "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.4.2",
+    "@testing-library/react": "^15.0.0",
+    "@testing-library/user-event": "^14.5.2",
     "@types/node": "^20.12.7",
     "@types/react": "^18.3.1",
     "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react": "^4.3.0",
+    "@vitest/coverage-v8": "^1.6.0",
     "autoprefixer": "^10.4.19",
+    "eslint": "^8.57.0",
+    "eslint-config-next": "14.2.3",
+    "jsdom": "^24.0.0",
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.3",
     "typescript": "^5.4.5",
-    "eslint": "^8.57.0",
-    "eslint-config-next": "14.2.3",
-    "vitest": "^1.6.0",
-    "@vitest/coverage-v8": "^1.6.0",
-    "jsdom": "^24.0.0",
-    "@testing-library/react": "^15.0.0",
-    "@testing-library/user-event": "^14.5.2",
-    "@testing-library/jest-dom": "^6.4.2",
-    "@vitejs/plugin-react": "^4.3.0"
+    "vitest": "^1.6.0"
   }
 }

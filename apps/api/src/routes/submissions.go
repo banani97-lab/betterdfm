@@ -128,6 +128,8 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
+	lib.Track("Submission Created", user.OrgID, map[string]any{"orgId": user.OrgID, "fileType": req.FileType, "projectId": req.ProjectID})
+
 	contentType := "application/zip"
 	presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 	if err != nil {
@@ -215,6 +217,8 @@ func (h *SubmissionsHandler) StartAnalysis(c echo.Context) error {
 	} else {
 		log.Printf("SQS enqueue succeeded for job %s", job.ID)
 	}
+
+	lib.Track("Analysis Requested", user.OrgID, map[string]any{"orgId": user.OrgID, "submissionId": submissionID, "profileId": req.ProfileID})
 
 	return c.JSON(http.StatusCreated, job)
 }

@@ -30,6 +30,9 @@ func main() {
 	adminCognitoClientID := os.Getenv("ADMIN_COGNITO_CLIENT_ID")
 	cognitoUserPoolID := os.Getenv("COGNITO_USER_POOL_ID")
 
+	// Analytics
+	lib.InitAnalytics()
+
 	// Database
 	database, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{})
 	if err != nil {

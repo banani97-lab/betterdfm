@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import { ThemeInit } from '@/components/ui/ThemeInit'
+import { AnalyticsPageView } from '@/components/ui/AnalyticsPageView'
 import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
 import lightFavicon from '@/app/dashboard/RapidDFM Light Mode Favicon.png'
 import {
@@ -67,6 +68,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeInit />
+        <AnalyticsPageView />
         {children}
       </body>
     </html>
