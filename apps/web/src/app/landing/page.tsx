@@ -3,6 +3,7 @@ import Image from 'next/image'
 import logoDark from '@/app/dashboard/RapidDFM Dark Mode Logo New.png'
 import { CheckCircle, Upload, Shield, Share2, BarChart3, Layers, Zap, ArrowRight } from 'lucide-react'
 import { LandingAnalytics } from './LandingAnalytics'
+import { ContactForm } from './ContactForm'
 
 const PORTAL_URL = 'https://portal.rapiddfm.com'
 
@@ -96,6 +97,7 @@ export default function LandingPage() {
             <a href="#features" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Features</a>
             <a href="#rules" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">DFM Rules</a>
             <a href="#pricing" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Pricing</a>
+            <a href="#contact" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Contact</a>
             <Link
               href={`${PORTAL_URL}/login`}
               className="text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
@@ -118,13 +120,13 @@ export default function LandingPage() {
           Upload Gerber or ODB++ files, check against your shop&apos;s capabilities, and share scored results with customers — in seconds, not hours.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href={`${PORTAL_URL}/login`}
+          <a
+            href="#contact"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
             data-track-click="hero-get-started"
           >
             Get Started <ArrowRight className="h-5 w-5" />
-          </Link>
+          </a>
           <a
             href="#features"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl border border-white/20 hover:border-white/40 text-white font-medium text-lg transition-colors"
@@ -278,8 +280,8 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                <Link
-                  href={`${PORTAL_URL}/login`}
+                <a
+                  href="#contact"
                   data-track-click={`pricing-${tier.name.toLowerCase()}`}
                   className={`block text-center py-3 rounded-xl font-semibold transition-colors ${
                     tier.highlight
@@ -288,28 +290,24 @@ export default function LandingPage() {
                   }`}
                 >
                   {tier.cta}
-                </Link>
+                </a>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* CTA */}
-      <section data-section="cta" className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <h2 className="text-3xl sm:text-4xl font-bold mb-4">
-          Stop Reviewing Designs Manually
-        </h2>
-        <p className="text-slate-400 max-w-lg mx-auto mb-10">
-          Join contract manufacturers who are saving hours per week with automated DFM analysis.
-        </p>
-        <Link
-          href={`${PORTAL_URL}/login`}
-          className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
-          data-track-click="cta-start-analyzing"
-        >
-          Start Analyzing <ArrowRight className="h-5 w-5" />
-        </Link>
+      {/* Contact */}
+      <section id="contact" data-section="contact" className="max-w-6xl mx-auto px-6 py-24">
+        <div className="max-w-xl mx-auto">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
+            Get in Touch
+          </h2>
+          <p className="text-slate-400 text-center mb-10">
+            Tell us about your shop and we&apos;ll show you how RapidDFM can streamline your DFM review process.
+          </p>
+          <ContactForm />
+        </div>
       </section>
 
       {/* Footer */}
@@ -322,6 +320,7 @@ export default function LandingPage() {
             <a href="#features" className="hover:text-white transition-colors">Features</a>
             <a href="#rules" className="hover:text-white transition-colors">Rules</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
+            <a href="#contact" className="hover:text-white transition-colors">Contact</a>
             <Link href={`${PORTAL_URL}/login`} className="hover:text-white transition-colors">Sign In</Link>
           </div>
         </div>

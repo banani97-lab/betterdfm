@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-cognito-identity-provider": "^3.600.0",
+    "@aws-sdk/client-ses": "^3.1019.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "lucide-react": "^0.378.0",
