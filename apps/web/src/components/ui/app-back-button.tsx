@@ -27,7 +27,7 @@ export function AppBackButton({
         'group relative inline-flex w-fit items-center gap-3 overflow-hidden rounded-full px-3 py-2 pr-4 text-left transition-all duration-200 focus-visible:outline-none focus-visible:ring-2',
         inverse
           ? 'border border-white/10 bg-white/10 text-white shadow-[0_18px_40px_-28px_rgba(15,23,42,0.75)] ring-1 ring-white/10 focus-visible:ring-orange-400/60 hover:-translate-y-0.5 hover:border-orange-400/35 hover:bg-white/14 hover:shadow-[0_22px_48px_-30px_rgba(249,115,22,0.45)]'
-          : 'border border-slate-200/80 bg-white/85 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.55)] ring-1 ring-white/60 backdrop-blur-md focus-visible:ring-sky-400/60 hover:-translate-y-0.5 hover:border-sky-300/80 hover:shadow-[0_22px_48px_-30px_rgba(14,165,233,0.55)] dark:border-white/10 dark:bg-slate-950/72 dark:ring-white/10 dark:hover:border-sky-400/40 dark:hover:bg-slate-950/88',
+          : 'border border-slate-200/80 bg-white/85 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.55)] ring-1 ring-white/60 backdrop-blur-md focus-visible:ring-sky-400/60 hover:-translate-y-0.5 hover:border-sky-300/80 hover:shadow-[0_22px_48px_-30px_rgba(14,165,233,0.55)] dark:border-white/10 dark:bg-white/5 dark:shadow-none dark:ring-white/5 dark:backdrop-blur-none dark:hover:border-sky-400/30 dark:hover:bg-white/10',
         className
       )}
       {...props}
