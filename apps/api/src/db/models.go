@@ -8,11 +8,13 @@ import (
 
 // Organization is a CM tenant
 type Organization struct {
-	ID        string    `gorm:"primaryKey" json:"id"`
-	Slug      string    `gorm:"uniqueIndex" json:"slug"`
-	Name      string    `json:"name"`
-	LogoURL   string    `json:"logoUrl"`
-	CreatedAt time.Time `json:"createdAt"`
+	ID                 string    `gorm:"primaryKey" json:"id"`
+	Slug               string    `gorm:"uniqueIndex" json:"slug"`
+	Name               string    `json:"name"`
+	LogoURL            string    `json:"logoUrl"`
+	SubscriptionTier   string    `gorm:"default:STARTER" json:"subscriptionTier"` // STARTER | PROFESSIONAL | ENTERPRISE
+	BillingCycleAnchor time.Time `json:"billingCycleAnchor"`
+	CreatedAt          time.Time `json:"createdAt"`
 }
 
 // User is linked to a Cognito sub
@@ -134,6 +136,16 @@ type ShareUpload struct {
 	UploaderName  string    `json:"uploaderName"`
 	UploaderEmail string    `json:"uploaderEmail"`
 	CreatedAt     time.Time `json:"createdAt"`
+}
+
+// UsageEvent tracks billable events per org
+type UsageEvent struct {
+	ID        string    `gorm:"primaryKey" json:"id"`
+	OrgID     string    `gorm:"index:idx_usage_org_created" json:"orgId"`
+	EventType string    `json:"eventType"` // ANALYSIS
+	RefID     string    `json:"refId"`
+	Overage   bool      `gorm:"default:false" json:"overage"`
+	CreatedAt time.Time `gorm:"index:idx_usage_org_created" json:"createdAt"`
 }
 
 // Violation is a single DFM issue found.

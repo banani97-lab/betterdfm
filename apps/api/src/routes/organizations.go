@@ -46,12 +46,13 @@ type RuleCount struct {
 }
 
 type AdminOrgHandler struct {
-	db  *gorm.DB
-	aws *lib.AWSClients
+	db    *gorm.DB
+	aws   *lib.AWSClients
+	quota *lib.QuotaService
 }
 
-func NewAdminOrgHandler(database *gorm.DB, awsClients *lib.AWSClients) *AdminOrgHandler {
-	return &AdminOrgHandler{db: database, aws: awsClients}
+func NewAdminOrgHandler(database *gorm.DB, awsClients *lib.AWSClients, quota *lib.QuotaService) *AdminOrgHandler {
+	return &AdminOrgHandler{db: database, aws: awsClients, quota: quota}
 }
 
 // ListOrganizations GET /admin/organizations
@@ -119,9 +120,10 @@ func (h *AdminOrgHandler) UpdateOrganization(c echo.Context) error {
 	}
 
 	var req struct {
-		Name    string `json:"name"`
-		Slug    string `json:"slug"`
-		LogoURL string `json:"logoUrl"`
+		Name             string `json:"name"`
+		Slug             string `json:"slug"`
+		LogoURL          string `json:"logoUrl"`
+		SubscriptionTier string `json:"subscriptionTier"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -141,6 +143,13 @@ func (h *AdminOrgHandler) UpdateOrganization(c echo.Context) error {
 	}
 	if req.LogoURL != "" {
 		updates["logo_url"] = req.LogoURL
+	}
+	if req.SubscriptionTier != "" {
+		validTiers := map[string]bool{"STARTER": true, "PROFESSIONAL": true, "ENTERPRISE": true}
+		if !validTiers[req.SubscriptionTier] {
+			return echo.NewHTTPError(http.StatusBadRequest, "subscriptionTier must be STARTER, PROFESSIONAL, or ENTERPRISE")
+		}
+		updates["subscription_tier"] = req.SubscriptionTier
 	}
 
 	if len(updates) > 0 {
@@ -331,6 +340,12 @@ func (h *AdminOrgHandler) CreateOrgUser(c echo.Context) error {
 			return echo.NewHTTPError(http.StatusNotFound, "organization not found")
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	// Check user limit for org's tier
+	check := h.quota.CheckResourceLimitWithTier(orgID, "users")
+	if !check.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"message": check.Message})
 	}
 
 	// Check no existing user with that email in org

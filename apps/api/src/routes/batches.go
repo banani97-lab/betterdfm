@@ -16,12 +16,13 @@ import (
 )
 
 type BatchesHandler struct {
-	db  *gorm.DB
-	aws *lib.AWSClients
+	db    *gorm.DB
+	aws   *lib.AWSClients
+	quota *lib.QuotaService
 }
 
-func NewBatchesHandler(database *gorm.DB, aws *lib.AWSClients) *BatchesHandler {
-	return &BatchesHandler{db: database, aws: aws}
+func NewBatchesHandler(database *gorm.DB, aws *lib.AWSClients, quota *lib.QuotaService) *BatchesHandler {
+	return &BatchesHandler{db: database, aws: aws, quota: quota}
 }
 
 const maxBatchFiles = 50
@@ -29,6 +30,13 @@ const maxBatchFiles = 50
 // CreateBatch POST /batches
 func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Check batch feature enabled for tier
+	if !h.quota.CheckFeatureEnabled(user.OrgID, "batch") {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{
+			"message": "Upgrade required: batch upload is not available on your current plan.",
+		})
+	}
 
 	var req struct {
 		ProjectID *string `json:"projectId"`
@@ -43,6 +51,14 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 	}
 	if len(req.Files) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "at least one file required")
+	}
+
+	// Check tier-specific batch file limit
+	tierLimits := lib.GetTierLimits(h.quota.GetUsageSummary(user.OrgID).Tier)
+	if len(req.Files) > tierLimits.MaxBatchFiles {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{
+			"message": fmt.Sprintf("Upgrade required: your plan allows up to %d files per batch.", tierLimits.MaxBatchFiles),
+		})
 	}
 	if len(req.Files) > maxBatchFiles {
 		return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("maximum %d files per batch", maxBatchFiles))
@@ -264,6 +280,7 @@ func (h *BatchesHandler) AnalyzeBatch(c echo.Context) error {
 	h.db.Model(&batch).Update("status", "PROCESSING")
 
 	var jobIDs []string
+	var anyOverage bool
 	for _, sub := range submissions {
 		job := db.AnalysisJob{
 			ID:           uuid.New().String(),
@@ -275,6 +292,13 @@ func (h *BatchesHandler) AnalyzeBatch(c echo.Context) error {
 		if err := h.db.Create(&job).Error; err != nil {
 			log.Printf("ERROR: failed to create job for submission %s: %v", sub.ID, err)
 			continue
+		}
+
+		// Record analysis usage
+		quotaCheck := h.quota.CheckAnalysisQuota(user.OrgID)
+		h.quota.RecordAnalysis(user.OrgID, job.ID, quotaCheck.IsOverage)
+		if quotaCheck.IsOverage {
+			anyOverage = true
 		}
 
 		// Update submission status
@@ -291,10 +315,24 @@ func (h *BatchesHandler) AnalyzeBatch(c echo.Context) error {
 
 	lib.Track("Batch Requested", user.OrgID, map[string]any{"orgId": user.OrgID, "batchId": batchID})
 
-	return c.JSON(http.StatusCreated, map[string]interface{}{
+	resp := map[string]interface{}{
 		"batchId": batchID,
 		"jobIds":  jobIDs,
-	})
+	}
+	if anyOverage {
+		quotaCheck := h.quota.CheckAnalysisQuota(user.OrgID)
+		overageCount := quotaCheck.Used - quotaCheck.Limit
+		if overageCount < 1 {
+			overageCount = 1
+		}
+		resp["quotaWarning"] = map[string]interface{}{
+			"used":         quotaCheck.Used,
+			"included":     quotaCheck.Limit,
+			"overageCount": overageCount,
+			"message":      "Additional analyses are $2 each.",
+		}
+	}
+	return c.JSON(http.StatusCreated, resp)
 }
 
 // RetryBatch POST /batches/:id/retry

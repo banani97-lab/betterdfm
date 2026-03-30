@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
 import { API_URL, getJob, getViolations, getBoardData, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -37,6 +38,7 @@ export default function ResultsPage() {
   const [compareOpen, setCompareOpen] = useState(false)
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null)
+  const { usage } = useUsage()
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -240,7 +242,7 @@ export default function ResultsPage() {
         </div>
         <div className="order-2 md:order-3 ml-auto flex flex-wrap items-center justify-end gap-2">
           <AppBackButton href={backHref} label={backLabel} />
-          {currentProjectId && <div className="relative">
+          {currentProjectId && usage?.features.compare !== false && <div className="relative">
             <Button variant="outline" className="h-10 px-3 md:h-11 md:px-4" onClick={() => setCompareOpen(o => !o)}>
               <GitCompareArrows className="h-4 w-4 mr-1" />Compare
             </Button>

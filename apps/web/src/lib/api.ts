@@ -141,6 +141,24 @@ export interface SubmissionOverview {
   generatedWith: 'ai' | 'fallback'
 }
 
+export interface UsageSummary {
+  tier: string // "STARTER" | "PROFESSIONAL" | "ENTERPRISE"
+  billingPeriodStart: string
+  billingPeriodEnd: string
+  analyses: { used: number; limit: number; overage: number }
+  users: { used: number; limit: number }
+  profiles: { used: number; limit: number }
+  projects: { used: number; limit: number }
+  shareLinks: { used: number; limit: number }
+  features: {
+    batchUpload: boolean
+    maxBatchFiles: number
+    compare: boolean
+    adminDashboard: boolean
+    customerPortal: boolean
+  }
+}
+
 // ── Fetch helper ─────────────────────────────────────────────────────────────
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
@@ -157,6 +175,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
     clearToken()
     window.location.replace('/login')
     return undefined as T
+  }
+  if (res.status === 403) {
+    const text = await res.text().catch(() => res.statusText)
+    throw new Error(text || `API ${path}: 403 Forbidden`)
   }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
@@ -547,4 +569,10 @@ export interface ComparisonResult {
 
 export async function compareJobs(jobAId: string, jobBId: string): Promise<ComparisonResult> {
   return apiFetch<ComparisonResult>(`/compare?jobA=${encodeURIComponent(jobAId)}&jobB=${encodeURIComponent(jobBId)}`)
+}
+
+// ── Usage ───────────────────────────────────────────────────────────────────
+
+export async function getUsage(): Promise<UsageSummary> {
+  return apiFetch<UsageSummary>('/usage')
 }

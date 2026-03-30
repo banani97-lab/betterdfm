@@ -12,6 +12,7 @@ import {
   type Submission,
 } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Badge } from '@/components/ui/badge'
@@ -55,6 +56,9 @@ export default function ProjectDetailPage() {
   const [editingRef, setEditingRef] = useState(false)
   const [editRef, setEditRef] = useState('')
   const [shareOpen, setShareOpen] = useState(false)
+  const { usage } = useUsage()
+  const shareAllowed = usage?.features.customerPortal !== false
+  const shareLimitReached = usage ? (usage.shareLinks.limit !== -1 && usage.shareLinks.used >= usage.shareLinks.limit) : false
 
   const fetchData = useCallback(async () => {
     try {
@@ -116,9 +120,15 @@ export default function ProjectDetailPage() {
         <div className="flex items-center gap-2">
           {canWrite() && (
             <>
-              <Button variant="outline" onClick={() => setShareOpen(true)}>
-                <Share2 className="h-4 w-4 mr-2" /> Share
-              </Button>
+              {shareAllowed && (
+                shareLimitReached ? (
+                  <p className="text-xs text-muted-foreground">Share link limit reached ({usage!.shareLinks.used}/{usage!.shareLinks.limit})</p>
+                ) : (
+                  <Button variant="outline" onClick={() => setShareOpen(true)}>
+                    <Share2 className="h-4 w-4 mr-2" /> Share
+                  </Button>
+                )
+              )}
               <Link href={`/upload?projectId=${project.id}`}>
                 <Button>
                   <Upload className="h-4 w-4 mr-2" /> Upload to Project

@@ -17,6 +17,7 @@ import {
   type AnalysisJob,
 } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -51,6 +52,7 @@ export default function UploadPage() {
 function UploadPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { usage } = useUsage()
   const projectId = searchParams.get('projectId') || undefined
   const backHref = projectId ? `/projects/${projectId}` : '/dashboard'
   const backLabel = projectId ? 'Project' : 'Dashboard'
@@ -79,20 +81,24 @@ function UploadPageInner() {
     }).catch(() => {})
   }, [router])
 
+  const batchAllowed = usage?.features.batchUpload !== false
+  const maxBatchFiles = usage?.features.maxBatchFiles ?? 50
+
   const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
     if (!selected || selected.length === 0) return
 
-    if (selected.length === 1) {
-      // Single file -- use existing flow
+    if (selected.length === 1 || !batchAllowed) {
+      // Single file -- use existing flow (or batch not allowed)
       setFile(selected[0])
       setFiles([])
       return
     }
 
-    // Multiple files -- batch flow
+    // Multiple files -- batch flow, capped by maxBatchFiles
     setFile(null)
-    const entries: FileEntry[] = Array.from(selected).map((f) => ({
+    const capped = Array.from(selected).slice(0, maxBatchFiles)
+    const entries: FileEntry[] = capped.map((f) => ({
       file: f,
       fileType: inferFileType(f.name),
       status: 'pending' as const,
@@ -264,7 +270,7 @@ function UploadPageInner() {
               <input
                 type="file"
                 accept=".zip,.gbr,.ger,.drl,.exc"
-                multiple
+                multiple={batchAllowed}
                 onChange={handleFilesSelected}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
@@ -358,6 +364,21 @@ function UploadPageInner() {
             <Button onClick={handleUpload} disabled={!hasFiles} className="w-full">
               {isBatch ? `Upload & Analyze ${files.length} Files` : 'Upload & Analyze'}
             </Button>
+
+            {usage && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground text-center">
+                  {usage.analyses.used} of {usage.analyses.limit === -1 ? 'unlimited' : usage.analyses.limit} analyses used this period
+                </p>
+                {usage.analyses.overage > 0 && (
+                  <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10">
+                    <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400 text-center">
+                      You&apos;ve exceeded your included analyses. Additional analyses are $2 each.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 

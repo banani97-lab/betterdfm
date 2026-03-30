@@ -13,12 +13,13 @@ import (
 
 // CompareHandler handles design comparison between two analysis jobs.
 type CompareHandler struct {
-	db *gorm.DB
+	db    *gorm.DB
+	quota *lib.QuotaService
 }
 
 // NewCompareHandler creates a new CompareHandler.
-func NewCompareHandler(database *gorm.DB) *CompareHandler {
-	return &CompareHandler{db: database}
+func NewCompareHandler(database *gorm.DB, quota *lib.QuotaService) *CompareHandler {
+	return &CompareHandler{db: database, quota: quota}
 }
 
 // matchThresholdMM is the maximum Euclidean distance (in mm) for two
@@ -62,6 +63,14 @@ type comparisonResponse struct {
 // Compares two analysis jobs and returns fixed, new, and unchanged violations.
 func (h *CompareHandler) Compare(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Check compare feature enabled for tier
+	if !h.quota.CheckFeatureEnabled(user.OrgID, "compare") {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{
+			"message": "Upgrade required: design comparison is not available on your current plan.",
+		})
+	}
+
 	jobAID := c.QueryParam("jobA")
 	jobBID := c.QueryParam("jobB")
 

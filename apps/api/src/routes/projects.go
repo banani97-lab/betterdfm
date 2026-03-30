@@ -12,12 +12,13 @@ import (
 )
 
 type ProjectsHandler struct {
-	db  *gorm.DB
-	aws *lib.AWSClients
+	db    *gorm.DB
+	aws   *lib.AWSClients
+	quota *lib.QuotaService
 }
 
-func NewProjectsHandler(database *gorm.DB, aws *lib.AWSClients) *ProjectsHandler {
-	return &ProjectsHandler{db: database, aws: aws}
+func NewProjectsHandler(database *gorm.DB, aws *lib.AWSClients, quota *lib.QuotaService) *ProjectsHandler {
+	return &ProjectsHandler{db: database, aws: aws, quota: quota}
 }
 
 type projectResponse struct {
@@ -167,6 +168,12 @@ func (h *ProjectsHandler) GetProject(c echo.Context) error {
 // CreateProject POST /projects
 func (h *ProjectsHandler) CreateProject(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Check resource limit
+	check := h.quota.CheckResourceLimitWithTier(user.OrgID, "projects")
+	if !check.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"message": check.Message})
+	}
 
 	var req struct {
 		Name        string `json:"name"`

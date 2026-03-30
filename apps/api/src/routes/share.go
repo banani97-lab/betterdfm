@@ -19,12 +19,13 @@ import (
 )
 
 type ShareHandler struct {
-	db  *gorm.DB
-	aws *lib.AWSClients
+	db    *gorm.DB
+	aws   *lib.AWSClients
+	quota *lib.QuotaService
 }
 
-func NewShareHandler(database *gorm.DB, aws *lib.AWSClients) *ShareHandler {
-	return &ShareHandler{db: database, aws: aws}
+func NewShareHandler(database *gorm.DB, aws *lib.AWSClients, quota *lib.QuotaService) *ShareHandler {
+	return &ShareHandler{db: database, aws: aws, quota: quota}
 }
 
 // ── Authenticated routes (CM-side) ─────────────────────────────────────────
@@ -32,6 +33,19 @@ func NewShareHandler(database *gorm.DB, aws *lib.AWSClients) *ShareHandler {
 // CreateShareLink POST /share-links
 func (h *ShareHandler) CreateShareLink(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Check share links feature enabled for tier
+	if !h.quota.CheckFeatureEnabled(user.OrgID, "share_links") {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{
+			"message": "Upgrade required: share links are not available on your current plan.",
+		})
+	}
+
+	// Check resource limit for active share links
+	check := h.quota.CheckResourceLimitWithTier(user.OrgID, "share_links")
+	if !check.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"message": check.Message})
+	}
 
 	var req struct {
 		ProjectID   *string    `json:"projectId"`

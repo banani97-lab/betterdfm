@@ -12,6 +12,7 @@ import {
   type ProfileRules,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -61,6 +62,8 @@ export default function AdminProfilePage() {
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [newName, setNewName] = useState('')
+  const { usage } = useUsage()
+  const profileLimitReached = usage ? (usage.profiles.limit !== -1 && usage.profiles.used >= usage.profiles.limit) : false
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
@@ -174,17 +177,23 @@ export default function AdminProfilePage() {
 
             {/* Create new */}
             <div className="mt-4 pt-4 border-t">
-              <p className="text-xs font-medium text-muted-foreground mb-2">New Profile</p>
-              <Input
-                placeholder="Profile name"
-                value={newName}
-                onChange={(e) => setNewName(e.target.value)}
-                className="mb-2 text-sm h-8"
-                onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-              />
-              <Button size="sm" onClick={handleCreate} disabled={creating || !newName.trim()} className="w-full">
-                <Plus className="h-3.5 w-3.5 mr-1" /> Create
-              </Button>
+              {profileLimitReached ? (
+                <p className="text-xs text-muted-foreground">Profile limit reached ({usage!.profiles.used}/{usage!.profiles.limit})</p>
+              ) : (
+                <>
+                  <p className="text-xs font-medium text-muted-foreground mb-2">New Profile</p>
+                  <Input
+                    placeholder="Profile name"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    className="mb-2 text-sm h-8"
+                    onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
+                  />
+                  <Button size="sm" onClick={handleCreate} disabled={creating || !newName.trim()} className="w-full">
+                    <Plus className="h-3.5 w-3.5 mr-1" /> Create
+                  </Button>
+                </>
+              )}
             </div>
           </div>
         </div>

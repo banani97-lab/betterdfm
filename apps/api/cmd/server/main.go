@@ -52,6 +52,7 @@ func main() {
 		&db.Violation{},
 		&db.ShareLink{},
 		&db.ShareUpload{},
+		&db.UsageEvent{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
@@ -92,17 +93,21 @@ func main() {
 	// JWT middleware for RapidDFM admins (validates audience against admin client ID)
 	adminJWTMW := lib.NewJWTMiddleware(jwtIssuer, adminCognitoClientID)
 
+	// Quota service for subscription tier enforcement
+	quotaService := lib.NewQuotaService(database)
+
 	// Route handlers
 	authHandler := routes.NewAuthHandler(database)
-	submissionsHandler := routes.NewSubmissionsHandler(database, awsClients)
-	batchesHandler := routes.NewBatchesHandler(database, awsClients)
+	submissionsHandler := routes.NewSubmissionsHandler(database, awsClients, quotaService)
+	batchesHandler := routes.NewBatchesHandler(database, awsClients, quotaService)
 	jobsHandler := routes.NewJobsHandler(database)
 	reportHandler := routes.NewReportHandler(database)
-	profilesHandler := routes.NewProfilesHandler(database)
-	compareHandler := routes.NewCompareHandler(database)
-	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients)
-	projectsHandler := routes.NewProjectsHandler(database, awsClients)
-	shareHandler := routes.NewShareHandler(database, awsClients)
+	profilesHandler := routes.NewProfilesHandler(database, quotaService)
+	compareHandler := routes.NewCompareHandler(database, quotaService)
+	adminOrgHandler := routes.NewAdminOrgHandler(database, awsClients, quotaService)
+	projectsHandler := routes.NewProjectsHandler(database, awsClients, quotaService)
+	shareHandler := routes.NewShareHandler(database, awsClients, quotaService)
+	usageHandler := routes.NewUsageHandler(quotaService)
 
 	// Auth routes (no JWT required for callback)
 	authGroup := e.Group("/auth")
@@ -124,6 +129,7 @@ func main() {
 	read.GET("/profiles", profilesHandler.ListProfiles)
 	read.GET("/profiles/:id", profilesHandler.GetProfile)
 	read.GET("/compare", compareHandler.Compare)
+	read.GET("/usage", usageHandler.GetUsage)
 
 	// Write routes — ANALYST + ADMIN only
 	write := e.Group("", jwtMW.Middleware(), lib.RequireRole("ANALYST", "ADMIN"))

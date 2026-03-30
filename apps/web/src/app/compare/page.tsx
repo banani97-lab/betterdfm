@@ -11,6 +11,8 @@ import {
   type BoardData,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
+import { UpgradeGate } from '@/components/ui/UpgradeGate'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -76,6 +78,7 @@ export default function ComparePage() {
 function ComparePageInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const { usage } = useUsage()
   const jobAId = searchParams.get('jobA') ?? ''
   const jobBId = searchParams.get('jobB') ?? ''
   const backHref = jobAId ? `/results/${jobAId}` : '/dashboard'
@@ -157,6 +160,17 @@ function ComparePageInner() {
     }
     load()
   }, [jobAId, jobBId, router])
+
+  if (usage?.features.compare === false) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
+        <UpgradeGate allowed={false} featureName="Design Comparison" tierRequired="Professional">
+          <></>
+        </UpgradeGate>
+        <AppBackButton href={backHref} label={backLabel} />
+      </div>
+    )
+  }
 
   if (loading) {
     return (

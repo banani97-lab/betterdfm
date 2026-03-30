@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { FolderOpen, Plus, Search, X } from 'lucide-react'
 import { getProjects, createProject, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
@@ -38,6 +39,8 @@ export default function ProjectsPage() {
   const [newDesc, setNewDesc] = useState('')
   const [newRef, setNewRef] = useState('')
   const [creating, setCreating] = useState(false)
+  const { usage } = useUsage()
+  const projectLimitReached = usage ? (usage.projects.limit !== -1 && usage.projects.used >= usage.projects.limit) : false
 
   const fetchProjects = useCallback(async (q?: string) => {
     try {
@@ -89,9 +92,13 @@ export default function ProjectsPage() {
         <RapidDFMLogo className="shrink-0" />
         <div className="flex items-center gap-2">
           {canWrite() && (
-            <Button onClick={() => setShowCreate(true)}>
-              <Plus className="h-4 w-4 mr-2" /> New Project
-            </Button>
+            projectLimitReached ? (
+              <p className="text-xs text-muted-foreground">Project limit reached ({usage!.projects.used}/{usage!.projects.limit}). Upgrade to create more.</p>
+            ) : (
+              <Button onClick={() => setShowCreate(true)}>
+                <Plus className="h-4 w-4 mr-2" /> New Project
+              </Button>
+            )
           )}
         </div>
       </header>
@@ -136,10 +143,13 @@ export default function ProjectsPage() {
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No projects yet</h3>
             <p className="text-sm text-muted-foreground mb-4">Create a project to organize your submissions</p>
-            {canWrite() && (
+            {canWrite() && !projectLimitReached && (
               <Button onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-2" /> Create your first project
               </Button>
+            )}
+            {canWrite() && projectLimitReached && (
+              <p className="text-xs text-muted-foreground">Project limit reached ({usage!.projects.used}/{usage!.projects.limit}). Upgrade to create more.</p>
             )}
           </div>
         ) : (

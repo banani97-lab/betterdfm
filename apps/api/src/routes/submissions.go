@@ -16,12 +16,13 @@ import (
 )
 
 type SubmissionsHandler struct {
-	db  *gorm.DB
-	aws *lib.AWSClients
+	db    *gorm.DB
+	aws   *lib.AWSClients
+	quota *lib.QuotaService
 }
 
-func NewSubmissionsHandler(database *gorm.DB, aws *lib.AWSClients) *SubmissionsHandler {
-	return &SubmissionsHandler{db: database, aws: aws}
+func NewSubmissionsHandler(database *gorm.DB, aws *lib.AWSClients, quota *lib.QuotaService) *SubmissionsHandler {
+	return &SubmissionsHandler{db: database, aws: aws, quota: quota}
 }
 
 type submissionResponse struct {
@@ -219,6 +220,28 @@ func (h *SubmissionsHandler) StartAnalysis(c echo.Context) error {
 	}
 
 	lib.Track("Analysis Requested", user.OrgID, map[string]any{"orgId": user.OrgID, "submissionId": submissionID, "profileId": req.ProfileID})
+
+	// Record analysis usage and check for overage
+	quotaCheck := h.quota.CheckAnalysisQuota(user.OrgID)
+	h.quota.RecordAnalysis(user.OrgID, job.ID, quotaCheck.IsOverage)
+
+	if quotaCheck.IsOverage {
+		overageCount := quotaCheck.Used - quotaCheck.Limit + 1
+		return c.JSON(http.StatusCreated, map[string]interface{}{
+			"id":           job.ID,
+			"orgId":        job.OrgID,
+			"submissionId": job.SubmissionID,
+			"profileId":    job.ProfileID,
+			"status":       job.Status,
+			"createdAt":    job.CreatedAt,
+			"quotaWarning": map[string]interface{}{
+				"used":         quotaCheck.Used + 1,
+				"included":     quotaCheck.Limit,
+				"overageCount": overageCount,
+				"message":      "Additional analyses are $2 each.",
+			},
+		})
+	}
 
 	return c.JSON(http.StatusCreated, job)
 }

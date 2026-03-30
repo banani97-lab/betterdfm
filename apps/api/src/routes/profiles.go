@@ -13,11 +13,12 @@ import (
 )
 
 type ProfilesHandler struct {
-	db *gorm.DB
+	db    *gorm.DB
+	quota *lib.QuotaService
 }
 
-func NewProfilesHandler(database *gorm.DB) *ProfilesHandler {
-	return &ProfilesHandler{db: database}
+func NewProfilesHandler(database *gorm.DB, quota *lib.QuotaService) *ProfilesHandler {
+	return &ProfilesHandler{db: database, quota: quota}
 }
 
 // ListProfiles GET /profiles
@@ -33,6 +34,13 @@ func (h *ProfilesHandler) ListProfiles(c echo.Context) error {
 // CreateProfile POST /profiles
 func (h *ProfilesHandler) CreateProfile(c echo.Context) error {
 	user := lib.GetUser(c)
+
+	// Check resource limit
+	check := h.quota.CheckResourceLimitWithTier(user.OrgID, "profiles")
+	if !check.Allowed {
+		return echo.NewHTTPError(http.StatusForbidden, map[string]string{"message": check.Message})
+	}
+
 	var req struct {
 		Name      string          `json:"name"`
 		IsDefault bool            `json:"isDefault"`

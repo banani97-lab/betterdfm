@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { AlertCircle, AlertTriangle, Cog, FolderOpen, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
 import { clearToken, canWrite, isLoggedIn } from '@/lib/auth'
+import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,7 @@ export default function DashboardPage() {
   const [retrying, setRetrying] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { usage } = useUsage()
 
   const fetchSubmissions = useCallback(async () => {
     try {
@@ -318,6 +320,44 @@ export default function DashboardPage() {
                 </Link>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* Usage summary */}
+        {usage && usage.analyses.limit !== -1 && (
+          <div className="mb-6">
+            {usage.analyses.overage > 0 ? (
+              <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4">
+                <p className="text-sm font-medium text-yellow-700 dark:text-yellow-400">
+                  You&apos;ve used {usage.analyses.used} of {usage.analyses.limit} included analyses. {usage.analyses.overage} additional {usage.analyses.overage === 1 ? 'analysis' : 'analyses'} at $2 each.
+                </p>
+              </div>
+            ) : usage.analyses.used >= usage.analyses.limit * 0.8 ? (
+              <div className="rounded-xl border border-border bg-card/55 p-4">
+                <p className="text-sm text-muted-foreground">
+                  You&apos;ve used {usage.analyses.used} of {usage.analyses.limit} analyses this period.
+                </p>
+                <div className="mt-2 w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-yellow-500 h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.round((usage.analyses.used / usage.analyses.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-border bg-card/55 p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <p className="text-xs text-muted-foreground">Analyses this period</p>
+                  <p className="text-xs text-muted-foreground">{usage.analyses.used} / {usage.analyses.limit}</p>
+                </div>
+                <div className="w-full bg-muted rounded-full h-2">
+                  <div
+                    className="bg-primary h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.round((usage.analyses.used / usage.analyses.limit) * 100))}%` }}
+                  />
+                </div>
+              </div>
+            )}
           </div>
         )}
 
