@@ -23,26 +23,30 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 		area  float64
 		pad   Pad
 	}
-	groups := map[string][]padInfo{}
+	type refLayer struct{ ref, layer string }
+	groups := map[refLayer][]padInfo{}
 
 	for _, pad := range board.Pads {
 		if pad.RefDes == "" || !smallPassiveClasses[pad.PackageClass] {
 			continue
 		}
 		area := pad.WidthMM * pad.HeightMM
-		groups[pad.RefDes] = append(groups[pad.RefDes], padInfo{area: area, pad: pad})
+		key := refLayer{pad.RefDes, pad.Layer}
+		groups[key] = append(groups[key], padInfo{area: area, pad: pad})
 	}
 
+	flagged := map[string]bool{}
 	var violations []Violation
-	for refDes, padInfos := range groups {
+	for key, padInfos := range groups {
 		if len(violations) >= maxViolations {
 			break
 		}
 
-		// Only check 2-pad components (typical passives: resistors, capacitors)
-		if len(padInfos) != 2 {
+		// Only check 2-pad components, deduplicate across layers
+		if len(padInfos) != 2 || flagged[key.ref] {
 			continue
 		}
+		refDes := key.ref
 
 		a1 := padInfos[0].area
 		a2 := padInfos[1].area
@@ -62,6 +66,7 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 				vPad = padInfos[1].pad
 			}
 
+			flagged[refDes] = true
 			msg, sug := msgTombstoningRisk(refDes, vPad.PackageClass, ratio)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
