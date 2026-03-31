@@ -76,3 +76,4 @@ class BoardData(BaseModel):
     warnings: list[str] = []
     polygons: list[Polygon] = []
     outlineHoles: list[list[Point]] = []  # inner cutout boundaries (slots, step-outs)
+    sourceFormat: str = ""  # "GERBER" | "ODB_PLUS_PLUS"

@@ -11,6 +11,9 @@ type FiducialRule struct{}
 func (r *FiducialRule) ID() string { return "fiducial-count" }
 
 func (r *FiducialRule) Run(board BoardData, _ ProfileRules) []Violation {
+	if board.SourceFormat == "GERBER" {
+		return nil // requires pad_usage attribute (ODB++ only)
+	}
 	count := 0
 	for _, p := range board.Pads {
 		if p.IsFiducial {

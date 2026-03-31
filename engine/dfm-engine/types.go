@@ -12,6 +12,7 @@ type BoardData struct {
 	BoardThicknessMM float64    `json:"boardThicknessMM"`
 	Warnings         []string   `json:"warnings,omitempty"`
 	Polygons         []Polygon  `json:"polygons,omitempty"`
+	SourceFormat     string     `json:"sourceFormat,omitempty"` // "GERBER" | "ODB_PLUS_PLUS"
 }
 
 type Layer struct {

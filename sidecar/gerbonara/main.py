@@ -55,8 +55,10 @@ def parse(req: ParseRequest):
     try:
         if req.fileType == "ODB_PLUS_PLUS":
             board = parse_odb(tmp_path)
+            board.sourceFormat = "ODB_PLUS_PLUS"
         else:
             board = parse_gerber(tmp_path)
+            board.sourceFormat = "GERBER"
         return board
     except Exception as e:
         logger.error("Parse failed: %s", e, exc_info=True)
