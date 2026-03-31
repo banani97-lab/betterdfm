@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import logoDark from '@/app/dashboard/RapidDFM Dark Mode Logo New.png'
-import { CheckCircle, Upload, Shield, Share2, BarChart3, Layers, Zap, ArrowRight } from 'lucide-react'
+import { ArrowRight, CircleDot } from 'lucide-react'
 import { LandingAnalytics } from './LandingAnalytics'
+import { LandingFeatures } from './LandingFeatures'
 import { ContactForm } from './ContactForm'
 
 const PORTAL_URL = 'https://portal.rapiddfm.com'
@@ -26,38 +27,6 @@ const RULES = [
   { name: 'Pad Size', desc: 'Validate pad geometry against IPC land patterns' },
 ]
 
-const FEATURES = [
-  {
-    icon: Upload,
-    title: 'Replace Manual File Inspection',
-    desc: 'Drop a Gerber or ODB++ file and get a scored DFM report in seconds. No more opening layers manually to inspect traces and clearances.',
-  },
-  {
-    icon: Layers,
-    title: 'Pinpoint Issues Instantly',
-    desc: 'Click any violation and the board viewer zooms to the exact location. Toggle layers, filter by rule, and resolve issues in minutes instead of hours.',
-  },
-  {
-    icon: Share2,
-    title: 'Eliminate Email Back-and-Forth',
-    desc: 'Send a branded share link to your customer. They see exactly what needs fixing, upload a revised design, and you track the improvement — no screenshots or phone calls.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Standardize Your DFM Output',
-    desc: 'Every design gets the same 16-rule check and a 0-100 manufacturability score. Export to PDF for a consistent, professional report — regardless of which engineer reviews it.',
-  },
-  {
-    icon: Shield,
-    title: 'Encode Your Shop Capabilities',
-    desc: 'Define manufacturing lines with your exact process limits — trace widths, drill sizes, clearances. Different profiles for FR4, HDI, flex. Your rules, applied automatically.',
-  },
-  {
-    icon: Zap,
-    title: 'Process a Week of Designs in Minutes',
-    desc: 'Upload an entire batch of incoming jobs at once. Parallel analysis with per-file tracking. Screen dozens of designs before they reach your engineering queue.',
-  },
-]
 
 export default function LandingPage() {
   return (
@@ -92,15 +61,13 @@ export default function LandingPage() {
       {/* Nav */}
       <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
-          <Image src={logoDark} alt="RapidDFM" className="h-10 w-auto" priority />
+          <a href="/" aria-label="RapidDFM home">
+            <Image src={logoDark} alt="RapidDFM" className="h-10 w-auto" priority />
+          </a>
           <div className="flex items-center gap-4">
-            <a href="#features" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Features</a>
-            <a href="#rules" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">DFM Rules</a>
-            <a href="#pricing" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Pricing</a>
-            <a href="#contact" className="text-sm text-slate-300 hover:text-white transition-colors hidden sm:block">Contact</a>
             <Link
               href={`${PORTAL_URL}/login`}
-              className="text-sm font-medium px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 transition-colors"
+              className="text-sm font-medium px-4 py-2 rounded-lg bg-[#1565c0] hover:bg-[#1976d2] transition-colors"
               data-track-click="nav-sign-in"
             >
               Sign In
@@ -111,11 +78,11 @@ export default function LandingPage() {
 
       {/* Hero */}
       <section data-section="hero" className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        <p className="text-sm font-medium text-blue-400 mb-4 tracking-wide">Built for real PCB manufacturing workflows</p>
+        <p className="text-sm font-medium text-[#4fc3f7] mb-4 tracking-wide">Built for real PCB manufacturing workflows</p>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
           Screen Incoming Designs
           <br />
-          <span className="text-blue-400">Before They Hit Your Engineers</span>
+          <span className="text-[#4fc3f7]">Before They Hit Your Engineers</span>
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
           RapidDFM replaces manual CAM review with automated manufacturability checks that run in seconds. Upload Gerber or ODB++ files, apply your shop&apos;s rules, and share results with customers — cutting first-pass review time and eliminating revision back-and-forth.
@@ -123,7 +90,7 @@ export default function LandingPage() {
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="#contact"
-            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-lg transition-colors shadow-lg shadow-blue-600/20"
+            className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-[#1565c0] hover:bg-[#1976d2] text-white font-semibold text-lg transition-colors shadow-lg shadow-[#1565c0]/20"
             data-track-click="hero-get-started"
           >
             Start Analyzing Designs <ArrowRight className="h-5 w-5" />
@@ -143,41 +110,33 @@ export default function LandingPage() {
       <section data-section="stats" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-center">
           <div>
-            <div className="text-3xl font-bold text-blue-400">16</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">16</div>
             <div className="text-sm text-slate-400">Automated Checks</div>
           </div>
           <div>
-            <div className="text-3xl font-bold text-blue-400">&lt;30s</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">&lt;30s</div>
             <div className="text-sm text-slate-400">Per Design</div>
           </div>
           <div>
-            <div className="text-3xl font-bold text-blue-400">Gerber + ODB++</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">Gerber + ODB++</div>
             <div className="text-sm text-slate-400">Native Support</div>
           </div>
           <div>
-            <div className="text-3xl font-bold text-blue-400">0-100</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">0-100</div>
             <div className="text-sm text-slate-400">Manufacturability Score</div>
           </div>
         </div>
       </section>
 
-      {/* Features */}
+      {/* Features — hover to expand */}
       <section id="features" data-section="features" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
           Cut First-Pass Review Time. Standardize DFM Across Your Team.
         </h2>
         <p className="text-slate-400 text-center max-w-2xl mx-auto mb-16">
-          Built for real PCB manufacturing workflows. Every feature replaces a manual step your engineers are doing today.
+          Every feature replaces a manual step your engineers are doing today. Hover to learn more.
         </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-8">
-          {FEATURES.map((f) => (
-            <div key={f.title} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 hover:border-blue-500/30 transition-colors">
-              <f.icon className="h-8 w-8 text-blue-400 mb-4" />
-              <h3 className="text-lg font-semibold mb-2">{f.title}</h3>
-              <p className="text-sm text-slate-400 leading-relaxed">{f.desc}</p>
-            </div>
-          ))}
-        </div>
+        <LandingFeatures />
       </section>
 
       {/* How it works */}
@@ -192,7 +151,7 @@ export default function LandingPage() {
               { step: '4', title: 'Share & Resolve', desc: 'Send results to your customer and track revisions until the design is fab-ready' },
             ].map((s) => (
               <div key={s.step}>
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-blue-600/20 text-blue-400 font-bold text-lg mb-4">
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1565c0]/20 text-[#4fc3f7] font-bold text-lg mb-4">
                   {s.step}
                 </div>
                 <h3 className="font-semibold text-lg mb-1">{s.title}</h3>
@@ -214,7 +173,7 @@ export default function LandingPage() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {RULES.map((r) => (
             <div key={r.name} className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <CheckCircle className="h-5 w-5 text-green-400 mt-0.5 shrink-0" />
+              <CircleDot className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />
               <div>
                 <div className="font-medium text-sm">{r.name}</div>
                 <div className="text-xs text-slate-500">{r.desc}</div>
@@ -292,7 +251,7 @@ export default function LandingPage() {
                 key={tier.name}
                 className={`rounded-2xl border p-8 flex flex-col ${
                   tier.highlight
-                    ? 'border-blue-500 bg-blue-600/10 ring-1 ring-blue-500/30'
+                    ? 'border-[#1565c0] bg-[#1565c0]/10 ring-1 ring-[#1565c0]/30'
                     : 'border-white/10 bg-white/[0.03]'
                 }`}
               >
@@ -308,11 +267,11 @@ export default function LandingPage() {
                     <span className="text-2xl font-bold text-slate-300">Custom Pricing</span>
                   )}
                 </div>
-                <p className="text-xs text-blue-400 mb-6">{tier.roi}</p>
+                <p className="text-xs text-[#4fc3f7] mb-6">{tier.roi}</p>
                 <ul className="flex-1 space-y-3 mb-8">
                   {tier.features.map((f) => (
                     <li key={f} className="flex items-center gap-2 text-sm text-slate-300">
-                      <CheckCircle className="h-4 w-4 text-green-400 shrink-0" />
+                      <span className="h-1.5 w-1.5 rounded-full bg-[#4fc3f7] shrink-0" />
                       {f}
                     </li>
                   ))}
@@ -322,7 +281,7 @@ export default function LandingPage() {
                   data-track-click={`pricing-${tier.name.toLowerCase()}`}
                   className={`block text-center py-3 rounded-xl font-semibold transition-colors ${
                     tier.highlight
-                      ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                      ? 'bg-[#1565c0] hover:bg-[#1976d2] text-white'
                       : 'border border-white/20 hover:border-white/40 text-white'
                   }`}
                 >
