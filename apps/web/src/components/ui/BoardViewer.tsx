@@ -514,44 +514,24 @@ function drawViolations(
       const color = SEV_COLOR[v.severity] ?? '#7090a8'
 
       if (isSelected) {
-        // Selected: pulsing ring + crosshairs + dashed line to secondary point
-        const baseR = 10
-        const t = (now % 1800) / 1800
-        const pulseR = baseR * (1.2 + Math.sin(t * Math.PI * 2) * 0.4)
-
+        // Selected: rectangle around violation location
+        const r = 12
+        ctx.save()
+        ctx.strokeStyle = color
+        ctx.lineWidth = 2
+        ctx.strokeRect(cx - r, cy - r, r * 2, r * 2)
         // Dashed line to secondary object
         if (v.x2 !== 0 || v.y2 !== 0) {
           const cx2 = tx(v.x2), cy2 = ty(v.y2)
           if (ok(cx2) && ok(cy2)) {
-            ctx.save()
             ctx.globalAlpha = 0.5
-            ctx.strokeStyle = color
             ctx.lineWidth = 1
             ctx.setLineDash([4, 3])
             ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx2, cy2); ctx.stroke()
             ctx.setLineDash([])
             ctx.beginPath(); ctx.arc(cx2, cy2, 4, 0, Math.PI * 2); ctx.stroke()
-            ctx.restore()
           }
         }
-
-        // Pulsing halo
-        ctx.save()
-        ctx.beginPath(); ctx.arc(cx, cy, pulseR, 0, Math.PI * 2)
-        ctx.strokeStyle = color + '90'; ctx.lineWidth = 1.5; ctx.stroke()
-
-        // Crosshairs
-        ctx.strokeStyle = color + 'cc'; ctx.lineWidth = 0.8
-        ctx.beginPath()
-        ctx.moveTo(cx - baseR * 2, cy); ctx.lineTo(cx - baseR * 0.8, cy)
-        ctx.moveTo(cx + baseR * 0.8, cy); ctx.lineTo(cx + baseR * 2, cy)
-        ctx.moveTo(cx, cy - baseR * 2); ctx.lineTo(cx, cy - baseR * 0.8)
-        ctx.moveTo(cx, cy + baseR * 0.8); ctx.lineTo(cx, cy + baseR * 2)
-        ctx.stroke()
-
-        // Center dot
-        ctx.fillStyle = color
-        ctx.beginPath(); ctx.arc(cx, cy, 3, 0, Math.PI * 2); ctx.fill()
         ctx.restore()
       } else {
         // Unselected: small colored dot with a thin ring — minimal footprint
@@ -762,7 +742,7 @@ export function BoardViewer({
   // Redraw whenever data/settings change
   useEffect(() => { draw() }, [draw])
 
-  // ── Center + RAF pulse for selected violation ───────────────────────────────
+  // ── Center on selected violation ─────────────────────────────────────────────
 
   useEffect(() => {
     if (!selectedViolationId) { draw(); return }
@@ -776,7 +756,6 @@ export function BoardViewer({
       const rect = canvas.getBoundingClientRect()
       const viewW = rect.width
       const viewH = rect.height
-      // Zoom in to 3x for context, or keep current zoom if already zoomed in more
       const targetZoom = Math.max(3, zoomRef.current)
       zoomRef.current = targetZoom
       panRef.current = {
@@ -786,10 +765,7 @@ export function BoardViewer({
       onTransformChange?.({ offsetX: panRef.current.x, offsetY: panRef.current.y, scale: targetZoom })
     }
 
-    let raf: number
-    const animate = () => { draw(); raf = requestAnimationFrame(animate) }
-    raf = requestAnimationFrame(animate)
-    return () => cancelAnimationFrame(raf)
+    draw()
   }, [selectedViolationId, draw])
 
   // ── Wheel — non-passive, zoom to cursor ─────────────────────────────────────
