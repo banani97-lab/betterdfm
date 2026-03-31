@@ -43,6 +43,11 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 	if profile.MinClearanceMM <= 0 {
 		return violations
 	}
+	// Gerber files lack net names — clearance checks produce excessive
+	// false positives because same-net traces can't be excluded.
+	if board.SourceFormat == "GERBER" {
+		return violations
+	}
 
 	// Compute board outline bounding box. Features more than 2 mm outside it
 	// are panel-level additions (fiducials, tooling marks, test coupons) that
