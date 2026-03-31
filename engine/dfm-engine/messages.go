@@ -53,6 +53,17 @@ func msgEdgeClearancePadBelow(measured, limit float64) (string, string) {
 		fmt.Sprintf("Move pad at least %.4f mm away from board edge.", limit)
 }
 
+func msgEdgeClearanceComponentBelow(label, refDes string, measured, limit float64) string {
+	if refDes != "" {
+		return fmt.Sprintf("%s %s is %.4f mm from board edge, below minimum %.4f mm", label, refDes, measured, limit)
+	}
+	return fmt.Sprintf("%s is %.4f mm from board edge, below minimum %.4f mm", label, measured, limit)
+}
+
+func msgEdgeClearanceDrillBelow(measured, limit, diamMM float64) string {
+	return fmt.Sprintf("Drill hole (%.2f mm) is %.4f mm from board edge, below minimum %.4f mm", diamMM, measured, limit)
+}
+
 func msgDrillToDrillBelow(measured, limit float64) (string, string) {
 	return fmt.Sprintf("Drill-to-drill clearance %.4f mm is below minimum %.4f mm", measured, limit),
 		fmt.Sprintf("Increase spacing between holes to at least %.4f mm edge-to-edge.", limit)
