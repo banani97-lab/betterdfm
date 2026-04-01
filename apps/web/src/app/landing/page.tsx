@@ -84,7 +84,7 @@ export default function LandingPage() {
             See How It Works
           </a>
         </div>
-        <p className="mt-6 text-sm text-slate-500">Works in your browser. No installation. Gerber + ODB++ native support.</p>
+        <p className="mt-6 text-sm text-slate-400">Works in your browser. No installation. Gerber + ODB++ native support.</p>
       </section>
 
       {/* Stats strip */}
@@ -204,17 +204,17 @@ export default function LandingPage() {
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
             <div className="text-4xl font-bold text-[#4fc3f7] mb-2">80%</div>
             <div className="text-sm text-slate-300 font-medium mb-2">Less first-pass review time</div>
-            <p className="text-xs text-slate-500">What used to take 45 minutes per board takes seconds. Your engineers review results, not raw files.</p>
+            <p className="text-xs text-slate-400">What used to take 45 minutes per board takes seconds. Your engineers review results, not raw files.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
             <div className="text-4xl font-bold text-[#4fc3f7] mb-2">3x</div>
             <div className="text-sm text-slate-300 font-medium mb-2">More RFQs without hiring</div>
-            <p className="text-xs text-slate-500">Screen incoming designs automatically. Your team focuses on quoting, not filtering.</p>
+            <p className="text-xs text-slate-400">Screen incoming designs automatically. Your team focuses on quoting, not filtering.</p>
           </div>
           <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
             <div className="text-4xl font-bold text-[#4fc3f7] mb-2">50%</div>
             <div className="text-sm text-slate-300 font-medium mb-2">Fewer revision cycles</div>
-            <p className="text-xs text-slate-500">Customers see every issue upfront with exact locations. Fix once, not three times.</p>
+            <p className="text-xs text-slate-400">Customers see every issue upfront with exact locations. Fix once, not three times.</p>
           </div>
         </div>
       </section>
