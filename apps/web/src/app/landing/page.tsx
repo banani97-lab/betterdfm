@@ -1,32 +1,12 @@
 import Link from 'next/link'
 import Image from 'next/image'
 import logoDark from '@/app/dashboard/RapidDFM Dark Mode Logo New.png'
-import { ArrowRight, CircleDot } from 'lucide-react'
+import { ArrowRight, X, Check } from 'lucide-react'
 import { LandingAnalytics } from './LandingAnalytics'
 import { LandingFeatures } from './LandingFeatures'
 import { ContactForm } from './ContactForm'
 
 const PORTAL_URL = 'https://portal.rapiddfm.com'
-
-const RULES = [
-  { name: 'Trace Width', desc: 'Catch underwidth traces before they cause opens' },
-  { name: 'Clearance', desc: 'Flag spacing violations that lead to shorts' },
-  { name: 'Drill Size', desc: 'Verify hole diameters match your drill inventory' },
-  { name: 'Annular Ring', desc: 'Ensure via pads meet registration tolerances' },
-  { name: 'Aspect Ratio', desc: 'Prevent drill breakage from high aspect holes' },
-  { name: 'Edge Clearance', desc: 'Avoid copper exposure at board edges after routing' },
-  { name: 'Solder Mask Dam', desc: 'Prevent solder bridging between tight-pitch pads' },
-  { name: 'Copper Sliver', desc: 'Detect thin copper features that flake during etch' },
-  { name: 'Silkscreen on Pad', desc: 'Stop ink contamination on solderable surfaces' },
-  { name: 'Drill-to-Drill', desc: 'Maintain spacing that prevents wall blowout' },
-  { name: 'Drill-to-Copper', desc: 'Protect trace integrity near drilled holes' },
-  { name: 'Trace Imbalance', desc: 'Flag thermal asymmetry that causes tombstoning' },
-  { name: 'Tombstoning Risk', desc: 'Detect uneven pads on small passives' },
-  { name: 'Package Capability', desc: 'Verify component sizes match your placement capability' },
-  { name: 'Fiducial Count', desc: 'Confirm alignment marks for pick-and-place' },
-  { name: 'Pad Size', desc: 'Validate pad geometry against IPC land patterns' },
-]
-
 
 export default function LandingPage() {
   return (
@@ -76,34 +56,35 @@ export default function LandingPage() {
         </div>
       </nav>
 
-      {/* Hero */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* HERO                                                                  */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
       <section data-section="hero" className="max-w-6xl mx-auto px-6 pt-24 pb-20 text-center">
-        <p className="text-sm font-medium text-[#4fc3f7] mb-4 tracking-wide">Built for real PCB manufacturing workflows</p>
         <h1 className="text-4xl sm:text-5xl md:text-6xl font-bold tracking-tight leading-tight">
-          Screen Incoming Designs
+          Stop Reviewing Bad Designs.
           <br />
-          <span className="text-[#4fc3f7]">Before They Hit Your Engineers</span>
+          <span className="text-[#4fc3f7]">Start Screening Them Automatically.</span>
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          RapidDFM replaces manual CAM review with automated manufacturability checks that run in seconds. Upload Gerber or ODB++ files, apply your shop&apos;s rules, and share results with customers — cutting first-pass review time and eliminating revision back-and-forth.
+          RapidDFM runs 16 manufacturability checks on every incoming Gerber and ODB++ file in under 30 seconds — before your CAM team ever opens them. Reduce first-pass review time by up to 80%, standardize quoting decisions, and eliminate revision loops with customers.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
             href="#contact"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-[#1565c0] hover:bg-[#1976d2] text-white font-semibold text-lg transition-colors shadow-lg shadow-[#1565c0]/20"
-            data-track-click="hero-get-started"
+            data-track-click="hero-get-demo"
           >
-            Start Analyzing Designs <ArrowRight className="h-5 w-5" />
+            Get a Demo <ArrowRight className="h-5 w-5" />
           </a>
           <a
-            href="#features"
+            href="#how-it-works"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl border border-white/20 hover:border-white/40 text-white font-medium text-lg transition-colors"
             data-track-click="hero-see-how"
           >
             See How It Works
           </a>
         </div>
-        <p className="mt-6 text-sm text-slate-500">Start analyzing designs in minutes — no complex setup required.</p>
+        <p className="mt-6 text-sm text-slate-500">Works in your browser. No installation. Gerber + ODB++ native support.</p>
       </section>
 
       {/* Stats strip */}
@@ -111,15 +92,15 @@ export default function LandingPage() {
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-center">
           <div>
             <div className="text-3xl font-bold text-[#4fc3f7]">16</div>
-            <div className="text-sm text-slate-400">Automated Checks</div>
+            <div className="text-sm text-slate-400">Automated DFM Checks</div>
           </div>
           <div>
             <div className="text-3xl font-bold text-[#4fc3f7]">&lt;30s</div>
             <div className="text-sm text-slate-400">Per Design</div>
           </div>
           <div>
-            <div className="text-3xl font-bold text-[#4fc3f7]">Gerber + ODB++</div>
-            <div className="text-sm text-slate-400">Native Support</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">80%</div>
+            <div className="text-sm text-slate-400">Less Manual Review</div>
           </div>
           <div>
             <div className="text-3xl font-bold text-[#4fc3f7]">0-100</div>
@@ -128,102 +109,159 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Features — hover to expand */}
-      <section id="features" data-section="features" className="max-w-6xl mx-auto px-6 py-24">
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* PROBLEM                                                               */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <section data-section="problem" className="max-w-6xl mx-auto px-6 py-24">
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-          Cut First-Pass Review Time. Standardize DFM Across Your Team.
+          Your CAM Team Shouldn&apos;t Be a Filter
         </h2>
         <p className="text-slate-400 text-center max-w-2xl mx-auto mb-16">
-          Every feature replaces a manual step your engineers are doing today. Hover to learn more.
+          Every board that hits your inbox costs engineering time — whether it&apos;s manufacturable or not.
         </p>
-        <LandingFeatures />
-      </section>
-
-      {/* How it works */}
-      <section data-section="how-it-works" className="border-y border-white/10 bg-white/[0.02]">
-        <div className="max-w-6xl mx-auto px-6 py-24">
-          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">From File Upload to Customer-Ready Report in Under a Minute</h2>
-          <div className="grid sm:grid-cols-4 gap-8 text-center">
-            {[
-              { step: '1', title: 'Upload', desc: 'Drop Gerber or ODB++ files — no manual extraction or file prep needed' },
-              { step: '2', title: 'Apply Rules', desc: 'Your manufacturing limits are checked automatically against the design' },
-              { step: '3', title: 'Review Results', desc: 'See every violation scored, mapped to the board, and ready to act on' },
-              { step: '4', title: 'Share & Resolve', desc: 'Send results to your customer and track revisions until the design is fab-ready' },
-            ].map((s) => (
-              <div key={s.step}>
-                <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1565c0]/20 text-[#4fc3f7] font-bold text-lg mb-4">
-                  {s.step}
-                </div>
-                <h3 className="font-semibold text-lg mb-1">{s.title}</h3>
-                <p className="text-sm text-slate-400">{s.desc}</p>
-              </div>
-            ))}
+        <div className="grid sm:grid-cols-2 gap-8 max-w-4xl mx-auto">
+          <div className="rounded-2xl border border-red-500/20 bg-red-500/5 p-6">
+            <h3 className="text-lg font-semibold text-red-400 mb-4">The reality today</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              <li className="flex gap-3"><X className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />Engineers spend 30-60 minutes per board opening layers, checking clearances, measuring traces — manually.</li>
+              <li className="flex gap-3"><X className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />Two engineers review the same file and flag different issues. No consistency between shifts.</li>
+              <li className="flex gap-3"><X className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />You email the customer a list of problems. They fix two, break three more. Repeat for a week.</li>
+              <li className="flex gap-3"><X className="h-4 w-4 text-red-400 mt-0.5 shrink-0" />RFQs pile up while your best engineers are stuck babysitting revision cycles.</li>
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-[#1565c0]/30 bg-[#1565c0]/5 p-6">
+            <h3 className="text-lg font-semibold text-[#4fc3f7] mb-4">With RapidDFM</h3>
+            <ul className="space-y-3 text-sm text-slate-300">
+              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Every incoming design gets the same 16 checks in under 30 seconds. Before anyone opens a CAM tool.</li>
+              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Same rules, same thresholds, same results — regardless of who&apos;s working. Day shift or night shift.</li>
+              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Send your customer a link. They see every violation, upload a fix, and you track the improvement. No emails.</li>
+              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Process more RFQs with the same team. Your engineers focus on engineering, not file screening.</li>
+            </ul>
           </div>
         </div>
       </section>
 
-      {/* DFM Rules */}
-      <section id="rules" data-section="rules" className="max-w-6xl mx-auto px-6 py-24">
-        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-          16 Checks Your Engineers Run Manually. Automated.
-        </h2>
-        <p className="text-slate-400 text-center max-w-2xl mx-auto mb-16">
-          Every design gets the same checks, every time, regardless of who reviews it. No more missed issues from rushed reviews or inconsistent standards between shifts.
-        </p>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {RULES.map((r) => (
-            <div key={r.name} className="flex items-start gap-3 rounded-xl border border-white/10 bg-white/[0.03] p-4">
-              <CircleDot className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />
-              <div>
-                <div className="font-medium text-sm">{r.name}</div>
-                <div className="text-xs text-slate-500">{r.desc}</div>
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* SOLUTION                                                              */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <section data-section="solution" className="border-y border-white/10 bg-white/[0.02]">
+        <div className="max-w-6xl mx-auto px-6 py-24 text-center">
+          <h2 className="text-3xl sm:text-4xl font-bold mb-4">
+            Automatically Screen Every Design in Seconds
+          </h2>
+          <p className="text-slate-400 max-w-2xl mx-auto mb-6">
+            Upload a file. Get a scored manufacturability report. Share it with your customer. Done.
+          </p>
+          <p className="text-slate-500 max-w-xl mx-auto text-sm">
+            RapidDFM applies your shop&apos;s capability limits — trace widths, clearances, drill sizes, annular rings, solder mask dams, and 11 more checks — against every incoming design. No setup per job. No inconsistency between reviewers. Just upload and know.
+          </p>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* HOW IT WORKS                                                          */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="how-it-works" data-section="how-it-works" className="max-w-6xl mx-auto px-6 py-24">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">How It Works</h2>
+        <div className="grid sm:grid-cols-4 gap-8 text-center">
+          {[
+            { step: '1', title: 'Upload', desc: 'Drop a Gerber ZIP or ODB++ archive. No file prep, no extraction.' },
+            { step: '2', title: 'Apply Your Rules', desc: 'Select a capability profile that matches your process line.' },
+            { step: '3', title: 'Instant Analysis', desc: '16 DFM checks run in under 30 seconds. Every violation scored and mapped.' },
+            { step: '4', title: 'Review & Share', desc: 'Send a branded report link to your customer. Track revisions until it\'s fab-ready.' },
+          ].map((s) => (
+            <div key={s.step}>
+              <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-[#1565c0]/20 text-[#4fc3f7] font-bold text-lg mb-4">
+                {s.step}
               </div>
+              <h3 className="font-semibold text-lg mb-1">{s.title}</h3>
+              <p className="text-sm text-slate-400">{s.desc}</p>
             </div>
           ))}
         </div>
       </section>
 
-      {/* Pricing */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* FEATURES (outcome-grouped, hover to expand)                           */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <section id="features" data-section="features" className="border-y border-white/10 bg-white/[0.02]">
+        <div className="max-w-6xl mx-auto px-6 py-24">
+          <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">
+            What It Does For Your Shop
+          </h2>
+          <LandingFeatures />
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* ROI                                                                   */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      <section data-section="roi" className="max-w-6xl mx-auto px-6 py-24">
+        <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">
+          The Math Is Simple
+        </h2>
+        <div className="grid sm:grid-cols-3 gap-8 max-w-4xl mx-auto text-center">
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
+            <div className="text-4xl font-bold text-[#4fc3f7] mb-2">80%</div>
+            <div className="text-sm text-slate-300 font-medium mb-2">Less first-pass review time</div>
+            <p className="text-xs text-slate-500">What used to take 45 minutes per board takes seconds. Your engineers review results, not raw files.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
+            <div className="text-4xl font-bold text-[#4fc3f7] mb-2">3x</div>
+            <div className="text-sm text-slate-300 font-medium mb-2">More RFQs without hiring</div>
+            <p className="text-xs text-slate-500">Screen incoming designs automatically. Your team focuses on quoting, not filtering.</p>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-8">
+            <div className="text-4xl font-bold text-[#4fc3f7] mb-2">50%</div>
+            <div className="text-sm text-slate-300 font-medium mb-2">Fewer revision cycles</div>
+            <p className="text-xs text-slate-500">Customers see every issue upfront with exact locations. Fix once, not three times.</p>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* PRICING                                                               */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
       <section id="pricing" data-section="pricing" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-24">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-            Pricing That Scales With Your Shop
+            Costs Less Than a Single Engineer Hour Per Day
           </h2>
           <p className="text-slate-400 text-center max-w-xl mx-auto mb-16">
-            Model your manufacturing capabilities and catch issues before they reach the shop floor.
+            Every plan pays for itself in the first week of use.
           </p>
           <div className="grid sm:grid-cols-3 gap-8 max-w-4xl mx-auto">
             {[
               {
-                name: 'Starter',
+                name: 'Pilot',
                 price: '$799',
                 period: '/mo',
-                subtitle: 'Evaluate and validate before full adoption',
+                subtitle: 'Prove the value. Minimal risk.',
                 features: [
                   'Up to 30 design analyses per month',
                   'Unlimited team access',
-                  '1 manufacturing line (capability profile)',
+                  '1 manufacturing line',
                   'PDF & CSV export',
                   'Interactive board viewer',
                 ],
-                roi: 'Ideal for single-process shops or initial evaluation',
-                cta: 'Get Started',
+                roi: 'Perfect for evaluating on real production jobs',
+                cta: 'Start Pilot',
                 highlight: false,
               },
               {
-                name: 'Professional',
+                name: 'Production',
                 price: '$2,499',
                 period: '/mo',
-                subtitle: 'Automate first-pass DFM and reduce manual CAM review time',
+                subtitle: 'Your core DFM workflow. Automated.',
                 features: [
                   'Up to 250 design analyses per month',
                   'Unlimited team access',
-                  'Up to 5 manufacturing lines (capability profiles)',
+                  'Up to 5 manufacturing lines',
                   'Customer portal with branded share links',
                   'Bulk design processing',
-                  'Revision-to-revision manufacturability tracking',
+                  'Revision-to-revision tracking',
                 ],
-                roi: 'Replace manual first-pass review across your production lines',
+                roi: 'Replace manual first-pass review across all your lines',
                 cta: 'Get Started',
                 highlight: true,
               },
@@ -231,18 +269,18 @@ export default function LandingPage() {
                 name: 'Enterprise',
                 price: '',
                 period: '',
-                subtitle: 'Automatically screen incoming jobs before they reach your engineering team',
+                subtitle: 'Full automation. Intake to approval.',
                 features: [
-                  'Scaled for continuous intake workflows',
+                  'Unlimited analyses',
                   'Unlimited team access',
                   'Custom manufacturing lines',
-                  'Everything in Professional',
-                  'API access & automated intake',
+                  'Everything in Production',
+                  'API access for automated intake',
                   'Admin dashboard & analytics',
                   'Priority processing',
                   'Dedicated onboarding',
                 ],
-                roi: 'Built for multi-site operations and automated job intake',
+                roi: 'For high-volume shops and multi-site operations',
                 cta: 'Talk to Sales',
                 highlight: false,
               },
@@ -293,14 +331,16 @@ export default function LandingPage() {
         </div>
       </section>
 
-      {/* Contact */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
+      {/* FINAL CTA                                                             */}
+      {/* ═══════════════════════════════════════════════════════════════════════ */}
       <section id="contact" data-section="contact" className="max-w-6xl mx-auto px-6 py-24">
         <div className="max-w-xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-bold text-center mb-4">
-            See It On Your Own Designs
+            Stop Reviewing. Start Screening.
           </h2>
           <p className="text-slate-400 text-center mb-10">
-            Tell us about your shop and we&apos;ll walk you through RapidDFM with your own board files. No generic demos — we&apos;ll show you what it catches on designs you&apos;ve already built.
+            Send us a board file you&apos;ve already reviewed. We&apos;ll run it through RapidDFM and show you what it catches — on your own designs, not a canned demo.
           </p>
           <ContactForm />
         </div>
@@ -313,8 +353,8 @@ export default function LandingPage() {
             &copy; {new Date().getFullYear()} Saturn Solutions. All rights reserved.
           </div>
           <div className="flex items-center gap-6 text-sm text-slate-500">
+            <a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a>
             <a href="#features" className="hover:text-white transition-colors">Features</a>
-            <a href="#rules" className="hover:text-white transition-colors">Rules</a>
             <a href="#pricing" className="hover:text-white transition-colors">Pricing</a>
             <a href="#contact" className="hover:text-white transition-colors">Contact</a>
             <Link href={`${PORTAL_URL}/login`} className="hover:text-white transition-colors">Sign In</Link>

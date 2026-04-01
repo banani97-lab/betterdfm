@@ -1,40 +1,30 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, Shield, Share2, BarChart3, Layers, Zap } from 'lucide-react'
+import { Search, Eye, Shield, Share2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
 
-const FEATURES = [
+const FEATURE_GROUPS = [
   {
-    icon: Upload,
-    title: 'Replace Manual File Inspection',
-    desc: 'Drop a Gerber or ODB++ file and get a scored DFM report in seconds. No more opening layers manually to inspect traces and clearances.',
+    icon: Search,
+    title: 'Catch Issues Early',
+    desc: 'Trace width, clearance, annular ring, drill size, solder mask dam, edge clearance, aspect ratio — 16 checks that catch fab-killing issues before your engineers open a CAM tool.',
   },
   {
-    icon: Layers,
-    title: 'Pinpoint Issues Instantly',
-    desc: 'Click any violation and the board viewer zooms to the exact location. Toggle layers, filter by rule, and resolve issues in minutes instead of hours.',
-  },
-  {
-    icon: Share2,
-    title: 'Eliminate Email Back-and-Forth',
-    desc: 'Send a branded share link to your customer. They see exactly what needs fixing, upload a revised design, and you track the improvement — no screenshots or phone calls.',
-  },
-  {
-    icon: BarChart3,
-    title: 'Standardize Your DFM Output',
-    desc: 'Every design gets the same 16-rule check and a 0-100 manufacturability score. Export to PDF for a consistent, professional report — regardless of which engineer reviews it.',
+    icon: Eye,
+    title: 'See Exactly What\u2019s Wrong',
+    desc: 'Every violation is mapped to the exact board location. Click to zoom in. Toggle layers. Filter by rule or severity. Resolve issues in minutes, not hours of manual layer inspection.',
   },
   {
     icon: Shield,
-    title: 'Encode Your Shop Capabilities',
-    desc: 'Define manufacturing lines with your exact process limits — trace widths, drill sizes, clearances. Different profiles for FR4, HDI, flex. Your rules, applied automatically.',
+    title: 'Standardize Your Process',
+    desc: 'Define capability profiles with your exact manufacturing limits. Different profiles for different lines. Every design gets the same checks — day shift or night shift, junior or senior.',
   },
   {
-    icon: Zap,
-    title: 'Process a Week of Designs in Minutes',
-    desc: 'Upload an entire batch of incoming jobs at once. Parallel analysis with per-file tracking. Screen dozens of designs before they reach your engineering queue.',
+    icon: Share2,
+    title: 'Communicate Clearly',
+    desc: 'Send your customer a branded link with every violation highlighted. They upload a revision, you track the score improvement. No more email threads with annotated screenshots.',
   },
 ]
 
@@ -42,8 +32,8 @@ export function LandingFeatures() {
   const [expanded, setExpanded] = useState<number | null>(null)
 
   return (
-    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-      {FEATURES.map((f, i) => {
+    <div className="grid sm:grid-cols-2 gap-5 max-w-4xl mx-auto">
+      {FEATURE_GROUPS.map((f, i) => {
         const isOpen = expanded === i
         return (
           <div

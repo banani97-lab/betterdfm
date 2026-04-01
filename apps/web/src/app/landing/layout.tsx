@@ -5,9 +5,9 @@ export const metadata: Metadata = {
   icons: {
     icon: darkFavicon.src,
   },
-  title: 'RapidDFM — Automated PCB DFM Analysis for Contract Manufacturers',
+  title: 'RapidDFM — Screen PCB Designs Automatically Before They Hit Your Engineers',
   description:
-    'Upload Gerber or ODB++ files and get instant design-for-manufacturability analysis against your shop\'s capabilities. 16 automated rule checks, scored reports, and a customer portal. Built for small to mid-tier PCB contract manufacturers.',
+    'Automated DFM screening for PCB contract manufacturers. Upload Gerber or ODB++ files, run 16 manufacturability checks in under 30 seconds, and share results with customers. Reduce manual CAM review time by up to 80%.',
   keywords: [
     'DFM', 'DFM analysis', 'PCB DFM', 'design for manufacturability',
     'Gerber analysis', 'ODB++ analysis', 'PCB manufacturing',
@@ -17,16 +17,16 @@ export const metadata: Metadata = {
     'RapidDFM', 'Saturn Solutions',
   ],
   openGraph: {
-    title: 'RapidDFM — Automated PCB DFM Analysis',
-    description: 'Instant design-for-manufacturability checks for PCB contract manufacturers. Upload, analyze, share results with customers.',
+    title: 'RapidDFM — Automated DFM Screening for PCB Shops',
+    description: 'Stop reviewing bad designs. Start screening them automatically. 16 DFM checks in under 30 seconds.',
     url: 'https://www.rapiddfm.com',
     siteName: 'RapidDFM',
     type: 'website',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'RapidDFM — Automated PCB DFM Analysis',
-    description: 'Instant design-for-manufacturability checks for PCB contract manufacturers.',
+    title: 'RapidDFM — Automated DFM Screening for PCB Shops',
+    description: 'Stop reviewing bad designs. Start screening them automatically.',
   },
   alternates: {
     canonical: 'https://www.rapiddfm.com',
