@@ -937,27 +937,39 @@ def _parse_components(
     return components
 
 
+# Max pad-to-center distance by package class (mm).
+# Derived from standard body sizes + pad overhang.
+_PACKAGE_TOLERANCE: dict[str, float] = {
+    "01005": 0.5, "0201": 0.6, "0402": 0.8, "0603": 1.2,
+    "0805": 1.5, "1206": 2.2, "1210": 2.2, "1812": 3.0,
+    "2010": 3.5, "2512": 4.0,
+}
+_DEFAULT_TOLERANCE = 3.0  # fallback for unclassified components
+
+
 class _RefdesIndex:
     """Grid-based spatial index for fast component/refdes lookups."""
 
     __slots__ = ("_grid", "_cell_size")
 
-    def __init__(self, components: list, cell_size: float = 6.0) -> None:
-        # cell_size=6.0 is 2x the default tolerance of 3.0mm
+    def __init__(self, components: list, cell_size: float = 10.0) -> None:
         self._cell_size = cell_size
         self._grid: dict[tuple[int, int], list[tuple[float, float, str, str]]] = {}
         for cx, cy, refdes, part_name in components:
             key = (int(math.floor(cx / cell_size)), int(math.floor(cy / cell_size)))
             self._grid.setdefault(key, []).append((cx, cy, refdes, part_name))
 
-    def lookup(self, x: float, y: float, tol: float = 3.0) -> tuple[str, str]:
-        """Return (refdes, packageClass) for nearest component within *tol* mm."""
+    def lookup(self, x: float, y: float) -> tuple[str, str]:
+        """Return (refdes, packageClass) for the nearest component whose
+        tolerance covers this pad. Tolerance is derived from the component's
+        package class so small packages use a tight radius and large packages
+        use a wider one."""
         cs = self._cell_size
         gx = int(math.floor(x / cs))
         gy = int(math.floor(y / cs))
         best_name = ""
         best_pkg = ""
-        best_dist = tol * tol
+        best_dist = float("inf")
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
                 bucket = self._grid.get((gx + dx, gy + dy))
@@ -965,10 +977,12 @@ class _RefdesIndex:
                     continue
                 for cx, cy, refdes, part_name in bucket:
                     d2 = (x - cx) ** 2 + (y - cy) ** 2
-                    if d2 <= best_dist:
+                    pkg = _classify_package(part_name)
+                    tol = _PACKAGE_TOLERANCE.get(pkg, _DEFAULT_TOLERANCE)
+                    if d2 <= tol * tol and d2 < best_dist:
                         best_dist = d2
                         best_name = refdes
-                        best_pkg = _classify_package(part_name)
+                        best_pkg = pkg
         return best_name, best_pkg
 
 
