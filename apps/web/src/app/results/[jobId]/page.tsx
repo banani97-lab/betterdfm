@@ -131,7 +131,14 @@ export default function ResultsPage() {
         setJob(jobData)
         setViolations(violationsData ?? [])
         track('Analysis Viewed', { jobId, score: jobData.mfgScore, grade: jobData.mfgGrade })
-        getBoardData(jobId).then(setBoardData).catch(() => {})
+        track('BoardViewer Started', { jobId })
+        const boardStart = Date.now()
+        getBoardData(jobId).then((bd) => {
+          setBoardData(bd)
+          track('BoardViewer Loaded', { jobId, durationMs: Date.now() - boardStart })
+        }).catch(() => {
+          track('BoardViewer Failed', { jobId, durationMs: Date.now() - boardStart })
+        })
         // Find the current submission's projectId for compare scoping
         getSubmissions().then(subs => {
           const current = subs?.find(s => s.id === jobData.submissionId)
