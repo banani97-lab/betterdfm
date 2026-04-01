@@ -35,7 +35,10 @@ jobs:
             gerbonara:
               - 'sidecar/gerbonara/**'
 
-  deploy-worker:
+  # Single job that builds worker + gerbonara images and deploys them
+  # together in one task definition revision. This prevents race conditions
+  # where two parallel jobs overwrite each other's task definition updates.
+  deploy-ecs:
     needs: changes
     if: needs.changes.outputs.worker == 'true'
     runs-on: ubuntu-latest
@@ -60,24 +63,46 @@ jobs:
           docker push $ECR_REGISTRY/betterdfm-worker:latest
           docker push $ECR_REGISTRY/betterdfm-worker:${{ github.sha }}
 
-      - name: Update worker task definition with new image
-        id: worker-task-def
+      - name: Build and push gerbonara
+        if: needs.changes.outputs.gerbonara == 'true'
+        working-directory: sidecar/gerbonara
         run: |
-          # Get current task def, update worker container image to SHA tag
+          docker build \
+            -t $ECR_REGISTRY/betterdfm-gerbonara:latest \
+            -t $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }} \
+            .
+          docker push $ECR_REGISTRY/betterdfm-gerbonara:latest
+          docker push $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}
+
+      - name: Register new task definition with updated images
+        id: task-def
+        run: |
           TASK_DEF=$(aws ecs describe-task-definition --task-definition betterdfm-worker --region $AWS_REGION --query 'taskDefinition')
-          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
+
+          # Always update worker image
+          TASK_DEF=$(echo "$TASK_DEF" | jq \
             --arg IMG "$ECR_REGISTRY/betterdfm-worker:${{ github.sha }}" \
-            '.containerDefinitions |= map(if .name == "dfm-worker" then .image = $IMG else . end) | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-          echo "$NEW_TASK_DEF" > /tmp/task-def.json
+            '.containerDefinitions |= map(if .name == "dfm-worker" then .image = $IMG else . end)')
+
+          # Update gerbonara image if it was rebuilt
+          if [ "${{ needs.changes.outputs.gerbonara }}" = "true" ]; then
+            TASK_DEF=$(echo "$TASK_DEF" | jq \
+              --arg IMG "$ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}" \
+              '.containerDefinitions |= map(if .name == "gerbonara" then .image = $IMG else . end)')
+          fi
+
+          # Remove metadata fields that can't be in a new registration
+          echo "$TASK_DEF" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > /tmp/task-def.json
+
           NEW_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/task-def.json --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "task_def_arn=$NEW_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy worker service
+      - name: Deploy ECS service
         run: |
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
-            --task-definition ${{ steps.worker-task-def.outputs.task_def_arn }} \
+            --task-definition ${{ steps.task-def.outputs.task_def_arn }} \
             --force-new-deployment \
             --region $AWS_REGION
 
@@ -131,56 +156,3 @@ jobs:
             sleep 15
           done
           echo "App Runner did not stabilize in time" && exit 1
-
-  deploy-gerbonara:
-    needs: changes
-    if: needs.changes.outputs.gerbonara == 'true'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
-
-      - uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and push gerbonara
-        working-directory: sidecar/gerbonara
-        run: |
-          docker build \
-            -t $ECR_REGISTRY/betterdfm-gerbonara:latest \
-            -t $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }} \
-            .
-          docker push $ECR_REGISTRY/betterdfm-gerbonara:latest
-          docker push $ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}
-
-      - name: Update gerbonara in worker task definition
-        id: gerbonara-task-def
-        run: |
-          # Get current task def, update gerbonara container image to SHA tag
-          TASK_DEF=$(aws ecs describe-task-definition --task-definition betterdfm-worker --region $AWS_REGION --query 'taskDefinition')
-          NEW_TASK_DEF=$(echo "$TASK_DEF" | jq \
-            --arg IMG "$ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}" \
-            '.containerDefinitions |= map(if .name == "gerbonara" then .image = $IMG else . end) | del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)')
-          echo "$NEW_TASK_DEF" > /tmp/task-def.json
-          NEW_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/task-def.json --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
-          echo "task_def_arn=$NEW_ARN" >> $GITHUB_OUTPUT
-
-      - name: Deploy worker service with new gerbonara
-        run: |
-          aws ecs update-service \
-            --cluster $ECS_CLUSTER \
-            --service $ECS_SERVICE \
-            --task-definition ${{ steps.gerbonara-task-def.outputs.task_def_arn }} \
-            --force-new-deployment \
-            --region $AWS_REGION
-
-      - name: Wait for ECS to stabilize
-        run: |
-          aws ecs wait services-stable \
-            --cluster $ECS_CLUSTER \
-            --services $ECS_SERVICE \
-            --region $AWS_REGION
