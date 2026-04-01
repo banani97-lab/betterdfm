@@ -152,7 +152,7 @@ export default function LandingPage() {
           <p className="text-slate-400 max-w-2xl mx-auto mb-6">
             Upload a file. Get a scored manufacturability report. Share it with your customer. Done.
           </p>
-          <p className="text-slate-500 max-w-xl mx-auto text-sm">
+          <p className="text-slate-400 max-w-xl mx-auto text-sm">
             RapidDFM applies your shop&apos;s capability limits — trace widths, clearances, drill sizes, annular rings, solder mask dams, and 11 more checks — against every incoming design. No setup per job. No inconsistency between reviewers. Just upload and know.
           </p>
         </div>
