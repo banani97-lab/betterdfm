@@ -28,6 +28,7 @@ jobs:
             worker:
               - 'workers/dfm-worker/**'
               - 'engine/dfm-engine/**'
+              - 'sidecar/gerbonara/**'
             api:
               - 'apps/api/**'
               - 'engine/dfm-engine/**'
