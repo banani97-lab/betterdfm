@@ -902,8 +902,11 @@ def _parse_components(
     except OSError:
         return components
 
-    for line in text.splitlines():
-        s = line.strip()
+    lines = text.splitlines()
+    i = 0
+    while i < len(lines):
+        s = lines[i].strip()
+        i += 1
         if not s or not s.startswith("CMP "):
             continue
         attr_pos = s.find(";")
@@ -918,8 +921,30 @@ def _parse_components(
             refdes = parts[6]
             part_name = parts[7] if len(parts) > 7 else ""
 
-            # If part_name doesn't classify, try the linked PKG record
-            if not _classify_package(part_name) and pkg_ref in eda_pkgs:
+            # Read PRP (property) lines that follow this CMP record
+            prp_pkg = ""
+            while i < len(lines):
+                prp_line = lines[i].strip()
+                if not prp_line.startswith("PRP "):
+                    break
+                i += 1
+                # Extract package class from common property names
+                if not prp_pkg:
+                    for prop_key in ("Imperial_Package_/_Case", "Case/Package"):
+                        if prop_key in prp_line:
+                            # Value is between single quotes: PRP Key 'Value'
+                            q1 = prp_line.find("'")
+                            q2 = prp_line.rfind("'")
+                            if 0 <= q1 < q2:
+                                val = prp_line[q1+1:q2].strip()
+                                pkg = _classify_package(val)
+                                if pkg:
+                                    prp_pkg = pkg
+
+            # Priority: PRP property > part_name > EDA PKG record > bbox
+            if prp_pkg:
+                part_name = f"{part_name}_{prp_pkg}" if part_name else prp_pkg
+            elif not _classify_package(part_name) and pkg_ref in eda_pkgs:
                 pkg_info = eda_pkgs[pkg_ref]
                 pkg_from_name = _classify_package(pkg_info["name"])
                 if pkg_from_name:
