@@ -942,15 +942,15 @@ class _RefdesIndex:
 
     __slots__ = ("_grid", "_cell_size")
 
-    def __init__(self, components: list, cell_size: float = 2.0) -> None:
-        # cell_size=2.0 is 2x the default tolerance of 1.0mm
+    def __init__(self, components: list, cell_size: float = 6.0) -> None:
+        # cell_size=6.0 is 2x the default tolerance of 3.0mm
         self._cell_size = cell_size
         self._grid: dict[tuple[int, int], list[tuple[float, float, str, str]]] = {}
         for cx, cy, refdes, part_name in components:
             key = (int(math.floor(cx / cell_size)), int(math.floor(cy / cell_size)))
             self._grid.setdefault(key, []).append((cx, cy, refdes, part_name))
 
-    def lookup(self, x: float, y: float, tol: float = 1.0) -> tuple[str, str]:
+    def lookup(self, x: float, y: float, tol: float = 3.0) -> tuple[str, str]:
         """Return (refdes, packageClass) for nearest component within *tol* mm."""
         cs = self._cell_size
         gx = int(math.floor(x / cs))
