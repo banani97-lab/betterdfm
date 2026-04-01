@@ -138,6 +138,16 @@ type ShareUpload struct {
 	CreatedAt     time.Time `json:"createdAt"`
 }
 
+// ContactSubmission stores contact form submissions from the landing page
+type ContactSubmission struct {
+	ID        string    `gorm:"primaryKey" json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Company   string    `json:"company"`
+	Message   string    `json:"message"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
 // UsageEvent tracks billable events per org
 type UsageEvent struct {
 	ID        string    `gorm:"primaryKey" json:"id"`

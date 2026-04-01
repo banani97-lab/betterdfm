@@ -53,6 +53,7 @@ func main() {
 		&db.ShareLink{},
 		&db.ShareUpload{},
 		&db.UsageEvent{},
+		&db.ContactSubmission{},
 	); err != nil {
 		log.Fatalf("auto-migrate failed: %v", err)
 	}
@@ -86,6 +87,10 @@ func main() {
 	e.GET("/health", func(c echo.Context) error {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
+
+	// Contact form (unauthenticated)
+	contactHandler := routes.NewContactHandler(database)
+	e.POST("/contact", contactHandler.SubmitContact)
 
 	// JWT middleware for app users (validates audience against app client ID)
 	jwtMW := lib.NewJWTMiddleware(jwtIssuer, cognitoClientID)
@@ -174,6 +179,7 @@ func main() {
 	adminAPI.POST("/organizations/:id/users", adminOrgHandler.CreateOrgUser)
 	adminAPI.PUT("/organizations/:id/users/:userId", adminOrgHandler.UpdateOrgUser)
 	adminAPI.DELETE("/organizations/:id/users/:userId", adminOrgHandler.DeleteOrgUser)
+	adminAPI.GET("/contacts", contactHandler.ListContacts)
 
 	port := os.Getenv("PORT")
 	if port == "" {

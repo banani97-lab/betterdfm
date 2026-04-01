@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Send, CheckCircle } from 'lucide-react'
+import { API_URL } from '@/lib/api'
 import { track } from '@/lib/analytics'
 
 export function ContactForm() {
@@ -18,7 +19,7 @@ export function ContactForm() {
     setError('')
     setSending(true)
     try {
-      const res = await fetch('/api/contact', {
+      const res = await fetch(`${API_URL}/contact`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, email, company, message }),
