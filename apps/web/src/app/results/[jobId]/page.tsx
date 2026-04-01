@@ -88,8 +88,21 @@ export default function ResultsPage() {
     return s
   }, [violations])
 
+  // Known layer names from board data — used to check if a violation's layer is real
+  const knownLayers = useMemo(() => {
+    const s = new Set<string>()
+    for (const l of boardData?.layers ?? []) s.add(l.name)
+    return s
+  }, [boardData])
+
   // Layer-filtered only — used for tab counts so they always show totals per severity.
-  const layerFiltered = violations.filter((v) => !v.layer || !hiddenLayers.has(v.layer))
+  // Violations on non-real layers (e.g. "drill") hide when all real layers are hidden.
+  const allHidden = knownLayers.size > 0 && hiddenLayers.size >= knownLayers.size
+  const layerFiltered = violations.filter((v) => {
+    if (!v.layer) return !allHidden
+    if (knownLayers.has(v.layer)) return !hiddenLayers.has(v.layer)
+    return !allHidden // non-real layer like "drill" — hide when everything is hidden
+  })
 
   // Severity + layer filtered — used for display and board markers.
   const visibleViolations = layerFiltered.filter((v) => {
@@ -312,18 +325,25 @@ export default function ResultsPage() {
       {/* Body: board + collapsible issues panel */}
       <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>
         <div className={cn('order-1 flex-1 min-h-0 min-w-0 overflow-hidden', collapseToBottom ? 'p-2 sm:p-3' : 'p-2 sm:p-3 md:p-4')}>
-          <BoardViewer
-            violations={visibleViolations.filter((v) => !v.ignored && (ruleFilter.size === 0 || ruleFilter.has(v.ruleId)))}
-            boardData={boardData}
-            selectedViolationId={selectedId}
-            onViolationClick={(v) => setSelectedId(v?.id)}
-            hiddenLayers={hiddenLayers}
-            onToggleLayer={toggleLayer}
-            onSetHiddenLayers={setHiddenLayers}
-            violationLayers={violationLayers}
-            allIgnoredLayers={allIgnoredLayers}
-            onIgnoreLayer={canWrite() ? handleIgnoreLayer : undefined}
-          />
+          {!boardData ? (
+            <div className="flex flex-col items-center justify-center h-full gap-3">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+              <p className="text-sm text-muted-foreground">Loading Board Visualizer</p>
+            </div>
+          ) : (
+            <BoardViewer
+              violations={visibleViolations.filter((v) => !v.ignored && (ruleFilter.size === 0 || ruleFilter.has(v.ruleId)))}
+              boardData={boardData}
+              selectedViolationId={selectedId}
+              onViolationClick={(v) => setSelectedId(v?.id)}
+              hiddenLayers={hiddenLayers}
+              onToggleLayer={toggleLayer}
+              onSetHiddenLayers={setHiddenLayers}
+              violationLayers={violationLayers}
+              allIgnoredLayers={allIgnoredLayers}
+              onIgnoreLayer={canWrite() ? handleIgnoreLayer : undefined}
+            />
+          )}
         </div>
 
         <section
