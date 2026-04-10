@@ -11,6 +11,7 @@ const TOC = [
   { id: 'scoring', label: '↳ Scoring' },
   { id: 'async-pipeline', label: 'Async Pipeline' },
   { id: 'sidecar', label: 'Gerbonara Sidecar' },
+  { id: 'odb-format', label: '↳ ODB++ Format' },
   { id: 'frontend', label: 'Frontend' },
   { id: 'design-decisions', label: 'Design Decisions' },
   { id: 'cicd', label: 'CI / CD' },
@@ -801,6 +802,202 @@ def _sym_to_mm(name: str, units: str) -> tuple[float, float, str]:
             <h3 style={h3Style}>Graceful degradation</h3>
             <p style={pStyle}>
               If the S3 download fails (no AWS credentials in dev mode), the sidecar returns a deterministic mock <code style={inlineCode}>BoardData</code> object with a representative set of traces, pads, and vias. This allows full end-to-end testing — upload → worker → rules → results — without a real PCB file or AWS access.
+            </p>
+          </section>
+
+          {/* ─── ODB++ FORMAT ────────────────────────────── */}
+          <SectionAnchor id="odb-format" />
+          <section style={{ marginBottom: '4rem' }}>
+            <h2 style={h2Style}>What an ODB++ File Actually Looks Like</h2>
+            <p style={pStyle}>
+              ODB++ is a directory-based format — not a single file. It arrives as a <code style={inlineCode}>.tgz</code> or <code style={inlineCode}>.zip</code> archive. Once extracted, it is a structured tree of plain-text files describing every aspect of the board: layer stack, board outline, netlists, component placements, and per-layer geometry. Here's an annotated walk-through of a real board.
+            </p>
+
+            <h3 style={h3Style}>Archive directory structure</h3>
+            <Code lang="bash">{`my_board.tgz
+└── my_board/                    ← job root
+    ├── matrix/
+    │   └── matrix               ← layer stack definitions
+    ├── steps/
+    │   └── pcb/                 ← step (board variant; "pcb" is the default)
+    │       ├── stephdr           ← step header: UNITS=INCH or MM
+    │       ├── profile           ← board outline (closed polygon)
+    │       ├── netlists/
+    │       │   └── cadnet/
+    │       │       └── netlist   ← net names + which pads belong to which net
+    │       ├── components/
+    │       │   ├── comp_+_top    ← component placements, top side
+    │       │   └── comp_+_bot    ← component placements, bottom side
+    │       └── layers/
+    │           ├── top/
+    │           │   └── features  ← top copper: traces, pads, vias
+    │           ├── bot/
+    │           │   └── features  ← bottom copper
+    │           ├── smt/
+    │           │   └── features  ← top solder mask
+    │           ├── smb/
+    │           │   └── features  ← bottom solder mask
+    │           ├── sst/
+    │           │   └── features  ← top silkscreen
+    │           └── drill/
+    │               └── features  ← drill hits`}</Code>
+
+            <h3 style={h3Style}>matrix/matrix — layer stack</h3>
+            <p style={pStyle}>
+              Each layer block declares its name, physical type, and stacking order. The parser reads <code style={inlineCode}>TYPE</code> to decide which DFM rules apply to a layer (copper gets clearance and trace-width checks; solder mask gets solder-mask-dam checks; etc.).
+            </p>
+            <Code lang="bash">{`LAYER {
+  NAME=top
+  TYPE=SIGNAL          # → COPPER in our model
+  ROW=1
+  CONTEXT=BOARD
+  POLARITY=POSITIVE
+}
+
+LAYER {
+  NAME=inner1
+  TYPE=POWER_GROUND    # → COPPER (power plane)
+  ROW=2
+  CONTEXT=BOARD
+  POLARITY=NEGATIVE
+}
+
+LAYER {
+  NAME=bot
+  TYPE=SIGNAL
+  ROW=8
+  CONTEXT=BOARD
+  POLARITY=POSITIVE
+}
+
+LAYER {
+  NAME=smt              # solder mask top
+  TYPE=SOLDER_MASK
+  ROW=9
+  CONTEXT=BOARD
+  POLARITY=NEGATIVE
+}
+
+LAYER {
+  NAME=drill
+  TYPE=DRILL
+  ROW=11
+  CONTEXT=BOARD
+}`}</Code>
+
+            <h3 style={h3Style}>steps/pcb/profile — board outline</h3>
+            <p style={pStyle}>
+              The profile file describes the board boundary as a set of contours. <code style={inlineCode}>OB</code> opens a new contour (the flag on the end is <code style={inlineCode}>I</code> for island / outer boundary, <code style={inlineCode}>H</code> for hole). <code style={inlineCode}>OS</code> adds a straight segment endpoint; <code style={inlineCode}>OC</code> adds an arc. Coordinates are in the job's native units (INCH here, so these are decimal inches).
+            </p>
+            <Code lang="bash">{`# Board outline — 100 mm × 80 mm rectangle (in inches: 3.937 × 3.150)
+OB 0.000 0.000 I        # start outer contour at origin
+OS 3.937 0.000          # bottom-right corner
+OS 3.937 3.150          # top-right corner
+OS 0.000 3.150          # top-left corner
+OE                      # close contour back to start
+
+# Mounting hole cutout (hole in the board)
+OB 0.200 0.200 H        # start hole contour
+OC 0.200 0.280 0.200 0.240 90.0 180.0   # arc: cx cy x y start_angle end_angle
+OC 0.280 0.200 0.200 0.240 180.0 270.0
+OC 0.280 0.280 0.200 0.240 270.0 360.0
+OE`}</Code>
+
+            <h3 style={h3Style}>layers/top/features — copper geometry</h3>
+            <p style={pStyle}>
+              This is the most complex file. It has two sections: a symbol table (pad shape definitions) followed by feature records (one per trace, pad, or via). The symbol table maps integer indices to named shapes. Feature records reference those indices.
+            </p>
+            <Code lang="bash">{`# ── Symbol table ─────────────────────────────────────────────────
+# Format: $<index> <symbol_name>
+# Symbol names encode shape + dimensions in mils (1 mil = 0.0254 mm)
+
+$0 r25              # round, 25-mil diameter  → 0.635 mm circle
+$1 rect60x40        # rectangle, 60×40 mils   → 1.524 × 1.016 mm
+$2 oval50x80        # oval/stadium, 50×80 mils → 1.27 × 2.032 mm
+$3 donut_r100x55    # via annular ring: 100-mil outer, 55-mil drill → 2.54 / 1.397 mm
+$4 rect100x60       # SMD pad, 100×60 mils     → 2.54 × 1.524 mm
+$5 s80              # square, 80 mils          → 2.032 mm
+$6 chamf_rect120x80 # chamfered rectangle      → 3.048 × 2.032 mm
+
+# ── Feature records ───────────────────────────────────────────────
+# Line (trace):   L x1 y1 x2 y2  P|N  sym_num  [;attr=val,...]
+# Pad:            P x  y  rot    P|N  sym_num  [mirror]  [;attr=val,...]
+# Arc:            A cx cy sr  ea  sa  ea  P|N  sym_num
+
+# Traces on top copper (sym $0 = 25-mil round trace)
+L 1.200 0.500 1.200 1.800 P 0             # vertical trace, x=1.2", y 0.5→1.8"
+L 1.200 1.800 2.400 1.800 P 0             # horizontal trace continuing right
+L 0.450 0.300 0.780 0.620 P 0 ;net=GND   # diagonal trace, net attribute
+
+# SMD pads (sym $4 = 100×60 mil rect pad)
+P 1.150 0.450  0.0  P 4   ;net=VCC,comp=U1,pin=1   # pad at (1.15, 0.45), 0° rotation
+P 1.250 0.450  0.0  P 4   ;net=GND,comp=U1,pin=2
+P 1.350 0.450  0.0  P 1   ;net=SDA,comp=U1,pin=3   # different sym ($1 = rect60x40)
+
+# Via (sym $3 = donut — annular ring with drill hole)
+P 1.200 1.800  0.0  P 3   ;net=VCC                 # via at trace junction
+
+# Through-hole component pin (oval pad, sym $2)
+P 0.600 0.600  90.0 P 2   ;net=CLK,comp=J1,pin=1   # rotated 90°`}</Code>
+
+            <h3 style={h3Style}>netlists/cadnet/netlist — connectivity</h3>
+            <p style={pStyle}>
+              The netlist maps net names to pad references. This is what enables the clearance rule to skip same-net copper — two traces on the <code style={inlineCode}>GND</code> net touching each other is intentional, not a violation.
+            </p>
+            <Code lang="bash">{`# Each NET block lists the pads belonging to that net
+NET {
+  NAME=VCC
+  COMP=U1 ; PIN=1          # component U1, pin 1
+  COMP=C1 ; PIN=1          # decoupling cap positive
+  COMP=J1 ; PIN=1
+}
+
+NET {
+  NAME=GND
+  COMP=U1 ; PIN=2
+  COMP=C1 ; PIN=2
+  COMP=J1 ; PIN=4
+}
+
+NET {
+  NAME=SDA
+  COMP=U1 ; PIN=3
+  COMP=U2 ; PIN=7
+}`}</Code>
+
+            <h3 style={h3Style}>What the parser extracts</h3>
+            <p style={pStyle}>
+              After parsing all of the above, the sidecar produces a single <code style={inlineCode}>BoardData</code> JSON blob. A medium-complexity 4-layer board typically yields numbers like these:
+            </p>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
+              gap: '0.75rem',
+              marginTop: '1rem',
+              marginBottom: '1.25rem',
+            }}>
+              {[
+                { label: '~97 000', sub: 'trace segments' },
+                { label: '~30 000', sub: 'pads' },
+                { label: '~8 000', sub: 'vias' },
+                { label: '~485', sub: 'outline points' },
+                { label: '15', sub: 'layers' },
+                { label: '~3 MB', sub: 'parsed JSON' },
+              ].map(({ label, sub }) => (
+                <div key={sub} style={{
+                  background: '#111418',
+                  border: '1px solid #1e2432',
+                  borderRadius: '8px',
+                  padding: '0.875rem',
+                  textAlign: 'center',
+                }}>
+                  <div style={{ fontSize: '1.35rem', fontWeight: 800, color: '#d4891a', lineHeight: 1 }}>{label}</div>
+                  <div style={{ fontSize: '11px', color: '#64748b', marginTop: '4px' }}>{sub}</div>
+                </div>
+              ))}
+            </div>
+            <p style={pStyle}>
+              The DFM engine then walks this data structure — not the raw file — so every rule operates purely on typed Go structs with all coordinates already in millimetres.
             </p>
           </section>
 
