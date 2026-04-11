@@ -176,6 +176,27 @@ def _parse_matrix(matrix_path: Path) -> list[dict]:
     return sorted(layers, key=lambda x: x["row"])
 
 
+def _layer_side(layer_name: str) -> str | None:
+    """Classify a layer as belonging to the top or bottom stack.
+
+    Used to disambiguate the spatial refdes lookup: a pad on a top-stack
+    layer must only be matched against top-side components, otherwise the
+    top-side pins of a chip can be wrongly attributed to a bottom-side
+    passive sitting directly beneath it (or vice versa).
+
+    Returns "top", "bot", or None when the layer side cannot be determined
+    from the name (callers fall back to the legacy unfiltered lookup).
+    """
+    n = layer_name.lower()
+    # Order matters: check "bot"/"bottom" before "top" so names like
+    # "bottom" don't accidentally match a substring rule.
+    if "bot" in n or "btm" in n or "back" in n or "b.cu" in n:
+        return "bot"
+    if "top" in n or "t.cu" in n or "f.cu" in n or "front" in n:
+        return "top"
+    return None
+
+
 def _matrix_type_to_ltype(mtype: str) -> str | None:
     """Map ODB++ matrix layer TYPE to our type string. Returns None to skip."""
     m = mtype.upper()
@@ -409,6 +430,11 @@ def _build_features(
             if name == ".pad_usage":
                 _pad_usage_idx = idx
                 break
+    # Pre-compute the side of this layer once — used to filter the refdes
+    # spatial lookup so top-side features aren't attributed to bottom-side
+    # components that happen to sit directly underneath (and vice versa).
+    layer_side = _layer_side(layer_name)
+
     in_surface = False
     in_island = False
     island_flag: str = "I"  # "I" = outer island, "H" = hole
@@ -560,7 +586,7 @@ def _build_features(
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
                 net = _attr_net(raw) or (net_index.lookup(x, y) if net_index else "")
-                ref, pkg_class = refdes_index.lookup(x, y) if refdes_index else ("", "")
+                ref, pkg_class = refdes_index.lookup(x, y, layer_side) if refdes_index else ("", "")
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
                     hole_diam = max(0.01, sym["w"])
@@ -890,13 +916,20 @@ def _classify_by_bbox(w_mm: float, h_mm: float) -> str:
 
 def _parse_components(
     comp_path: Path, units: str, eda_pkgs: dict[int, dict] | None = None,
+    side_hint: str | None = None,
 ) -> list:
-    """Parse ODB++ CMP file → [(x_mm, y_mm, refdes, part_name)].
+    """Parse ODB++ CMP file → [(x_mm, y_mm, refdes, part_name, side)].
 
     If eda_pkgs is provided, uses PKG name/bbox as fallback for classification.
+
+    `side` is "top", "bot", or "" if unknown. Priority:
+    1. `side_hint` from the caller (driven by the directory path, e.g.
+       `components/top` or `layers/comp_+_bot`) — most reliable.
+    2. The CMP record's mirror flag (parts[5]: "N" = not mirrored = top,
+       "M" = mirrored = bottom) — fallback when the path is ambiguous.
     """
     eda_pkgs = eda_pkgs or {}
-    components: list[tuple[float, float, str, str]] = []
+    components: list[tuple[float, float, str, str, str]] = []
     try:
         text = comp_path.read_text(errors="replace")
     except OSError:
@@ -918,8 +951,18 @@ def _parse_components(
             pkg_ref = int(parts[1])
             x_mm = _coord_to_mm(float(parts[2]), units)
             y_mm = _coord_to_mm(float(parts[3]), units)
+            # parts[4] = rotation, parts[5] = mirror flag ("N" or "M")
+            mirror = parts[5].upper() if len(parts) > 5 else ""
             refdes = parts[6]
             part_name = parts[7] if len(parts) > 7 else ""
+            if side_hint in ("top", "bot"):
+                side = side_hint
+            elif mirror == "M":
+                side = "bot"
+            elif mirror == "N":
+                side = "top"
+            else:
+                side = ""
 
             # Read PRP (property) lines that follow this CMP record
             prp_pkg = ""
@@ -955,7 +998,7 @@ def _parse_components(
                     if pkg_from_bbox:
                         part_name = f"{part_name}_{pkg_from_bbox}" if part_name else pkg_from_bbox
 
-            components.append((x_mm, y_mm, refdes, part_name))
+            components.append((x_mm, y_mm, refdes, part_name, side))
         except (ValueError, IndexError):
             pass
 
@@ -979,16 +1022,30 @@ class _RefdesIndex:
 
     def __init__(self, components: list, cell_size: float = 10.0) -> None:
         self._cell_size = cell_size
-        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str]]] = {}
-        for cx, cy, refdes, part_name in components:
+        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str]]] = {}
+        for entry in components:
+            # Accept both legacy 4-tuples and new 5-tuples for safety.
+            if len(entry) == 5:
+                cx, cy, refdes, part_name, side = entry
+            else:
+                cx, cy, refdes, part_name = entry
+                side = ""
             key = (int(math.floor(cx / cell_size)), int(math.floor(cy / cell_size)))
-            self._grid.setdefault(key, []).append((cx, cy, refdes, part_name))
+            self._grid.setdefault(key, []).append((cx, cy, refdes, part_name, side))
 
-    def lookup(self, x: float, y: float) -> tuple[str, str]:
+    def lookup(self, x: float, y: float, side: str | None = None) -> tuple[str, str]:
         """Return (refdes, packageClass) for the nearest component whose
         tolerance covers this pad. Tolerance is derived from the component's
         package class so small packages use a tight radius and large packages
-        use a wider one."""
+        use a wider one.
+
+        When `side` is "top" or "bot", only components on the same side are
+        considered — this prevents a top-side chip pin from being wrongly
+        attributed to a bottom-side passive sitting directly underneath
+        (or vice versa). A component with an unknown side ("") is treated
+        as a wildcard and always eligible, preserving behavior for boards
+        where side information couldn't be recovered.
+        """
         cs = self._cell_size
         gx = int(math.floor(x / cs))
         gy = int(math.floor(y / cs))
@@ -1000,7 +1057,9 @@ class _RefdesIndex:
                 bucket = self._grid.get((gx + dx, gy + dy))
                 if bucket is None:
                     continue
-                for cx, cy, refdes, part_name in bucket:
+                for cx, cy, refdes, part_name, comp_side in bucket:
+                    if side in ("top", "bot") and comp_side and comp_side != side:
+                        continue
                     d2 = (x - cx) ** 2 + (y - cy) ** 2
                     pkg = _classify_package(part_name)
                     tol = _PACKAGE_TOLERANCE.get(pkg, _DEFAULT_TOLERANCE)
@@ -1149,7 +1208,14 @@ def parse_odb(file_path: str) -> BoardData:
                             comp_search_paths.append((cfile, f"layers/{d.name}/components"))
             for cp, label in comp_search_paths:
                 if cp.exists():
-                    c = _parse_components(cp, units, eda_pkgs=eda_pkgs)
+                    lower = label.lower()
+                    if "top" in lower:
+                        side_hint: str | None = "top"
+                    elif "bot" in lower or "btm" in lower:
+                        side_hint = "bot"
+                    else:
+                        side_hint = None
+                    c = _parse_components(cp, units, eda_pkgs=eda_pkgs, side_hint=side_hint)
                     components.extend(c)
                     logger.info("ODB++ %s: %d components", label, len(c))
 
