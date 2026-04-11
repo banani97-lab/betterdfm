@@ -814,6 +814,205 @@ def _net_lookup(x: float, y: float, points: list, tol: float = 0.05) -> str:
     return best_name
 
 
+def _point_in_ring(x: float, y: float, ring: list) -> bool:
+    """Ray-casting point-in-polygon test. `ring` is a list of Point objects."""
+    n = len(ring)
+    if n < 3:
+        return False
+    inside = False
+    j = n - 1
+    for i in range(n):
+        yi = ring[i].y
+        yj = ring[j].y
+        if (yi > y) != (yj > y):
+            xi = ring[i].x
+            xj = ring[j].x
+            x_intersect = (xj - xi) * (y - yi) / ((yj - yi) or 1e-20) + xi
+            if x < x_intersect:
+                inside = not inside
+        j = i
+    return inside
+
+
+def _point_in_polygon(x: float, y: float, poly) -> bool:
+    """True if (x, y) lies inside the polygon's outer ring and outside all holes."""
+    if not _point_in_ring(x, y, poly.points):
+        return False
+    for hole in poly.holes:
+        if _point_in_ring(x, y, hole):
+            return False
+    return True
+
+
+def _infer_polygon_nets(
+    polygons: list,
+    pads: list,
+    traces: list,
+    vias: list,
+    net_points: list,
+    warnings: list | None = None,
+) -> None:
+    """Fill in empty `netName` on copper pour polygons by majority vote of
+    features that physically lie inside (or adjacent to) the polygon.
+
+    Some ODB++ exports declare plane surfaces with an attribute block that
+    has no `.net=` token (e.g. `S P 0;;ID=8400`), so `_attr_net` on the S
+    record returns empty. Without a net on the polygon, the clearance rule's
+    same-net skip can't match, and every thermal-relief via catch-pad gets
+    flagged as "too close to the pour edge" — even though it's the designed
+    anti-pad geometry.
+
+    Inference is layered — each pass runs only on polygons still unlabeled
+    after the previous pass. Earlier passes are stricter (inside-polygon
+    containment); later passes relax to proximity as a last resort:
+
+    1. **Same-layer pads inside the polygon.** Most effective on plane
+       layers: thermal-relief catch-pads carry the plane's net via the
+       netlist-to-pad association that `_build_features` already wires up.
+    2. **Same-layer traces inside the polygon.** Covers small copper islands
+       on signal layers where a trace passes through but no pad sits inside.
+       Tallies each trace whose midpoint is inside the polygon.
+    3. **Netlist points inside the polygon.** Uses the raw `(x, y, net_name)`
+       records parsed from `netlists/cadnet/netlist`. Covers isolated islands
+       that have no pads *or* traces inside — a netlist point that falls
+       inside the polygon is strong evidence the island is on that net.
+    4. **Nearest labeled via within 1 mm of the polygon centroid.** Fallback
+       for slivers that contain no features at all (thermal-relief spokes,
+       break-out copper adjacent to signal vias). These polygons are too
+       small to contain anything inside their outer ring, but they sit
+       immediately adjacent to a via whose net they almost certainly belong
+       to. Scoped tightly (1 mm) so it can't pollute larger islands.
+
+    Holes are respected in passes 1-3: a feature inside an anti-pad is on
+    the *via's* net, not the pour's, and must not be counted.
+
+    Split planes are handled correctly — each sub-polygon is labeled from
+    the features inside *its own* boundary, so a board with a GND plane
+    and a VCC_3V3 island on the same layer ends up with each sub-pour on
+    the right net.
+    """
+    if not polygons:
+        return
+    # Group features by layer once.
+    pads_by_layer: dict[str, list] = {}
+    for p in pads:
+        pads_by_layer.setdefault(p.layer, []).append(p)
+    traces_by_layer: dict[str, list] = {}
+    for t in traces:
+        traces_by_layer.setdefault(t.layer, []).append(t)
+
+    def _inside(poly, x: float, y: float) -> bool:
+        # Outer ring containment, minus any holes.
+        return _point_in_polygon(x, y, poly)
+
+    def _majority(tally: dict[str, int]) -> str:
+        if not tally:
+            return ""
+        return max(tally.items(), key=lambda kv: kv[1])[0]
+
+    inferred = {"pads": 0, "traces": 0, "netlist": 0, "nearest_via": 0}
+    # Pass-4 tolerance: the sliver polygons we're catching here are on the
+    # order of 0.3–0.5 mm, sitting immediately next to a via. 1 mm is large
+    # enough to reach the adjacent via's center but small enough that we
+    # can't accidentally label a larger island from an unrelated via across
+    # the board.
+    nearest_via_tol_mm = 1.0
+    nearest_via_tol2 = nearest_via_tol_mm * nearest_via_tol_mm
+
+    for poly in polygons:
+        if poly.netName or not poly.points:
+            continue
+
+        # Bounding box filter — polygons can be huge, features usually aren't.
+        xs = [pt.x for pt in poly.points]
+        ys = [pt.y for pt in poly.points]
+        minx, maxx = min(xs), max(xs)
+        miny, maxy = min(ys), max(ys)
+
+        # --- Pass 1: pads inside polygon ---
+        tally: dict[str, int] = {}
+        for p in pads_by_layer.get(poly.layer, []):
+            if p.x < minx or p.x > maxx or p.y < miny or p.y > maxy:
+                continue
+            if not p.netName or p.netName == "$NONE$":
+                continue
+            if not _inside(poly, p.x, p.y):
+                continue
+            tally[p.netName] = tally.get(p.netName, 0) + 1
+        if tally:
+            poly.netName = _majority(tally)
+            inferred["pads"] += 1
+            continue
+
+        # --- Pass 2: traces inside polygon (midpoint test) ---
+        for t in traces_by_layer.get(poly.layer, []):
+            if not t.netName or t.netName == "$NONE$":
+                continue
+            mx = (t.startX + t.endX) / 2
+            my = (t.startY + t.endY) / 2
+            if mx < minx or mx > maxx or my < miny or my > maxy:
+                continue
+            if not _inside(poly, mx, my):
+                continue
+            tally[t.netName] = tally.get(t.netName, 0) + 1
+        if tally:
+            poly.netName = _majority(tally)
+            inferred["traces"] += 1
+            continue
+
+        # --- Pass 3: netlist points inside polygon ---
+        # net_points is layer-independent; a netlist entry at (x, y) inside
+        # this polygon's outer-minus-holes region is evidence of what net
+        # passes through (and likely connects to) the island.
+        for (nx, ny, nname) in net_points:
+            if not nname or nname == "$NONE$":
+                continue
+            if nx < minx or nx > maxx or ny < miny or ny > maxy:
+                continue
+            if not _inside(poly, nx, ny):
+                continue
+            tally[nname] = tally.get(nname, 0) + 1
+        if tally:
+            poly.netName = _majority(tally)
+            inferred["netlist"] += 1
+            continue
+
+        # --- Pass 4: nearest labeled via within 1 mm of centroid ---
+        # Last-resort proximity fallback for thermal-relief slivers and
+        # break-out copper. These tiny polygons contain no features inside
+        # their own ring, but sit immediately next to a single via whose
+        # net they almost certainly share.
+        cx = sum(xs) / len(xs)
+        cy = sum(ys) / len(ys)
+        best_v_net = ""
+        best_v_d2 = nearest_via_tol2
+        for v in vias:
+            if not v.netName or v.netName == "$NONE$":
+                continue
+            d2 = (v.x - cx) ** 2 + (v.y - cy) ** 2
+            if d2 < best_v_d2:
+                best_v_d2 = d2
+                best_v_net = v.netName
+        if best_v_net:
+            poly.netName = best_v_net
+            inferred["nearest_via"] += 1
+
+    total = sum(inferred.values())
+    unresolved = sum(1 for p in polygons if not p.netName)
+    if total and warnings is not None:
+        warnings.append(
+            f"Inferred net name for {total} unlabeled copper pour polygon(s) "
+            f"(pads:{inferred['pads']} traces:{inferred['traces']} "
+            f"netlist:{inferred['netlist']} nearest_via:{inferred['nearest_via']})"
+        )
+    logger.info(
+        "ODB++ polygon net inference: labeled %d "
+        "(pads:%d traces:%d netlist:%d nearest_via:%d), %d still unlabeled",
+        total, inferred["pads"], inferred["traces"],
+        inferred["netlist"], inferred["nearest_via"], unresolved,
+    )
+
+
 def _attr_net(raw_line: str) -> str:
     """Extract net name from ODB++ attribute string."""
     semi = raw_line.find(";")
@@ -1244,6 +1443,13 @@ def parse_odb(file_path: str) -> BoardData:
                                  warnings=warnings, polygons=polygons)
                 after = len(traces) + len(pads) + len(vias)
                 logger.info("ODB++ %s (%s): %d features", layer_name, ltype, after - before)
+
+            # Backfill net names on pour polygons whose S record carried no
+            # `.net=` attribute — inferred from features (pads, traces,
+            # netlist points, nearest via) physically inside or adjacent to
+            # each polygon. See _infer_polygon_nets for why this matters
+            # for the clearance rule.
+            _infer_polygon_nets(polygons, pads, traces, vias, net_points, warnings=warnings)
 
             if not outline and outline_layer_name:
                 feat = _find_layer_features(layers_dir, outline_layer_name)
