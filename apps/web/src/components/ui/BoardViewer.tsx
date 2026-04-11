@@ -514,13 +514,18 @@ function drawViolations(
       const color = SEV_COLOR[v.severity] ?? '#7090a8'
 
       if (isSelected) {
-        // Selected: rectangle around violation location
-        const r = 12
         ctx.save()
         ctx.strokeStyle = color
         ctx.lineWidth = 2
-        ctx.strokeRect(cx - r, cy - r, r * 2, r * 2)
-        // Dashed line to secondary object
+        // Crosshair rectangle around the violation point. Suppressed when
+        // the violation is component-scoped (has a refDes) because
+        // drawComponentHighlight will draw a dashed bounding box around
+        // the whole component — two stacked red squares is just noise.
+        if (!v.refDes) {
+          const r = 12
+          ctx.strokeRect(cx - r, cy - r, r * 2, r * 2)
+        }
+        // Dashed line to secondary object (clearance/dam rules).
         if (v.x2 !== 0 || v.y2 !== 0) {
           const cx2 = tx(v.x2), cy2 = ty(v.y2)
           if (ok(cx2) && ok(cy2)) {
