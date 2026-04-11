@@ -1,23 +1,35 @@
 package dfmengine
 
-// padSizeRange defines expected pad dimension ranges for a passive package class
-// based on IPC-7351B land pattern recommendations.
+// padSizeRange defines the acceptable pad dimension envelope for a passive
+// package class, based on IPC-7351B land pattern recommendations spanning
+// Density C (Min land protrusion) through Density A (Max land protrusion),
+// with a small tolerance on each end.
+//
+// Dimensions are expressed as (short, long) rather than (width, height) so
+// the check is rotation-invariant: a 1206 placed at 0° has the same pad
+// footprint as one placed at 90°, and the rule normalizes each pad to
+// (min, max) of its two dimensions before comparing.
 type padSizeRange struct {
-	minW, maxW float64
-	minH, maxH float64
+	minShort, maxShort float64 // shorter pad dimension
+	minLong, maxLong   float64 // longer pad dimension
 }
 
+// IPC-7351B nominal pad dimensions for rectangular passives. Values are
+// generous enough to cover Density A/B/C variations plus fabrication
+// tolerance; the goal is to catch genuinely misplaced pads (e.g. a 0402
+// pad on an 0805 footprint) without false-flagging standard land patterns.
 var ipcPadRanges = map[string]padSizeRange{
-	"01005": {0.10, 0.25, 0.10, 0.25},
-	"0201":  {0.20, 0.40, 0.20, 0.40},
-	"0402": {0.40, 0.80, 0.40, 0.80},
-	"0603": {0.60, 1.20, 0.60, 1.30},
-	"0805": {0.80, 1.60, 0.80, 1.80},
-	"1206": {1.00, 2.00, 1.20, 2.50},
-	"1210": {1.00, 2.00, 1.80, 3.00},
-	"1812": {1.60, 2.60, 2.80, 3.80},
-	"2010": {1.80, 2.80, 2.00, 3.00},
-	"2512": {2.20, 3.40, 2.80, 3.80},
+	// Package: short (across body)     long (along body axis)
+	"01005": {0.10, 0.30, 0.15, 0.35},
+	"0201":  {0.15, 0.40, 0.20, 0.45},
+	"0402":  {0.40, 0.75, 0.45, 0.85},
+	"0603":  {0.60, 1.05, 0.70, 1.30},
+	"0805":  {0.75, 1.40, 0.90, 1.60},
+	"1206":  {0.85, 1.35, 1.30, 2.00},
+	"1210":  {0.85, 1.35, 1.90, 2.80},
+	"1812":  {1.40, 2.20, 2.60, 3.80},
+	"2010":  {1.50, 2.40, 2.40, 3.40},
+	"2512":  {1.80, 2.80, 2.90, 4.20},
 }
 
 // PadSizeForPackageRule checks that pad dimensions match IPC-7351 expected ranges
@@ -40,6 +52,15 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 	// mounting lands we want to measure against IPC-7351.
 	outerLayers := outerCopperLayerSet(board.Layers)
 
+	// Reject pads that sit on a drill hit — those are through-hole via
+	// catch-pads or leaded-component pads, not SMT lands. IPC-7351 passive
+	// land patterns don't apply to them. The parser emits via catch-pads
+	// as CIRCLE pads on every copper layer of the via, and the refdes
+	// spatial lookup then tags each one with the nearest component's
+	// refdes/package — this filter removes the resulting false positives.
+	drillSet := newDrillLocationSet(board.Drills)
+	const drillCoincidenceTolMM = 0.05
+
 	// Track unclassified components (non-empty RefDes but empty PackageClass)
 	unclassifiedRefs := map[string]struct{}{}
 
@@ -49,6 +70,10 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 		}
 
 		if len(outerLayers) > 0 && !outerLayers[pad.Layer] {
+			continue
+		}
+
+		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
 			continue
 		}
 
@@ -64,9 +89,18 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 			continue
 		}
 
-		// Check width
-		if pad.WidthMM < expected.minW {
-			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, pad.WidthMM, expected.minW)
+		// Normalize (widthMM, heightMM) to (short, long) so rotated parts
+		// are compared against the correct axes. Pad bounding-box width is
+		// whichever axis is longer in canvas space, which flips depending
+		// on whether the component is placed at 0°/180° vs 90°/270°.
+		padShort, padLong := pad.WidthMM, pad.HeightMM
+		if padShort > padLong {
+			padShort, padLong = padLong, padShort
+		}
+
+		// Short dimension check
+		if padShort < expected.minShort {
+			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, padShort, expected.minShort)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
@@ -75,13 +109,13 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 				Y:          pad.Y,
 				Message:    msg,
 				Suggestion: sug,
-				MeasuredMM: pad.WidthMM,
-				LimitMM:    expected.minW,
+				MeasuredMM: padShort,
+				LimitMM:    expected.minShort,
 				Unit:       "mm",
 				RefDes:     pad.RefDes,
 			})
-		} else if pad.WidthMM > expected.maxW {
-			msg, sug := msgPadOversizedForPackage(pad.RefDes, pad.PackageClass, pad.WidthMM, expected.maxW)
+		} else if padShort > expected.maxShort {
+			msg, sug := msgPadOversizedForPackage(pad.RefDes, pad.PackageClass, padShort, expected.maxShort)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "INFO",
@@ -90,8 +124,8 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 				Y:          pad.Y,
 				Message:    msg,
 				Suggestion: sug,
-				MeasuredMM: pad.WidthMM,
-				LimitMM:    expected.maxW,
+				MeasuredMM: padShort,
+				LimitMM:    expected.maxShort,
 				Unit:       "mm",
 				RefDes:     pad.RefDes,
 			})
@@ -101,9 +135,9 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 			break
 		}
 
-		// Check height
-		if pad.HeightMM < expected.minH {
-			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, pad.HeightMM, expected.minH)
+		// Long dimension check
+		if padLong < expected.minLong {
+			msg, sug := msgPadUndersizedForPackage(pad.RefDes, pad.PackageClass, padLong, expected.minLong)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
@@ -112,13 +146,13 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 				Y:          pad.Y,
 				Message:    msg,
 				Suggestion: sug,
-				MeasuredMM: pad.HeightMM,
-				LimitMM:    expected.minH,
+				MeasuredMM: padLong,
+				LimitMM:    expected.minLong,
 				Unit:       "mm",
 				RefDes:     pad.RefDes,
 			})
-		} else if pad.HeightMM > expected.maxH {
-			msg, sug := msgPadOversizedForPackage(pad.RefDes, pad.PackageClass, pad.HeightMM, expected.maxH)
+		} else if padLong > expected.maxLong {
+			msg, sug := msgPadOversizedForPackage(pad.RefDes, pad.PackageClass, padLong, expected.maxLong)
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "INFO",
@@ -127,8 +161,8 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 				Y:          pad.Y,
 				Message:    msg,
 				Suggestion: sug,
-				MeasuredMM: pad.HeightMM,
-				LimitMM:    expected.maxH,
+				MeasuredMM: padLong,
+				LimitMM:    expected.maxLong,
 				Unit:       "mm",
 				RefDes:     pad.RefDes,
 			})
