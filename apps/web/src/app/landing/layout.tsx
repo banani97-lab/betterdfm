@@ -1,9 +1,8 @@
 import type { Metadata } from 'next'
-import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
 
 export const metadata: Metadata = {
   icons: {
-    icon: darkFavicon.src,
+    icon: '/favicon.png',
   },
   title: 'RapidDFM — Screen PCB Designs Automatically Before They Hit Your Engineers',
   description:

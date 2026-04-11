@@ -36,12 +36,18 @@ func (r *PackageCapabilityRule) Run(board BoardData, profile ProfileRules) []Vio
 	const maxViolations = 500
 	var violations []Violation
 
+	// Only consider component mounting pads (outer copper layers).
+	outerLayers := outerCopperLayerSet(board.Layers)
+
 	// Deduplicate by RefDes — one violation per component, not per pad
 	seen := map[string]bool{}
 
 	for _, pad := range board.Pads {
 		if len(violations) >= maxViolations {
 			break
+		}
+		if len(outerLayers) > 0 && !outerLayers[pad.Layer] {
+			continue
 		}
 		if pad.PackageClass == "" || pad.RefDes == "" {
 			continue

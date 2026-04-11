@@ -113,3 +113,31 @@ type Rule interface {
 	ID() string
 	Run(board BoardData, profile ProfileRules) []Violation
 }
+
+// outerCopperLayerSet returns the set of outermost copper layer names from
+// the board stack — the first and last layer with type COPPER or POWER_GROUND
+// in stack order. Component mounting pads can only exist on these layers;
+// internal planes (e.g. L02_GND) and inner signal layers cannot host SMT
+// lands, so rules that check component pads should filter by this set.
+//
+// Returns an empty map when no layer metadata is available, in which case
+// callers should treat all pads as eligible (current behavior preserved).
+func outerCopperLayerSet(layers []Layer) map[string]bool {
+	var first, last string
+	for _, l := range layers {
+		if l.Type == "COPPER" || l.Type == "POWER_GROUND" {
+			if first == "" {
+				first = l.Name
+			}
+			last = l.Name
+		}
+	}
+	set := map[string]bool{}
+	if first != "" {
+		set[first] = true
+	}
+	if last != "" {
+		set[last] = true
+	}
+	return set
+}

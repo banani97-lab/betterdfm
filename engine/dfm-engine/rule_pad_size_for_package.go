@@ -33,12 +33,23 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 	const maxViolations = 500
 	var violations []Violation
 
+	// Only check component mounting pads on outer copper layers. Internal
+	// planes (e.g. L02_GND) can carry "pads" that are really plane features
+	// like thermal reliefs or solid connections — they get a refdes via
+	// spatial lookup to the component above, but they are not the physical
+	// mounting lands we want to measure against IPC-7351.
+	outerLayers := outerCopperLayerSet(board.Layers)
+
 	// Track unclassified components (non-empty RefDes but empty PackageClass)
 	unclassifiedRefs := map[string]struct{}{}
 
 	for _, pad := range board.Pads {
 		if len(violations) >= maxViolations {
 			break
+		}
+
+		if len(outerLayers) > 0 && !outerLayers[pad.Layer] {
+			continue
 		}
 
 		if pad.PackageClass == "" {

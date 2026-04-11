@@ -21,6 +21,9 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 	const maxViolations = 500
 	const maxRatio = 1.3
 
+	// Only consider component mounting pads (outer copper layers).
+	outerLayers := outerCopperLayerSet(board.Layers)
+
 	// Group pads by RefDes, only for small passive package classes
 	type padInfo struct {
 		area  float64
@@ -30,6 +33,9 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 	groups := map[refLayer][]padInfo{}
 
 	for _, pad := range board.Pads {
+		if len(outerLayers) > 0 && !outerLayers[pad.Layer] {
+			continue
+		}
 		if pad.RefDes == "" || !smallPassiveClasses[pad.PackageClass] {
 			continue
 		}
