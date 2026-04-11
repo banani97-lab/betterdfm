@@ -613,6 +613,15 @@ export function BoardViewer({
   const [rotation,          setRotation]          = useState(0)
   const [openDropdownLayer, setOpenDropdownLayer] = useState<string | null>(null)
 
+  // Snapshot of hiddenLayers captured when a violation focus session starts.
+  // Restored when the user deselects. `null` = not currently in a focus session.
+  const preFocusHiddenRef = useRef<Set<string> | null>(null)
+  // Mirror of the latest hiddenLayers prop so the focus effect can read it
+  // without taking a dependency (which would cause the effect to re-run and
+  // clobber its own updates).
+  const hiddenLayersRef = useRef(hiddenLayers)
+  useEffect(() => { hiddenLayersRef.current = hiddenLayers })
+
   // ── External transform synchronization ────────────────────────────────────
   // When controlled externally, sync refs from the prop so draw() uses them.
   useEffect(() => {
@@ -767,6 +776,41 @@ export function BoardViewer({
 
     draw()
   }, [selectedViolationId, draw])
+
+  // ── Filter visible layers to the selected violation's layer ─────────────────
+  // When a violation is selected and carries a layer, narrow the toggled-on
+  // layers to just that one so the zoomed-in view isn't cluttered with
+  // unrelated copper/silk/etc. On deselect, restore the user's prior toggles.
+  // Violations without a layer (e.g. fiducial-count) leave the toggles alone.
+  useEffect(() => {
+    if (!onSetHiddenLayers) return
+
+    if (!selectedViolationId) {
+      if (preFocusHiddenRef.current !== null) {
+        onSetHiddenLayers(preFocusHiddenRef.current)
+        preFocusHiddenRef.current = null
+      }
+      return
+    }
+
+    const v = violations.find(vi => vi.id === selectedViolationId)
+    if (!v || !v.layer || layers.length === 0) return
+
+    // Capture the pre-focus snapshot exactly once per focus session so that
+    // clicking from one violation straight to another doesn't treat the
+    // already-filtered state as "what the user wanted".
+    if (preFocusHiddenRef.current === null) {
+      preFocusHiddenRef.current = new Set(hiddenLayersRef.current)
+    }
+    const next = new Set<string>()
+    for (const l of layers) {
+      if (l.name !== v.layer) next.add(l.name)
+    }
+    onSetHiddenLayers(next)
+    // Depending only on selectedViolationId keeps this from re-firing when
+    // the effect itself updates hiddenLayers via onSetHiddenLayers.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedViolationId])
 
   // ── Wheel — non-passive, zoom to cursor ─────────────────────────────────────
 
