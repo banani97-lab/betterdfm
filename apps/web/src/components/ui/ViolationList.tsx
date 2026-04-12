@@ -209,28 +209,34 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                     <p className="text-xs text-muted-foreground mt-1 leading-snug">{v.suggestion}</p>
                   )}
                   {v.measuredMM !== 0 && !v.ignored && (
-                    <div className="mt-1 grid grid-cols-2 gap-x-3 text-xs font-mono text-muted-foreground">
-                      <span>
-                        Measured&nbsp;
-                        <span className="text-foreground">
-                          {v.unit === 'ratio'
-                            ? v.measuredMM.toFixed(2)
-                            : `${v.measuredMM.toFixed(3)} mm`}
+                    <div className="mt-1 text-xs font-mono text-muted-foreground space-y-0.5">
+                      <div className="flex gap-x-3">
+                        <span>
+                          Measured&nbsp;
+                          <span className="text-foreground">
+                            {v.unit === 'ratio'
+                              ? v.measuredMM.toFixed(2)
+                              : `${v.measuredMM.toFixed(3)} mm`}
+                          </span>
                         </span>
-                      </span>
-                      <span>
-                        Limit&nbsp;
-                        <span className="text-foreground">
-                          {v.unit === 'ratio'
-                            ? v.limitMM.toFixed(2)
-                            : `${v.limitMM.toFixed(3)} mm`}
+                        <span>
+                          Limit&nbsp;
+                          <span className="text-foreground">
+                            {v.unit === 'ratio'
+                              ? v.limitMM.toFixed(2)
+                              : `${v.limitMM.toFixed(3)} mm`}
+                          </span>
                         </span>
-                      </span>
-                      {v.netName && (
-                        <span>Net&nbsp;<span className="text-foreground">{v.netName}</span></span>
-                      )}
-                      {v.refDes && (
-                        <span>Ref&nbsp;<span className="text-foreground">{v.refDes}</span></span>
+                      </div>
+                      {(v.netName || v.refDes) && (
+                        <div className="flex gap-x-3 min-w-0">
+                          {v.netName && (
+                            <span className="truncate min-w-0">Net&nbsp;<span className="text-foreground">{v.netName}</span></span>
+                          )}
+                          {v.refDes && (
+                            <span className="flex-shrink-0">Ref&nbsp;<span className="text-foreground">{v.refDes}</span></span>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
