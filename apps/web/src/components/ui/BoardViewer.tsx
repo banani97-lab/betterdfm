@@ -807,9 +807,34 @@ export function BoardViewer({
     if (preFocusHiddenRef.current === null) {
       preFocusHiddenRef.current = new Set(hiddenLayersRef.current)
     }
+
+    // For drill/outline/rout violations, show the violation's layer PLUS
+    // outer copper layers for context — a drill layer alone shows holes
+    // but no surrounding copper, making it hard to orient.
+    const vLayerLower = v.layer.toLowerCase()
+    const needsContext = vLayerLower === 'drill' || vLayerLower.includes('drill') ||
+      vLayerLower.includes('outline') || vLayerLower === 'rout'
+
+    const visible = new Set<string>([v.layer])
+    if (needsContext) {
+      // Add the first and last copper-type layers (outer copper)
+      for (const l of layers) {
+        if (l.type === 'COPPER' || l.type === 'POWER_GROUND') {
+          visible.add(l.name)
+          break // first copper = top
+        }
+      }
+      for (let i = layers.length - 1; i >= 0; i--) {
+        if (layers[i].type === 'COPPER' || layers[i].type === 'POWER_GROUND') {
+          visible.add(layers[i].name)
+          break // last copper = bottom
+        }
+      }
+    }
+
     const next = new Set<string>()
     for (const l of layers) {
-      if (l.name !== v.layer) next.add(l.name)
+      if (!visible.has(l.name)) next.add(l.name)
     }
     onSetHiddenLayers(next)
     // Depending only on selectedViolationId keeps this from re-firing when
