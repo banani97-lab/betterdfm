@@ -38,6 +38,13 @@ func main() {
 	sqsClient := sqs.NewFromConfig(cfg)
 
 	w := internal.NewWorker(db, sqsClient, sqsQueueURL, gerbonaraURL)
+
+	// Wait for the gerbonara sidecar to be healthy before consuming jobs.
+	// Both containers start simultaneously in Fargate; without this check
+	// the worker grabs a job from SQS before gerbonara has finished booting
+	// and fails with "connection refused".
+	internal.WaitForSidecar(gerbonaraURL+"/health", 120)
+
 	log.Println("starting SQS polling loop...")
 	w.Poll(context.Background())
 }
