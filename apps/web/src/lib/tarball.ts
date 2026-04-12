@@ -81,7 +81,7 @@ function buildHeader(entry: TarEntry): Uint8Array {
  * The archive ends with two 512-byte zero blocks as required by the format.
  */
 export function createTar(entries: TarEntry[]): Blob {
-  const parts: (Uint8Array | ArrayBuffer)[] = []
+  const parts: BlobPart[] = []
 
   for (const entry of entries) {
     parts.push(buildHeader(entry))
