@@ -40,6 +40,9 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
 			continue
 		}
+		if isTestPoint(pad.RefDes) {
+			continue
+		}
 		if pad.RefDes == "" || !smallPassiveClasses[pad.PackageClass] {
 			continue
 		}

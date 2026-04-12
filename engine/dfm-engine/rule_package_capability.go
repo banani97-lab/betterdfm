@@ -53,6 +53,9 @@ func (r *PackageCapabilityRule) Run(board BoardData, profile ProfileRules) []Vio
 		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
 			continue
 		}
+		if isTestPoint(pad.RefDes) {
+			continue
+		}
 		if pad.PackageClass == "" || pad.RefDes == "" {
 			continue
 		}

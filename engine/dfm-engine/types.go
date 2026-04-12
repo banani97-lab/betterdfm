@@ -114,6 +114,28 @@ type Rule interface {
 	Run(board BoardData, profile ProfileRules) []Violation
 }
 
+// isTestPoint returns true for refdes prefixes that denote test points,
+// mounting holes, or other non-component features. These should not be
+// subjected to IPC-7351 pad-size checks, package-capability checks, or
+// tombstoning analysis — their pads are not SMT land patterns.
+func isTestPoint(refDes string) bool {
+	if len(refDes) < 2 {
+		return false
+	}
+	// TP = test point, MH = mounting hole, FID = fiducial
+	c0, c1 := refDes[0], refDes[1]
+	if c0 == 'T' && c1 == 'P' {
+		return true
+	}
+	if c0 == 'M' && c1 == 'H' {
+		return true
+	}
+	if len(refDes) >= 3 && c0 == 'F' && c1 == 'I' && refDes[2] == 'D' {
+		return true
+	}
+	return false
+}
+
 // outerCopperLayerSet returns the set of outermost copper layer names from
 // the board stack — the first and last layer with type COPPER or POWER_GROUND
 // in stack order. Component mounting pads can only exist on these layers;
