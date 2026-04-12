@@ -18,12 +18,8 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 	const maxViolations = 500
 	const maxRatio = 1.3
 
-	// Only consider component mounting pads (outer copper layers,
-	// not coincident with a drill hit — see pad-size-for-package for
-	// the full rationale).
+	// Only consider component mounting pads (outer copper layers).
 	outerLayers := outerCopperLayerSet(board.Layers)
-	drillSet := newDrillLocationSet(board.Drills)
-	const drillCoincidenceTolMM = 0.05
 
 	// Group pads by RefDes, only for small passive package classes
 	type padInfo struct {
@@ -37,7 +33,7 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 		if len(outerLayers) > 0 && !outerLayers[pad.Layer] {
 			continue
 		}
-		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
+		if pad.IsViaCatchPad {
 			continue
 		}
 		if isTestPoint(pad.RefDes) {

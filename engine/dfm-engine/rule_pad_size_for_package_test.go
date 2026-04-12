@@ -129,50 +129,22 @@ func TestPadSizeForPackage_RotationInvariant(t *testing.T) {
 	}
 }
 
-// Regression: pads that sit on a drill hit are through-hole via catch-pads
-// or leaded-component pads, not SMT land patterns. Applying IPC-7351
-// passive envelopes to them produces noise — e.g. a 0.762 mm via catch-pad
-// flagged as "undersized 0805 land" because refdes spatial lookup tagged
-// it with a nearby component's package class.
-func TestPadSizeForPackage_IgnoresPadsOnDrillHits(t *testing.T) {
+// Regression: via catch-pads (IsViaCatchPad=true) are not SMT land patterns
+// and must not be checked against IPC-7351 pad-size envelopes.
+func TestPadSizeForPackage_IgnoresViaCatchPads(t *testing.T) {
 	rule := &PadSizeForPackageRule{}
 	board := BoardData{
 		SourceFormat: "ODB_PLUS_PLUS",
 		Layers:       fourLayerStack(),
 		Pads: []Pad{
-			// Via catch-pad: round, sits directly on a drill hit, got
-			// tagged as "R169 0805" by the refdes spatial lookup.
 			{Layer: "L01_TOP", X: 10.0, Y: 10.0, WidthMM: 0.762, HeightMM: 0.762,
-				Shape: "CIRCLE", RefDes: "R169", PackageClass: "0805"},
-		},
-		Drills: []Drill{
-			{X: 10.0, Y: 10.0, DiamMM: 0.406, Plated: true},
+				Shape: "CIRCLE", RefDes: "R169", PackageClass: "0805",
+				IsViaCatchPad: true},
 		},
 	}
 	viols := rule.Run(board, ProfileRules{})
 	if len(viols) != 0 {
-		t.Fatalf("expected 0 violations for pad-on-drill (via catch-pad), got %d: %+v", len(viols), viols)
-	}
-}
-
-// Sanity: a small numeric offset between pad center and drill center
-// (typical fabrication noise) should still be treated as coincident.
-func TestPadSizeForPackage_DrillCoincidenceTolerance(t *testing.T) {
-	rule := &PadSizeForPackageRule{}
-	board := BoardData{
-		SourceFormat: "ODB_PLUS_PLUS",
-		Layers:       fourLayerStack(),
-		Pads: []Pad{
-			{Layer: "L01_TOP", X: 10.000, Y: 10.000, WidthMM: 0.762, HeightMM: 0.762,
-				Shape: "CIRCLE", RefDes: "R1", PackageClass: "0805"},
-		},
-		Drills: []Drill{
-			{X: 10.020, Y: 9.985, DiamMM: 0.406, Plated: true}, // ~25 µm off
-		},
-	}
-	viols := rule.Run(board, ProfileRules{})
-	if len(viols) != 0 {
-		t.Fatalf("expected drill coincidence within tolerance, got %d violations", len(viols))
+		t.Fatalf("expected 0 violations for via catch-pad, got %d: %+v", len(viols), viols)
 	}
 }
 

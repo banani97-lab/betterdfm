@@ -49,14 +49,6 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 	// mounting lands we want to measure against IPC-7351.
 	outerLayers := outerCopperLayerSet(board.Layers)
 
-	// Reject pads that sit on a drill hit — those are through-hole via
-	// catch-pads or leaded-component pads, not SMT lands. IPC-7351 passive
-	// land patterns don't apply to them. The parser emits via catch-pads
-	// as CIRCLE pads on every copper layer of the via, and the refdes
-	// spatial lookup then tags each one with the nearest component's
-	// refdes/package — this filter removes the resulting false positives.
-	drillSet := newDrillLocationSet(board.Drills)
-	const drillCoincidenceTolMM = 0.05
 
 	// Track unclassified components (non-empty RefDes but empty PackageClass)
 	unclassifiedRefs := map[string]struct{}{}
@@ -70,7 +62,7 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 			continue
 		}
 
-		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
+		if pad.IsViaCatchPad {
 			continue
 		}
 		if isTestPoint(pad.RefDes) {

@@ -1451,6 +1451,31 @@ def parse_odb(file_path: str) -> BoardData:
             # for the clearance rule.
             _infer_polygon_nets(polygons, pads, traces, vias, net_points, warnings=warnings)
 
+            # Mark via catch-pads: any pad whose center coincides with a
+            # drill hit is a through-hole via annular ring, not a component
+            # mounting pad. Rules use pad.isViaCatchPad to skip them.
+            _tol = 0.05  # 50 µm
+            _tol2 = _tol * _tol
+            _drill_grid: dict[tuple[int, int], list[tuple[float, float]]] = {}
+            _cell = 2.0
+            for d in drills:
+                _k = (int(d.x / _cell), int(d.y / _cell))
+                _drill_grid.setdefault(_k, []).append((d.x, d.y))
+            for p in pads:
+                _gx, _gy = int(p.x / _cell), int(p.y / _cell)
+                for _dx in (-1, 0, 1):
+                    for _dy in (-1, 0, 1):
+                        for (_drx, _dry) in _drill_grid.get((_gx + _dx, _gy + _dy), ()):
+                            if (_drx - p.x) ** 2 + (_dry - p.y) ** 2 <= _tol2:
+                                p.isViaCatchPad = True
+                                break
+                        if p.isViaCatchPad:
+                            break
+                    if p.isViaCatchPad:
+                        break
+            _via_catch_count = sum(1 for p in pads if p.isViaCatchPad)
+            logger.info("ODB++ via catch-pad tagging: %d / %d pads marked", _via_catch_count, len(pads))
+
             if not outline and outline_layer_name:
                 feat = _find_layer_features(layers_dir, outline_layer_name)
                 if feat:

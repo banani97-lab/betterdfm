@@ -86,11 +86,6 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 	// in spatial.go).  Query cost is O(cells_covered) instead of O(n_pads).
 	const gridCellMM = 2.0
 
-	// Skip via catch-pads — silkscreen touching a via is cosmetic, not a
-	// manufacturing concern (no paste/reflow on vias). Without this filter,
-	// every refdes label near an escape via gets flagged.
-	drillSet := newDrillLocationSet(board.Drills)
-	const drillTolMM = 0.05
 
 	type padEntry struct {
 		box    bb
@@ -103,7 +98,7 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 		if !isCopperLayer(p.Layer) {
 			continue
 		}
-		if drillSet.Has(p.X, p.Y, drillTolMM) {
+		if p.IsViaCatchPad {
 			continue
 		}
 		hw, hh := p.WidthMM/2, p.HeightMM/2

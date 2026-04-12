@@ -40,6 +40,7 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 		outerLayers[lastCopper] = true
 	}
 
+
 	// Group pads by layer, then use a sorted sweep to avoid O(n²).
 	type padWithRadius struct {
 		p      Pad
@@ -49,6 +50,9 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 	for _, p := range board.Pads {
 		if !outerLayers[p.Layer] {
 			continue // skip inner-layer pads — no solder mask there
+		}
+		if p.IsViaCatchPad {
+			continue
 		}
 		r := math.Max(p.WidthMM, p.HeightMM) / 2
 		byLayer[p.Layer] = append(byLayer[p.Layer], padWithRadius{p, r})

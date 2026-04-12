@@ -41,6 +41,7 @@ class Pad(BaseModel):
     packageClass: str = ""  # e.g. "0201", "0402", "0603", "0805", "1206"
     contour: list[Point] = []  # polygon contour when shape == "POLYGON"
     isFiducial: bool = False
+    isViaCatchPad: bool = False
 
 
 class Via(BaseModel):
