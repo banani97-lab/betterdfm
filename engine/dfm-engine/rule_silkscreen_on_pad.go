@@ -26,19 +26,37 @@ func (a bb) overlaps(b bb) bool {
 // boardSide returns "top", "bot", or "" (unknown) for a layer name.
 func boardSide(layer string) string {
 	n := strings.ToLower(layer)
-	if strings.Contains(n, "top") || strings.Contains(n, "comp") || strings.Contains(n, "front") {
+	// Full-word matches
+	if strings.Contains(n, "top") || strings.Contains(n, "comp") || strings.Contains(n, "front") ||
+		strings.Contains(n, "f.cu") {
 		return "top"
 	}
-	if strings.Contains(n, "bot") || strings.Contains(n, "bottom") || strings.Contains(n, "back") ||
-		strings.Contains(n, "sol") {
+	if strings.Contains(n, "bot") || strings.Contains(n, "back") || strings.Contains(n, "b.cu") {
 		return "bot"
+	}
+	// ODB++ abbreviated layer names (exact match)
+	switch n {
+	case "sst", "smt", "spt":
+		return "top"
+	case "ssb", "smb", "spb":
+		return "bot"
+	}
+	// First/last copper layer heuristic: L01/signal_1 = top
+	if strings.HasPrefix(n, "l01") || n == "signal_1" {
+		return "top"
 	}
 	return ""
 }
 
 func sameSide(layerA, layerB string) bool {
 	sa, sb := boardSide(layerA), boardSide(layerB)
-	return sa == "" || sb == "" || sa == sb
+	if sa == "" || sb == "" {
+		// Can't determine side for one of the layers — only match if
+		// both are unknown (legacy fallback). Don't assume a silk layer
+		// with unknown side is on the same side as a known-side copper pad.
+		return sa == "" && sb == ""
+	}
+	return sa == sb
 }
 
 func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Violation {
