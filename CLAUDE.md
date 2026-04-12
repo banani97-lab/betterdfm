@@ -1,6 +1,6 @@
 # RapidDFM
 
-Design-for-manufacturability (DFM) analysis platform for PCB designs. Users upload Gerber or ODB++ files, the system parses board geometry, runs 11 manufacturing rule checks against a capability profile, and presents violations with a visual board viewer.
+Design-for-manufacturability (DFM) analysis platform for PCB designs. Users upload ODB++ files (as archives or folders), the system parses board geometry, runs manufacturing rule checks against a capability profile, and presents violations with a visual board viewer.
 
 ## Architecture
 
@@ -24,7 +24,7 @@ User uploads file
   → web: startAnalysis() calls API
   → api: creates AnalysisJob (PENDING), enqueues SQS message
   → worker: polls SQS, calls gerbonara POST /parse
-  → gerbonara: downloads from S3, parses Gerber/ODB++, returns BoardData
+  → gerbonara: downloads from S3, parses ODB++, returns BoardData
   → worker: runs 11 DFM rules, computes score, stores violations + board data
   → web: polls GET /jobs/:id until DONE, renders results
 ```
@@ -104,7 +104,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 
 ### Python (Sidecar)
 
-- **Two parsers**: `parser_gerber.py` (uses gerbonara LayerStack) and `parser_odb.py` (custom archive extraction).
+- **ODB++ parser**: `parser_odb.py` (custom archive extraction and feature parsing).
 - **All coordinates output in millimeters** — unit conversion happens in parsers.
 - **Fallback mock data** if S3 is unavailable (dev mode).
 
