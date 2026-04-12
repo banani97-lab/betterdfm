@@ -1014,7 +1014,8 @@ def _infer_polygon_nets(
 
 
 def _propagate_trace_nets(
-    traces: list, pads: list, warnings: list | None = None,
+    traces: list, pads: list, layers: list,
+    outline: list, warnings: list | None = None,
 ) -> None:
     """Fill in empty trace netName by walking connectivity from pads.
 
@@ -1031,7 +1032,10 @@ def _propagate_trace_nets(
        a seeded trace without crossing a different-net pad gets the same net.
 
     Only empty nets are filled — traces that already have a net from the
-    file are never overwritten.
+    file are never overwritten. Only copper/power-ground layers are
+    processed (silk, mask, paste, drill don't need net propagation).
+    Out-of-board traces (fab drawing, panelization marks) are skipped to
+    save memory on large boards.
     """
     if not traces:
         return
@@ -1039,10 +1043,38 @@ def _propagate_trace_nets(
     TOL = 0.02  # 20 µm endpoint matching tolerance
     CELL = 0.1  # grid cell for endpoint spatial index
 
+    # Only propagate on copper layers — silk/mask/paste/drill don't
+    # participate in clearance checks, so spending memory on them is waste.
+    copper_layer_names = {
+        l.name for l in layers
+        if l.type in ("COPPER", "POWER_GROUND")
+    }
+
+    # Compute board bbox for out-of-board filtering.
+    if outline:
+        o_xs = [p.x for p in outline]
+        o_ys = [p.y for p in outline]
+        o_min_x, o_max_x = min(o_xs), max(o_xs)
+        o_min_y, o_max_y = min(o_ys), max(o_ys)
+        BUF = 2.0  # same as clearance rule's panel buffer
+
+        def _in_board(t) -> bool:
+            mx = (t.startX + t.endX) / 2
+            my = (t.startY + t.endY) / 2
+            return (o_min_x - BUF <= mx <= o_max_x + BUF and
+                    o_min_y - BUF <= my <= o_max_y + BUF)
+    else:
+        def _in_board(_t) -> bool:
+            return True
+
     # Group traces by layer so propagation doesn't cross layers.
     from collections import defaultdict
     by_layer: dict[str, list[int]] = defaultdict(list)
     for i, t in enumerate(traces):
+        if t.layer not in copper_layer_names:
+            continue
+        if not _in_board(t):
+            continue
         by_layer[t.layer].append(i)
 
     # Group pads by layer.
@@ -1581,7 +1613,7 @@ def parse_odb(file_path: str) -> BoardData:
             # is too sparse for midpoint lookups. We seed from pads (a
             # trace endpoint touching a pad inherits its net) then BFS
             # through connected trace chains via shared endpoints.
-            _propagate_trace_nets(traces, pads, warnings=warnings)
+            _propagate_trace_nets(traces, pads, layers, outline, warnings=warnings)
 
             # Mark via catch-pads: any pad whose center coincides with a
             # drill hit is a through-hole via annular ring, not a component
