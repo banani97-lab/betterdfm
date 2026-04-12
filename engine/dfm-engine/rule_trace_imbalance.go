@@ -87,9 +87,8 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 
 // connectedCopperWidth returns an effective copper width connected to a pad.
 // It checks both traces (by endpoint proximity) and polygons (pad inside pour).
-// A pad sitting on a copper polygon returns a large synthetic width to represent
-// the thermal mass of the pour — this correctly flags imbalance when one pad
-// has a thin trace and the other sits on a ground/power plane.
+// A pad sitting on a copper polygon returns the polygon's shortest bounding-box
+// dimension as a synthetic width, representing the thermal mass of the pour.
 func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLayers map[string]bool) float64 {
 	var maxWidth float64
 
@@ -105,19 +104,21 @@ func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLay
 		}
 	}
 
-	// Check if pad is connected to a copper polygon on the same layer.
-	// A polygon connection represents a large copper pour — thermal relief
-	// patterns mean the pad center may not be inside the polygon, so we also
-	// check if any polygon edge passes near the pad (within pad radius + 0.5mm).
+	// Check if pad is connected to a same-net copper polygon on the same layer.
+	// Only same-net polygons can be thermally connected — a GND pour's anti-pad
+	// edge near a signal pad does NOT constitute a thermal connection.
 	padRadius := math.Max(pad.WidthMM, pad.HeightMM) / 2
-	proximity := padRadius + 0.5 // thermal relief spokes are typically within this range
+	proximity := padRadius + 0.5
 	for _, poly := range polygons {
 		if poly.Layer != pad.Layer || !copperLayers[poly.Layer] {
 			continue
 		}
+		// Net filter: only match polygons on the pad's net.
+		if poly.NetName == "" || poly.NetName != pad.NetName {
+			continue
+		}
 		connected := pointInPolygon(pad.X, pad.Y, poly.Points)
 		if !connected {
-			// Check if any polygon edge is near the pad
 			n := len(poly.Points)
 			for i := 0; i < n && !connected; i++ {
 				a := poly.Points[i]
@@ -128,7 +129,10 @@ func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLay
 			}
 		}
 		if connected {
-			pourWidth := 10.0
+			// Use the polygon's shortest bbox dimension as equivalent width
+			// instead of a hardcoded constant. A 2 mm routing island and a
+			// 200 mm ground plane have very different thermal mass.
+			pourWidth := polyShortDim(poly)
 			if pourWidth > maxWidth {
 				maxWidth = pourWidth
 			}
@@ -137,5 +141,40 @@ func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLay
 	}
 
 	return maxWidth
+}
+
+// polyShortDim returns the shortest bounding-box dimension of a polygon,
+// capped at 50 mm. Used as a proxy for the thermal mass a copper pour
+// contributes relative to a thin trace.
+func polyShortDim(poly Polygon) float64 {
+	if len(poly.Points) < 3 {
+		return 1.0
+	}
+	minX, maxX := poly.Points[0].X, poly.Points[0].X
+	minY, maxY := poly.Points[0].Y, poly.Points[0].Y
+	for _, p := range poly.Points[1:] {
+		if p.X < minX {
+			minX = p.X
+		}
+		if p.X > maxX {
+			maxX = p.X
+		}
+		if p.Y < minY {
+			minY = p.Y
+		}
+		if p.Y > maxY {
+			maxY = p.Y
+		}
+	}
+	w := maxX - minX
+	h := maxY - minY
+	short := math.Min(w, h)
+	if short < 0.1 {
+		short = 0.1
+	}
+	if short > 50.0 {
+		short = 50.0
+	}
+	return short
 }
 
