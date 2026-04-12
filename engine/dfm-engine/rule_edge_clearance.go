@@ -55,6 +55,14 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 	)
 	limit := profile.MinEdgeClearanceMM
 
+	// Reject pads that sit on a drill hit — those are via catch-pads, not
+	// component pads. The parser stores via catch-pads as Pads on every
+	// copper layer, and the refdes spatial lookup tags them with a nearby
+	// component's refdes (e.g. mounting holes MH10/MH11), so the RefDes
+	// filter below can't distinguish them from real component pads.
+	drillSet := newDrillLocationSet(board.Drills)
+	const drillCoincidenceTolMM = 0.05
+
 	// Check component pads and fiducials only (skip anonymous pads like pour thermals)
 	for _, pad := range board.Pads {
 		if len(violations) >= maxViol {
@@ -65,6 +73,9 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 		}
 		// Only check pads that belong to a component or are fiducials
 		if pad.RefDes == "" && !pad.IsFiducial {
+			continue
+		}
+		if drillSet.Has(pad.X, pad.Y, drillCoincidenceTolMM) {
 			continue
 		}
 		if !inBBoxRegion(pad.X, pad.Y) {
