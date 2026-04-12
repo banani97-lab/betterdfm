@@ -320,6 +320,14 @@ function UploadPageInner() {
           ))}
         </div>
 
+        {/* Step: packaging folder into tar */}
+        {step === 'packaging' && (
+          <div className="flex flex-col items-center justify-center gap-3 py-12">
+            <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+            <p className="text-sm font-medium text-foreground">Packaging folder...</p>
+          </div>
+        )}
+
         {/* Step: select */}
         {step === 'select' && (
           <div className="space-y-6">
@@ -340,12 +348,7 @@ function UploadPageInner() {
                 onChange={handleFilesSelected}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              {step === 'packaging' ? (
-                <div className="flex flex-col items-center gap-2 text-center px-4">
-                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
-                  <p className="text-sm font-medium text-foreground">Packaging folder...</p>
-                </div>
-              ) : !hasFiles ? (
+              {!hasFiles ? (
                 <div className="flex flex-col items-center gap-2 text-center px-4">
                   <Upload className="h-10 w-10 text-muted-foreground" />
                   <div>
