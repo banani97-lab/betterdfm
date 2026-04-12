@@ -817,18 +817,22 @@ export function BoardViewer({
 
     const visible = new Set<string>([v.layer])
     if (needsContext) {
-      // Add the first and last copper-type layers (outer copper)
       for (const l of layers) {
+        // Add outer copper (first and last COPPER layers) for context
         if (l.type === 'COPPER' || l.type === 'POWER_GROUND') {
           visible.add(l.name)
-          break // first copper = top
+          break
         }
       }
       for (let i = layers.length - 1; i >= 0; i--) {
         if (layers[i].type === 'COPPER' || layers[i].type === 'POWER_GROUND') {
           visible.add(layers[i].name)
-          break // last copper = bottom
+          break
         }
+      }
+      // Also show all drill-type layers so holes are visible in the panel
+      for (const l of layers) {
+        if (l.type === 'DRILL') visible.add(l.name)
       }
     }
 

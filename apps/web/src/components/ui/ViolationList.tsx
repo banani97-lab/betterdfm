@@ -54,9 +54,15 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
 
   useEffect(() => {
     if (!selectedId || !listRef.current) return
-    const el = listRef.current.querySelector(`[data-violation-id="${selectedId}"]`)
-    el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-  }, [selectedId])
+    // Use rAF to scroll after the DOM has settled — the layer-filter
+    // effect in BoardViewer can trigger a parent rerender that changes
+    // the violations list, shifting DOM positions. Scrolling before that
+    // rerender lands on the wrong offset.
+    requestAnimationFrame(() => {
+      const el = listRef.current?.querySelector(`[data-violation-id="${selectedId}"]`)
+      el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    })
+  }, [selectedId, violations])
 
   // Counts always reflect the full layer-filtered set, not the active severity tab
   const counts = {

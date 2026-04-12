@@ -1013,6 +1013,131 @@ def _infer_polygon_nets(
     )
 
 
+def _propagate_trace_nets(
+    traces: list, pads: list, warnings: list | None = None,
+) -> None:
+    """Fill in empty trace netName by walking connectivity from pads.
+
+    Many ODB++ exports don't carry `.net=` attributes on L (trace) records
+    and the netlist file is too sparse for midpoint lookups. This leaves
+    most traces without a net, which breaks the clearance rule's same-net
+    skip and produces thousands of false positives.
+
+    Strategy:
+    1. **Seed** — for each trace with an empty net, check if either endpoint
+       is within tolerance of a pad that has a known net. If so, adopt it.
+    2. **BFS propagation** — walk through connected trace chains via shared
+       endpoints (spatial grid, 20 µm tolerance). Every trace reachable from
+       a seeded trace without crossing a different-net pad gets the same net.
+
+    Only empty nets are filled — traces that already have a net from the
+    file are never overwritten.
+    """
+    if not traces:
+        return
+
+    TOL = 0.02  # 20 µm endpoint matching tolerance
+    CELL = 0.1  # grid cell for endpoint spatial index
+
+    # Group traces by layer so propagation doesn't cross layers.
+    from collections import defaultdict
+    by_layer: dict[str, list[int]] = defaultdict(list)
+    for i, t in enumerate(traces):
+        by_layer[t.layer].append(i)
+
+    # Group pads by layer.
+    pads_by_layer: dict[str, list] = defaultdict(list)
+    for p in pads:
+        if p.netName and p.netName != "$NONE$":
+            pads_by_layer[p.layer].append(p)
+
+    total_seeded = 0
+    total_propagated = 0
+
+    for layer, trace_idxs in by_layer.items():
+        layer_pads = pads_by_layer.get(layer, [])
+
+        # Build spatial grid of trace endpoints for fast neighbour lookup.
+        ep_grid: dict[tuple[int, int], list[int]] = defaultdict(list)
+        for i in trace_idxs:
+            t = traces[i]
+            for x, y in ((t.startX, t.startY), (t.endX, t.endY)):
+                ep_grid[(int(x / CELL), int(y / CELL))].append(i)
+
+        def _touching(x: float, y: float, exclude: int) -> list[int]:
+            """Trace indices with an endpoint within TOL of (x, y)."""
+            gx, gy = int(x / CELL), int(y / CELL)
+            result: list[int] = []
+            tol2 = TOL * TOL
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for j in ep_grid.get((gx + dx, gy + dy), ()):
+                        if j == exclude:
+                            continue
+                        tj = traces[j]
+                        if (tj.startX - x) ** 2 + (tj.startY - y) ** 2 <= tol2 or \
+                           (tj.endX - x) ** 2 + (tj.endY - y) ** 2 <= tol2:
+                            result.append(j)
+            return result
+
+        def _pad_net_at(x: float, y: float) -> str:
+            """Return the net of a pad whose edge is within TOL of (x, y)."""
+            for p in layer_pads:
+                dx, dy = abs(x - p.x), abs(y - p.y)
+                hw, hh = p.widthMM / 2, p.heightMM / 2
+                if p.shape == "CIRCLE":
+                    if (dx * dx + dy * dy) ** 0.5 - hw <= TOL:
+                        return p.netName
+                else:
+                    if max(dx - hw, dy - hh, 0) <= TOL:
+                        return p.netName
+            return ""
+
+        # Phase 1: seed from pads.
+        assigned: dict[int, str] = {}
+        for i in trace_idxs:
+            t = traces[i]
+            if t.netName:
+                assigned[i] = t.netName
+                continue
+            net = _pad_net_at(t.startX, t.startY) or _pad_net_at(t.endX, t.endY)
+            if net:
+                assigned[i] = net
+                total_seeded += 1
+
+        # Phase 2: BFS propagation through shared endpoints.
+        queue = list(assigned.keys())
+        visited = set(assigned.keys())
+        while queue:
+            i = queue.pop()
+            net = assigned[i]
+            t = traces[i]
+            for x, y in ((t.startX, t.startY), (t.endX, t.endY)):
+                for j in _touching(x, y, i):
+                    if j in visited:
+                        continue
+                    visited.add(j)
+                    assigned[j] = net
+                    total_propagated += 1
+                    queue.append(j)
+
+        # Apply assignments.
+        for i, net in assigned.items():
+            if not traces[i].netName:
+                traces[i].netName = net
+
+    total = total_seeded + total_propagated
+    if total and warnings is not None:
+        warnings.append(
+            f"Propagated net names to {total} traces "
+            f"(seeded:{total_seeded} propagated:{total_propagated})"
+        )
+    logger.info(
+        "ODB++ trace net propagation: labeled %d (seeded:%d propagated:%d)",
+        total, total_seeded, total_propagated,
+    )
+
+
 def _attr_net(raw_line: str) -> str:
     """Extract net name from ODB++ attribute string."""
     semi = raw_line.find(";")
@@ -1450,6 +1575,13 @@ def parse_odb(file_path: str) -> BoardData:
             # each polygon. See _infer_polygon_nets for why this matters
             # for the clearance rule.
             _infer_polygon_nets(polygons, pads, traces, vias, net_points, warnings=warnings)
+
+            # Propagate net names to traces that lack them. Many ODB++
+            # exports don't put `.net=` on L records and the netlist file
+            # is too sparse for midpoint lookups. We seed from pads (a
+            # trace endpoint touching a pad inherits its net) then BFS
+            # through connected trace chains via shared endpoints.
+            _propagate_trace_nets(traces, pads, warnings=warnings)
 
             # Mark via catch-pads: any pad whose center coincides with a
             # drill hit is a through-hole via annular ring, not a component
