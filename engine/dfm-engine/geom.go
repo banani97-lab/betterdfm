@@ -61,6 +61,87 @@ func padEdgeDist(px, py float64, pad Pad) float64 {
 	}
 }
 
+// padToPadGap returns the minimum edge-to-edge distance between two pads.
+// Returns 0 if the pads overlap. Shape-aware for all common pad types.
+func padToPadGap(a, b Pad) float64 {
+	// For two RECTs: exact axis-aligned bounding box distance.
+	if a.Shape == "RECT" && b.Shape == "RECT" {
+		gapX := math.Max(0, math.Max(
+			(b.X-b.WidthMM/2)-(a.X+a.WidthMM/2),
+			(a.X-a.WidthMM/2)-(b.X+b.WidthMM/2),
+		))
+		gapY := math.Max(0, math.Max(
+			(b.Y-b.HeightMM/2)-(a.Y+a.HeightMM/2),
+			(a.Y-a.HeightMM/2)-(b.Y+b.HeightMM/2),
+		))
+		return math.Sqrt(gapX*gapX + gapY*gapY)
+	}
+	// For two CIRCLEs: center distance minus both radii.
+	if a.Shape == "CIRCLE" && b.Shape == "CIRCLE" {
+		d := math.Sqrt((a.X-b.X)*(a.X-b.X) + (a.Y-b.Y)*(a.Y-b.Y))
+		return math.Max(0, d-a.WidthMM/2-b.WidthMM/2)
+	}
+	// General case: find the closest point on pad A's surface to pad B's
+	// center, then measure from that point to pad B's edge. This is exact
+	// for CIRCLE-RECT and a very close approximation for other combos.
+	cpx, cpy := padClosestPoint(a, b.X, b.Y)
+	return padEdgeDist(cpx, cpy, b)
+}
+
+// padClosestPoint returns the point on pad's surface nearest to (px, py).
+// If (px, py) is inside the pad, returns (px, py) itself.
+func padClosestPoint(pad Pad, px, py float64) (float64, float64) {
+	switch pad.Shape {
+	case "RECT":
+		cx := math.Max(pad.X-pad.WidthMM/2, math.Min(px, pad.X+pad.WidthMM/2))
+		cy := math.Max(pad.Y-pad.HeightMM/2, math.Min(py, pad.Y+pad.HeightMM/2))
+		return cx, cy
+	case "CIRCLE":
+		dx, dy := px-pad.X, py-pad.Y
+		d := math.Sqrt(dx*dx + dy*dy)
+		r := pad.WidthMM / 2
+		if d <= r {
+			return px, py
+		}
+		return pad.X + dx/d*r, pad.Y + dy/d*r
+	case "OVAL":
+		r := math.Min(pad.WidthMM, pad.HeightMM) / 2
+		halfLen := math.Max(0, (math.Max(pad.WidthMM, pad.HeightMM)-2*r)/2)
+		// Closest point on capsule axis segment
+		var sx, sy, ex, ey float64
+		if pad.WidthMM >= pad.HeightMM {
+			sx, sy = pad.X-halfLen, pad.Y
+			ex, ey = pad.X+halfLen, pad.Y
+		} else {
+			sx, sy = pad.X, pad.Y-halfLen
+			ex, ey = pad.X, pad.Y+halfLen
+		}
+		// Project onto axis segment
+		adx, ady := ex-sx, ey-sy
+		l2 := adx*adx + ady*ady
+		var t float64
+		if l2 > 0 {
+			t = math.Max(0, math.Min(1, ((px-sx)*adx+(py-sy)*ady)/l2))
+		}
+		nearX, nearY := sx+t*adx, sy+t*ady
+		dx, dy := px-nearX, py-nearY
+		d := math.Sqrt(dx*dx + dy*dy)
+		if d <= r {
+			return px, py
+		}
+		return nearX + dx/d*r, nearY + dy/d*r
+	default:
+		// Fallback: treat as circle with max dimension
+		r := math.Max(pad.WidthMM, pad.HeightMM) / 2
+		dx, dy := px-pad.X, py-pad.Y
+		d := math.Sqrt(dx*dx + dy*dy)
+		if d <= r {
+			return px, py
+		}
+		return pad.X + dx/d*r, pad.Y + dy/d*r
+	}
+}
+
 // padProjection returns the pad's half-extent projected onto the unit vector (dx, dy).
 // Use this to compute the pad-to-pad gap: gap = centerDist - projA - projB where
 // projA = padProjection(padA, bX-aX, bY-aY) and projB = padProjection(padB, aX-bX, aY-bY).

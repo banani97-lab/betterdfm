@@ -82,12 +82,10 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 				if b.p.X-b.radius > xLimit {
 					break // all remaining pads are too far in X
 				}
-				centerDist := math.Sqrt((a.p.X-b.p.X)*(a.p.X-b.p.X) + (a.p.Y-b.p.Y)*(a.p.Y-b.p.Y))
-				// P2.1: Use padProjection for shape-aware pad-to-pad gap.
-				dx, dy := b.p.X-a.p.X, b.p.Y-a.p.Y
-				edgeDist := centerDist - padProjection(a.p, dx, dy) - padProjection(b.p, -dx, -dy)
-				// Overlapping openings (edgeDist < 0) are a DRC concern, not DFM -- skip.
-				if edgeDist < 0 {
+				edgeDist := padToPadGap(a.p, b.p)
+				// Overlapping or touching openings are a DRC concern, not DFM — skip.
+				// padToPadGap returns 0 for overlapping pads (clamped from negative).
+				if edgeDist <= geomEps {
 					continue
 				}
 				if edgeDist < minDam-geomEps {
