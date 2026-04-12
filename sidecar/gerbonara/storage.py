@@ -39,7 +39,7 @@ def download_from_s3(bucket: str, key: str) -> str:
 
 
 def _mock_board() -> BoardData:
-    """Return a simple mock board for testing without real S3/Gerber files."""
+    """Return a simple mock board for testing without real S3/ODB++ files."""
     return BoardData(
         layers=[
             Layer(name="top_copper", type="COPPER"),

@@ -351,7 +351,7 @@ export default function TechnicalPage() {
           <section style={{ marginBottom: '4rem' }}>
             <h2 style={h2Style}>What is RapidDFM?</h2>
             <p style={pStyle}>
-              RapidDFM is a SaaS Design-for-Manufacturability (DFM) analysis platform aimed at contract PCB manufacturers. A CM white-labels it as a portal — their customers upload Gerber RS-274X or ODB++ files, the platform runs 16 manufacturing rule checks against a configurable capability profile, and returns a scored manufacturability report with violations pinpointed on an interactive SVG board viewer.
+              RapidDFM is a SaaS Design-for-Manufacturability (DFM) analysis platform aimed at contract PCB manufacturers. A CM white-labels it as a portal — their customers upload ODB++ files, the platform runs 16 manufacturing rule checks against a configurable capability profile, and returns a scored manufacturability report with violations pinpointed on an interactive SVG board viewer.
             </p>
             <p style={pStyle}>
               The core insight: CMs today do this review manually, spending 30–60 minutes per board opening CAM tools and checking clearances, drill sizes, and annular rings by eye. RapidDFM automates the entire first pass in under 30 seconds, surfaces all violations with coordinates and severity, and gives customers a shareable link they can use to track revisions.
@@ -600,10 +600,6 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
                 title: 'Panel filtering',
                 body: 'Copper features more than 2 mm outside the board outline are ignored entirely. These are typically fiducials, tooling marks, and test coupons that appear in panel frames — not part of the actual board.',
               },
-              {
-                title: 'ODB++ vs. Gerber',
-                body: 'The clearance rule requires net information to exclude same-net copper (intentionally connected traces have zero clearance by design). ODB++ includes a full netlist. Gerber RS-274X does not — running clearance on Gerber would flood the report with false positives. The rule is skipped for Gerber uploads.',
-              },
             ].map(({ title, body }, i) => (
               <Callout key={title} number={i + 1} title={title}>{body}</Callout>
             ))}
@@ -758,21 +754,15 @@ while (true) {
           <section style={{ marginBottom: '4rem' }}>
             <h2 style={h2Style}>Gerbonara Sidecar</h2>
             <p style={pStyle}>
-              Parsing Gerber and ODB++ files in Go would require reimplementing two complex, underspecified formats. Instead, a Python FastAPI sidecar wraps the <a href="https://github.com/jaseg/gerbonara" style={{ color: '#4a9eff', textDecoration: 'none' }}>gerbonara</a> library and exposes a single <code style={inlineCode}>POST /parse</code> endpoint. The worker calls the sidecar with an S3 key; the sidecar downloads the file and returns a <code style={inlineCode}>BoardData</code> JSON blob.
+              Parsing ODB++ files in Go would require reimplementing a complex, underspecified format. Instead, a Python FastAPI sidecar exposes a single <code style={inlineCode}>POST /parse</code> endpoint. The worker calls the sidecar with an S3 key; the sidecar downloads the file and returns a <code style={inlineCode}>BoardData</code> JSON blob.
             </p>
 
-            <h3 style={h3Style}>Format support</h3>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1rem', marginBottom: '1.5rem' }}>
-              <div style={{ background: '#111418', border: '1px solid #1e2432', borderRadius: '8px', padding: '1rem' }}>
-                <div style={{ color: '#4a9eff', fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>Gerber RS-274X</div>
-                <div style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.6 }}>
-                  Uses gerbonara <code style={inlineCode}>LayerStack</code> for layer grouping and geometry extraction. Limited to geometric checks — no netlist, so clearance rule is skipped.
-                </div>
-              </div>
+            <h3 style={h3Style}>ODB++ format</h3>
+            <div style={{ marginTop: '1rem', marginBottom: '1.5rem' }}>
               <div style={{ background: '#111418', border: '1px solid #1e2432', borderRadius: '8px', padding: '1rem' }}>
                 <div style={{ color: '#d4891a', fontWeight: 700, fontSize: '13px', marginBottom: '6px' }}>ODB++</div>
                 <div style={{ color: '#64748b', fontSize: '12px', lineHeight: 1.6 }}>
-                  Custom archive extractor handles double-gzip (outer gzip wrapping inner tar). Parses feature records and symbol definitions. Includes full netlist → clearance rule enabled.
+                  Custom archive extractor handles double-gzip (outer gzip wrapping inner tar), plain tar, and zip. Parses feature records, symbol definitions, and component lists. Includes full netlist for same-net filtering in clearance checks.
                 </div>
               </div>
             </div>
@@ -1052,7 +1042,7 @@ NET {
             </div>
 
             <p style={pStyle}>
-              Layer type is inferred from filename heuristics (<code style={inlineCode}>gtl</code> → top copper, <code style={inlineCode}>gbl</code> → bottom copper, <code style={inlineCode}>gto</code> → top silkscreen, etc.) so users don't need to label their Gerber layers. External transform sync enables the compare view where two boards pan/zoom in lockstep — useful for diffing before/after a revision.
+              Layer type is inferred from layer metadata in the ODB++ matrix and filename heuristics. External transform sync enables the compare view where two boards pan/zoom in lockstep — useful for diffing before/after a revision.
             </p>
 
             <h3 style={h3Style}>Auth</h3>
@@ -1080,10 +1070,6 @@ NET {
               {
                 title: 'Per-rule score caps sum to 100',
                 body: 'Each rule\'s maximum contribution to the penalty is calibrated so all caps sum exactly to 100. This prevents a single dense-board violation type (e.g. 10,000 clearance hits) from auto-failing the score. A board where only clearance is maximally violated still scores 83 — grade B, still fixable.',
-              },
-              {
-                title: 'Clearance disabled for Gerber',
-                body: 'Gerber RS-274X has no netlist. Without net information, the clearance rule can\'t distinguish intentionally connected copper from a genuine violation. Running it on Gerber produces hundreds of false positives. Better to skip it and surface the other 15 checks cleanly.',
               },
               {
                 title: 'Spatial deduplication post-collection',

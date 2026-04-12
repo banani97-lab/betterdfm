@@ -69,8 +69,8 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 		if f.Filename == "" {
 			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("files[%d]: filename required", i))
 		}
-		if f.FileType != "GERBER" && f.FileType != "ODB_PLUS_PLUS" {
-			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("files[%d]: fileType must be GERBER or ODB_PLUS_PLUS", i))
+		if f.FileType != "ODB_PLUS_PLUS" {
+			return echo.NewHTTPError(http.StatusBadRequest, fmt.Sprintf("files[%d]: fileType must be ODB_PLUS_PLUS", i))
 		}
 	}
 
@@ -120,7 +120,7 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 			CreatedAt: now,
 		})
 
-		contentType := "application/zip"
+		contentType := "application/octet-stream"
 		presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 		if err != nil {
 			presignedURL = ""

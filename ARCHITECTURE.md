@@ -12,7 +12,7 @@ RapidDFM is a SaaS PCB Design-for-Manufacturability (DFM) engine. Contract manuf
 | Backend API | Go (Echo framework) |
 | DFM Worker | Go (ECS Fargate, polls SQS) |
 | DFM Rule Engine | Go library (shared between API and worker) |
-| Gerber/ODB++ Parsing | Python FastAPI sidecar wrapping gerbonara |
+| ODB++ Parsing | Python FastAPI sidecar |
 | Database | AWS RDS PostgreSQL via GORM |
 | File Storage | AWS S3 (presigned upload URLs) |
 | Job Queue | AWS SQS |
@@ -73,7 +73,7 @@ See `apps/api/src/db/models.go` for GORM model definitions.
 - **organizations** — CM tenants
 - **users** — linked to Cognito sub, belong to an org
 - **capability_profiles** — CM shop floor constraints (JSON rules blob)
-- **submissions** — uploaded Gerber/ODB++ files
+- **submissions** — uploaded ODB++ files
 - **analysis_jobs** — one analysis run per submission+profile pair
 - **violations** — individual DFM issues found per job
 

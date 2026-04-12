@@ -200,7 +200,7 @@ export default function BatchDetailPage() {
                     >
                       <td className="px-4 py-3 font-medium truncate max-w-[200px]">{sub.filename}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {sub.fileType === 'ODB_PLUS_PLUS' ? 'ODB++' : 'Gerber'}
+                        ODB++
                       </td>
                       <td className="px-4 py-3">{statusBadge(sub.jobStatus || sub.status)}</td>
                       <td className="px-4 py-3 text-right font-mono">

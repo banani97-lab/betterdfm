@@ -66,7 +66,7 @@ export default function LandingPage() {
           <span className="text-[#4fc3f7]">Start Screening Them Automatically.</span>
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          RapidDFM runs 16 manufacturability checks on every incoming Gerber and ODB++ file in under 30 seconds — before your CAM team ever opens them. Reduce first-pass review time by up to 80%, standardize quoting decisions, and eliminate revision loops with customers.
+          RapidDFM runs 16 manufacturability checks on every incoming ODB++ file in under 30 seconds — before your CAM team ever opens them. Reduce first-pass review time by up to 80%, standardize quoting decisions, and eliminate revision loops with customers.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
@@ -84,7 +84,7 @@ export default function LandingPage() {
             See How It Works
           </a>
         </div>
-        <p className="mt-6 text-sm text-slate-400">Works in your browser. No installation. Gerber + ODB++ native support.</p>
+        <p className="mt-6 text-sm text-slate-400">Works in your browser. No installation. ODB++ native support.</p>
       </section>
 
       {/* Stats strip */}
@@ -165,7 +165,7 @@ export default function LandingPage() {
         <h2 className="text-3xl sm:text-4xl font-bold text-center mb-16">How It Works</h2>
         <div className="grid sm:grid-cols-4 gap-8 text-center">
           {[
-            { step: '1', title: 'Upload', desc: 'Drop a Gerber ZIP or ODB++ archive. No file prep, no extraction.' },
+            { step: '1', title: 'Upload', desc: 'Drop an ODB++ archive or folder. No file prep, no extraction.' },
             { step: '2', title: 'Apply Your Rules', desc: 'Select a capability profile that matches your process line.' },
             { step: '3', title: 'Instant Analysis', desc: '16 DFM checks run in under 30 seconds. Every violation scored and mapped.' },
             { step: '4', title: 'Review & Share', desc: 'Send a branded report link to your customer. Track revisions until it\'s fab-ready.' },

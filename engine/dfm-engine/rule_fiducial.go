@@ -11,9 +11,6 @@ type FiducialRule struct{}
 func (r *FiducialRule) ID() string { return "fiducial-count" }
 
 func (r *FiducialRule) Run(board BoardData, _ ProfileRules) []Violation {
-	if board.SourceFormat == "GERBER" {
-		return nil // requires pad_usage attribute (ODB++ only)
-	}
 	count := 0
 	for _, p := range board.Pads {
 		if p.IsFiducial {
@@ -22,7 +19,7 @@ func (r *FiducialRule) Run(board BoardData, _ ProfileRules) []Violation {
 	}
 
 	// Only run this rule if the parser provided fiducial data (at least one
-	// pad tagged). Gerber files don't carry fiducial attributes, so we skip
+	// pad tagged). If no fiducials are found in the data, we skip
 	// rather than always failing.
 	if count == 0 {
 		return nil

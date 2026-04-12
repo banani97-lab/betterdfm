@@ -39,9 +39,6 @@ type PadSizeForPackageRule struct{}
 func (r *PadSizeForPackageRule) ID() string { return "pad-size-for-package" }
 
 func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation {
-	if board.SourceFormat == "GERBER" {
-		return nil // requires component data (packageClass)
-	}
 	const maxViolations = 500
 	var violations []Violation
 

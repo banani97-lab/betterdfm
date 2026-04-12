@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""ODB++ / Gerber sidecar parser for RapidDFM (gerbonara).
+"""ODB++ sidecar parser for RapidDFM.
 
 Parse pipeline (ODB++):
     parse_odb(file_path)
@@ -28,7 +28,6 @@ from fastapi import FastAPI, HTTPException
 from models import ParseRequest, BoardData
 from storage import download_from_s3, _mock_board
 from parser_odb import parse_odb
-from parser_gerber import parse_gerber
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -53,12 +52,10 @@ def parse(req: ParseRequest):
         return _mock_board()
 
     try:
-        if req.fileType == "ODB_PLUS_PLUS":
-            board = parse_odb(tmp_path)
-            board.sourceFormat = "ODB_PLUS_PLUS"
-        else:
-            board = parse_gerber(tmp_path)
-            board.sourceFormat = "GERBER"
+        if req.fileType != "ODB_PLUS_PLUS":
+            raise HTTPException(status_code=400, detail=f"Unsupported file type: {req.fileType}")
+        board = parse_odb(tmp_path)
+        board.sourceFormat = "ODB_PLUS_PLUS"
         return board
     except Exception as e:
         logger.error("Parse failed: %s", e, exc_info=True)

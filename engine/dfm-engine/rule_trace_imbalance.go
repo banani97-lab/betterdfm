@@ -9,9 +9,6 @@ type TraceImbalanceRule struct{}
 func (TraceImbalanceRule) ID() string { return "trace-imbalance" }
 
 func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation {
-	if board.SourceFormat == "GERBER" {
-		return nil // requires component data (refDes)
-	}
 	maxRatio := profile.MaxTraceImbalanceRatio
 	if maxRatio <= 0 {
 		return nil

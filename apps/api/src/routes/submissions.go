@@ -86,7 +86,7 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 
 	var req struct {
 		Filename  string  `json:"filename"`
-		FileType  string  `json:"fileType"` // GERBER | ODB_PLUS_PLUS
+		FileType  string  `json:"fileType"` // ODB_PLUS_PLUS
 		ProjectID *string `json:"projectId"`
 	}
 	if err := c.Bind(&req); err != nil {
@@ -95,8 +95,8 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 	if req.Filename == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "filename required")
 	}
-	if req.FileType != "GERBER" && req.FileType != "ODB_PLUS_PLUS" {
-		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be GERBER or ODB_PLUS_PLUS")
+	if req.FileType != "ODB_PLUS_PLUS" {
+		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be ODB_PLUS_PLUS")
 	}
 
 	submissionID := uuid.New().String()
@@ -131,7 +131,7 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 
 	lib.Track("Submission Created", user.OrgID, map[string]any{"orgId": user.OrgID, "fileType": req.FileType, "projectId": req.ProjectID})
 
-	contentType := "application/zip"
+	contentType := "application/octet-stream"
 	presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 	if err != nil {
 		// Return the submission even if presign fails (dev mode without real S3)

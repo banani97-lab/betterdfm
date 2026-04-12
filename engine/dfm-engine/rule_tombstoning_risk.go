@@ -15,9 +15,6 @@ type TombstoningRiskRule struct{}
 func (r *TombstoningRiskRule) ID() string { return "tombstoning-risk" }
 
 func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
-	if board.SourceFormat == "GERBER" {
-		return nil // requires component data (refDes, packageClass)
-	}
 	const maxViolations = 500
 	const maxRatio = 1.3
 

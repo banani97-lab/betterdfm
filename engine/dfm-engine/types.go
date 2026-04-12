@@ -12,7 +12,7 @@ type BoardData struct {
 	BoardThicknessMM float64    `json:"boardThicknessMM"`
 	Warnings         []string   `json:"warnings,omitempty"`
 	Polygons         []Polygon  `json:"polygons,omitempty"`
-	SourceFormat     string     `json:"sourceFormat,omitempty"` // "GERBER" | "ODB_PLUS_PLUS"
+	SourceFormat     string     `json:"sourceFormat,omitempty"` // "ODB_PLUS_PLUS"
 }
 
 type Layer struct {
@@ -102,7 +102,7 @@ type Violation struct {
 	MeasuredMM float64 `json:"measuredMM"` // actual measured value (e.g. 0.08 mm trace width)
 	LimitMM    float64 `json:"limitMM"`    // the rule limit that was violated (e.g. 0.10 mm)
 	Unit       string  `json:"unit"`       // "mm" | "ratio"
-	NetName    string  `json:"netName"`    // net name, "" for Gerber or unknown
+	NetName    string  `json:"netName"`    // net name, "" if unknown
 	RefDes     string  `json:"refDes"`     // reference designator, "" if not a component pad
 	X2         float64 `json:"x2"`         // second object X (clearance/dam rules), 0 otherwise
 	Y2         float64 `json:"y2"`         // second object Y (clearance/dam rules), 0 otherwise

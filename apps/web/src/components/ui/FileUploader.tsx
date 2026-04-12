@@ -79,8 +79,8 @@ export function FileUploader({ accept, onFile, disabled }: FileUploaderProps) {
         <div className="flex flex-col items-center gap-2 text-center px-4">
           <Upload className="h-10 w-10 text-muted-foreground" />
           <div>
-            <p className="text-sm font-medium text-foreground">Drop your Gerber or ODB++ file here</p>
-            <p className="text-xs text-muted-foreground mt-1">or click to browse — .zip, .gbr, .ger accepted</p>
+            <p className="text-sm font-medium text-foreground">Drop your ODB++ file or folder here</p>
+            <p className="text-xs text-muted-foreground mt-1">or click to browse &mdash; .zip, .tar, .tgz accepted</p>
           </div>
         </div>
       )}

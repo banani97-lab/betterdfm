@@ -83,7 +83,7 @@ type Batch struct {
 	UpdatedAt time.Time `json:"updatedAt"`
 }
 
-// Submission is an uploaded Gerber or ODB++ file
+// Submission is an uploaded ODB++ file
 type Submission struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
 	OrgID     string    `json:"orgId"`
@@ -91,7 +91,7 @@ type Submission struct {
 	ProjectID *string   `json:"projectId"`
 	BatchID   *string   `json:"batchId"`
 	Filename  string    `json:"filename"`
-	FileType  string    `json:"fileType"` // GERBER | ODB_PLUS_PLUS
+	FileType  string    `json:"fileType"` // ODB_PLUS_PLUS
 	FileKey   string    `json:"fileKey"`  // S3 key
 	Status    string    `json:"status"`   // UPLOADED | ANALYZING | DONE | FAILED
 	CreatedAt time.Time `json:"createdAt"`

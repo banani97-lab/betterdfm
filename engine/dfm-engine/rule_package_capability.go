@@ -21,9 +21,6 @@ type PackageCapabilityRule struct{}
 func (r *PackageCapabilityRule) ID() string { return "package-capability" }
 
 func (r *PackageCapabilityRule) Run(board BoardData, profile ProfileRules) []Violation {
-	if board.SourceFormat == "GERBER" {
-		return nil // requires component data (packageClass)
-	}
 	if profile.SmallestPackageClass == "" {
 		return nil
 	}

@@ -410,8 +410,8 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 	if req.Filename == "" {
 		return echo.NewHTTPError(http.StatusBadRequest, "filename is required")
 	}
-	if req.FileType != "GERBER" && req.FileType != "ODB_PLUS_PLUS" {
-		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be GERBER or ODB_PLUS_PLUS")
+	if req.FileType != "ODB_PLUS_PLUS" {
+		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be ODB_PLUS_PLUS")
 	}
 
 	submissionID := uuid.New().String()
@@ -451,7 +451,7 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 
 	lib.Track("SharePage Uploaded", link.OrgID, map[string]any{"orgId": link.OrgID, "fileType": req.FileType})
 
-	contentType := "application/zip"
+	contentType := "application/octet-stream"
 	presignedURL, err := h.aws.PresignPutURL(c.Request().Context(), fileKey, contentType)
 	if err != nil {
 		return c.JSON(http.StatusCreated, map[string]string{

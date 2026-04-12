@@ -57,7 +57,7 @@ export default function SharedPage() {
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadName, setUploadName] = useState('')
   const [uploadEmail, setUploadEmail] = useState('')
-  const [uploadFileType, setUploadFileType] = useState<'GERBER' | 'ODB_PLUS_PLUS'>('GERBER')
+  const uploadFileType = 'ODB_PLUS_PLUS' as const
   const [dragOver, setDragOver] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
 
@@ -300,28 +300,6 @@ export default function SharedPage() {
                         onChange={(e) => setUploadEmail(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                       />
-                    </div>
-                  </div>
-
-                  {/* File type */}
-                  <div>
-                    <label className="block text-xs font-medium text-muted-foreground mb-1.5">File format</label>
-                    <div className="flex gap-2">
-                      {([['GERBER', 'Gerber'], ['ODB_PLUS_PLUS', 'ODB++']] as const).map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setUploadFileType(value)}
-                          className={cn(
-                            'flex-1 py-2 text-sm font-medium rounded-lg border transition-all',
-                            uploadFileType === value
-                              ? 'border-primary bg-primary/10 text-primary'
-                              : 'border-border text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                          )}
-                        >
-                          {label}
-                        </button>
-                      ))}
                     </div>
                   </div>
 

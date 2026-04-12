@@ -1,6 +1,6 @@
 # RapidDFM
 
-A SaaS PCB Design-for-Manufacturability (DFM) analysis engine. Contract manufacturers define their shop's capability profile; their customers upload Gerber or ODB++ files and receive instant, visual, actionable feedback.
+A SaaS PCB Design-for-Manufacturability (DFM) analysis engine. Contract manufacturers define their shop's capability profile; their customers upload ODB++ files and receive instant, visual, actionable feedback.
 
 ## Core Concepts
 
@@ -68,7 +68,7 @@ ECS Fargate Worker
 | `web` | Next.js 14 (TypeScript) | 3000 | Customer-facing portal |
 | `api` | Go + Echo | 8080 | REST API, auth, job dispatch |
 | `worker` | Go (SQS poller) | — | Async DFM analysis runner |
-| `gerbonara` | Python FastAPI | 8001 | Gerber/ODB++ file parser |
+| `gerbonara` | Python FastAPI | 8001 | ODB++ file parser |
 | `postgres` | PostgreSQL 16 | 5432 | Primary database |
 
 ### Monorepo Layout

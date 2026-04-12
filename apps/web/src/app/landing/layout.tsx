@@ -6,10 +6,10 @@ export const metadata: Metadata = {
   },
   title: 'RapidDFM — Screen PCB Designs Automatically Before They Hit Your Engineers',
   description:
-    'Automated DFM screening for PCB contract manufacturers. Upload Gerber or ODB++ files, run 16 manufacturability checks in under 30 seconds, and share results with customers. Reduce manual CAM review time by up to 80%.',
+    'Automated DFM screening for PCB contract manufacturers. Upload ODB++ files, run 16 manufacturability checks in under 30 seconds, and share results with customers. Reduce manual CAM review time by up to 80%.',
   keywords: [
     'DFM', 'DFM analysis', 'PCB DFM', 'design for manufacturability',
-    'Gerber analysis', 'ODB++ analysis', 'PCB manufacturing',
+    'ODB++ analysis', 'PCB manufacturing',
     'contract manufacturer', 'PCB fabrication', 'DFM check',
     'trace width check', 'clearance check', 'annular ring',
     'drill size check', 'PCB design review', 'manufacturing score',

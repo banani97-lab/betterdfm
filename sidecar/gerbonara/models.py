@@ -5,7 +5,7 @@ from pydantic import BaseModel
 
 class ParseRequest(BaseModel):
     fileKey: str
-    fileType: str  # "GERBER" | "ODB_PLUS_PLUS"
+    fileType: str  # "ODB_PLUS_PLUS"
     bucket: str
 
 
@@ -76,4 +76,4 @@ class BoardData(BaseModel):
     warnings: list[str] = []
     polygons: list[Polygon] = []
     outlineHoles: list[list[Point]] = []  # inner cutout boundaries (slots, step-outs)
-    sourceFormat: str = ""  # "GERBER" | "ODB_PLUS_PLUS"
+    sourceFormat: str = ""  # "ODB_PLUS_PLUS"

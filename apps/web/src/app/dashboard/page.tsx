@@ -387,7 +387,7 @@ export default function DashboardPage() {
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/45">
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Upload a Gerber or ODB++ file to get started</p>
+            <p className="text-sm text-muted-foreground mb-4">Upload an ODB++ file to get started</p>
             {canWrite() && (
               <Link href="/upload">
                 <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>

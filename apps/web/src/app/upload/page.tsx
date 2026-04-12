@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle, XCircle, Upload, File, X } from 'lucide-react'
+import { CheckCircle, XCircle, Upload, File, X, FolderOpen } from 'lucide-react'
 import {
   createSubmission,
   uploadToS3,
@@ -23,22 +23,17 @@ import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
+import { readDirectoryEntry, packageFilesAsTar } from '@/lib/tarball'
 
-type Step = 'select' | 'uploading' | 'analyzing' | 'done' | 'error'
+type Step = 'select' | 'packaging' | 'uploading' | 'analyzing' | 'done' | 'error'
 
 const STEPS = ['select', 'uploading', 'analyzing', 'done']
 
 interface FileEntry {
   file: File
-  fileType: 'GERBER' | 'ODB_PLUS_PLUS'
+  fileType: 'ODB_PLUS_PLUS'
   status: 'pending' | 'uploading' | 'uploaded' | 'failed'
   progress: number
-}
-
-function inferFileType(filename: string): 'GERBER' | 'ODB_PLUS_PLUS' {
-  const lower = filename.toLowerCase()
-  if (lower.endsWith('.tgz') || lower.endsWith('.tar') || lower.endsWith('.tar.gz') || lower.includes('odb')) return 'ODB_PLUS_PLUS'
-  return 'GERBER'
 }
 
 export default function UploadPage() {
@@ -58,7 +53,7 @@ function UploadPageInner() {
   const backLabel = projectId ? 'Project' : 'Dashboard'
   // Single-file state (existing flow)
   const [file, setFile] = useState<File | null>(null)
-  const [fileType, setFileType] = useState<'GERBER' | 'ODB_PLUS_PLUS'>('GERBER')
+  const fileType = 'ODB_PLUS_PLUS' as const
   // Multi-file state (batch flow)
   const [files, setFiles] = useState<FileEntry[]>([])
   const isBatch = files.length > 1
@@ -100,7 +95,7 @@ function UploadPageInner() {
     const capped = Array.from(selected).slice(0, maxBatchFiles)
     const entries: FileEntry[] = capped.map((f) => ({
       file: f,
-      fileType: inferFileType(f.name),
+      fileType: 'ODB_PLUS_PLUS' as const,
       status: 'pending' as const,
       progress: 0,
     }))
@@ -118,9 +113,32 @@ function UploadPageInner() {
 
   const [dragOver, setDragOver] = useState(false)
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault()
     setDragOver(false)
+
+    // Check if a folder was dropped (drag-and-drop directory API).
+    const items = e.dataTransfer.items
+    if (items && items.length > 0) {
+      const firstEntry = items[0].webkitGetAsEntry?.()
+      if (firstEntry?.isDirectory) {
+        // Package the dropped folder into a tar archive.
+        setStep('packaging')
+        try {
+          const fileList = await readDirectoryEntry(firstEntry as FileSystemDirectoryEntry)
+          const tarBlob = await packageFilesAsTar(fileList)
+          const tarFile = new window.File([tarBlob], `${firstEntry.name}.tar`, { type: 'application/x-tar' })
+          setFile(tarFile)
+          setFiles([])
+          setStep('select')
+        } catch (err) {
+          setErrorMsg(err instanceof Error ? err.message : 'Failed to package folder')
+          setStep('error')
+        }
+        return
+      }
+    }
+
     const dropped = e.dataTransfer.files
     if (!dropped || dropped.length === 0) return
 
@@ -134,11 +152,31 @@ function UploadPageInner() {
     const capped = Array.from(dropped).slice(0, maxBatchFiles)
     const entries: FileEntry[] = capped.map((f) => ({
       file: f,
-      fileType: inferFileType(f.name),
+      fileType: 'ODB_PLUS_PLUS' as const,
       status: 'pending' as const,
       progress: 0,
     }))
     setFiles(entries)
+  }
+
+  // Handle folder selection via <input webkitdirectory>
+  const handleFolderSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files
+    if (!selected || selected.length === 0) return
+    setStep('packaging')
+    try {
+      const tarBlob = await packageFilesAsTar(selected)
+      // Use the common folder prefix as the archive name.
+      const firstPath = (selected[0] as File & { webkitRelativePath?: string }).webkitRelativePath || ''
+      const folderName = firstPath.split('/')[0] || 'upload'
+      const tarFile = new window.File([tarBlob], `${folderName}.tar`, { type: 'application/x-tar' })
+      setFile(tarFile)
+      setFiles([])
+      setStep('select')
+    } catch (err) {
+      setErrorMsg(err instanceof Error ? err.message : 'Failed to package folder')
+      setStep('error')
+    }
   }
 
   // Single-file upload (existing flow)
@@ -297,17 +335,22 @@ function UploadPageInner() {
             >
               <input
                 type="file"
-                accept=".zip,.tar,.tgz,.tar.gz,.gbr,.ger,.drl,.exc"
+                accept=".zip,.tar,.tgz,.tar.gz"
                 multiple={batchAllowed}
                 onChange={handleFilesSelected}
                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
               />
-              {!hasFiles ? (
+              {step === 'packaging' ? (
+                <div className="flex flex-col items-center gap-2 text-center px-4">
+                  <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+                  <p className="text-sm font-medium text-foreground">Packaging folder...</p>
+                </div>
+              ) : !hasFiles ? (
                 <div className="flex flex-col items-center gap-2 text-center px-4">
                   <Upload className="h-10 w-10 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium text-foreground">Drop your Gerber or ODB++ files here</p>
-                    <p className="text-xs text-muted-foreground mt-1">or click to browse -- .zip, .gbr, .ger accepted. Select multiple files for batch upload.</p>
+                    <p className="text-sm font-medium text-foreground">Drop your ODB++ archive or folder here</p>
+                    <p className="text-xs text-muted-foreground mt-1">or click to browse &mdash; .zip, .tar, .tgz accepted. You can also drop a folder directly.</p>
                   </div>
                 </div>
               ) : file && !isBatch ? (
@@ -340,17 +383,7 @@ function UploadPageInner() {
                     <File className="h-4 w-4 text-muted-foreground flex-shrink-0" />
                     <span className="flex-1 text-sm truncate">{entry.file.name}</span>
                     <span className="text-xs text-muted-foreground">{(entry.file.size / 1024).toFixed(0)} KB</span>
-                    <select
-                      value={entry.fileType}
-                      onChange={(e) => {
-                        const ft = e.target.value as 'GERBER' | 'ODB_PLUS_PLUS'
-                        setFiles((prev) => prev.map((f, idx) => idx === i ? { ...f, fileType: ft } : f))
-                      }}
-                      className="text-xs border border-input bg-background rounded px-1 py-0.5"
-                    >
-                      <option value="GERBER">Gerber</option>
-                      <option value="ODB_PLUS_PLUS">ODB++</option>
-                    </select>
+                    <span className="text-xs text-muted-foreground">ODB++</span>
                     <button onClick={() => removeFile(i)} className="p-0.5 rounded hover:bg-muted text-muted-foreground" type="button">
                       <X className="h-3.5 w-3.5" />
                     </button>
@@ -362,15 +395,18 @@ function UploadPageInner() {
             <div className="grid grid-cols-2 gap-4">
               {!isBatch && (
                 <div>
-                  <label className="block text-sm font-medium text-foreground mb-1">File Type</label>
-                  <select
-                    value={fileType}
-                    onChange={(e) => setFileType(e.target.value as 'GERBER' | 'ODB_PLUS_PLUS')}
-                    className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-                  >
-                    <option value="GERBER">Gerber</option>
-                    <option value="ODB_PLUS_PLUS">ODB++</option>
-                  </select>
+                  <label className="block text-sm font-medium text-foreground mb-1">Select Folder</label>
+                  <label className="flex items-center gap-2 w-full border border-input bg-background rounded-md px-3 py-2 text-sm cursor-pointer hover:bg-muted/50 transition-colors">
+                    <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                    <span className="text-muted-foreground">Choose ODB++ folder...</span>
+                    <input
+                      type="file"
+                      // @ts-expect-error -- webkitdirectory is non-standard but widely supported
+                      webkitdirectory=""
+                      onChange={handleFolderSelected}
+                      className="hidden"
+                    />
+                  </label>
                 </div>
               )}
 

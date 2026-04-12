@@ -43,12 +43,6 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 	if profile.MinClearanceMM <= 0 {
 		return violations
 	}
-	// Gerber files lack net names — clearance checks produce excessive
-	// false positives because same-net traces can't be excluded.
-	if board.SourceFormat == "GERBER" {
-		return violations
-	}
-
 	// Compute board outline bounding box. Features more than 2 mm outside it
 	// are panel-level additions (fiducials, tooling marks, test coupons) that
 	// should not be DFM-checked for trace clearance.
@@ -164,6 +158,14 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 
 	minC := profile.MinClearanceMM
 
+	// $NONE$ is the ODB++ convention for "this copper has no electrical net"
+	// — mounting hole rings, mechanical markers, board-level annotations.
+	// These features are not part of the electrical design and should not
+	// participate in electrical clearance DRC.
+	isNonElectrical := func(net string) bool {
+		return net == "$NONE$"
+	}
+
 	for layer, traces := range tracesByLayer {
 		// P4.3: 2D grid hash for trace-to-trace clearance.
 		// Cell size = 2*minC ensures any violating pair occupies the same or adjacent cells.
@@ -209,6 +211,9 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						b := traces[j]
 						// Same-net traces are intentionally connected — no clearance check.
 						if a.t.NetName != "" && a.t.NetName == b.t.NetName {
+							continue
+						}
+						if isNonElectrical(a.t.NetName) || isNonElectrical(b.t.NetName) {
 							continue
 						}
 						dist := segToSegDist(
@@ -275,6 +280,9 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				}
 				// Same-net trace and pad are intentionally connected — skip.
 				if t.NetName != "" && t.NetName == p.NetName {
+					continue
+				}
+				if isNonElectrical(t.NetName) || isNonElectrical(p.NetName) {
 					continue
 				}
 				// P2.1: closest-point + padEdgeDist for shape-aware clearance.

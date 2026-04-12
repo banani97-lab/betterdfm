@@ -7,7 +7,7 @@ export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080
 export interface Submission {
   id: string
   filename: string
-  fileType: 'GERBER' | 'ODB_PLUS_PLUS'
+  fileType: 'ODB_PLUS_PLUS'
   status: 'UPLOADED' | 'ANALYZING' | 'DONE' | 'FAILED'
   createdAt: string
   orgId: string
