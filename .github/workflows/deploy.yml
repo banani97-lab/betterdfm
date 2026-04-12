@@ -97,12 +97,29 @@ jobs:
           NEW_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/task-def.json --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
           echo "task_def_arn=$NEW_ARN" >> $GITHUB_OUTPUT
 
-      - name: Deploy ECS service
+      - name: Deploy worker ECS service
         run: |
           aws ecs update-service \
             --cluster $ECS_CLUSTER \
             --service $ECS_SERVICE \
             --task-definition ${{ steps.task-def.outputs.task_def_arn }} \
+            --force-new-deployment \
+            --region $AWS_REGION
+
+      - name: Deploy gerbonara ECS service
+        if: needs.changes.outputs.gerbonara == 'true'
+        run: |
+          # Register a new gerbonara task definition with the updated image
+          TASK_DEF=$(aws ecs describe-task-definition --task-definition betterdfm-gerbonara --region $AWS_REGION --query 'taskDefinition')
+          TASK_DEF=$(echo "$TASK_DEF" | jq \
+            --arg IMG "$ECR_REGISTRY/betterdfm-gerbonara:${{ github.sha }}" \
+            '.containerDefinitions |= map(if .name == "gerbonara" then .image = $IMG else . end)')
+          echo "$TASK_DEF" | jq 'del(.taskDefinitionArn, .revision, .status, .requiresAttributes, .compatibilities, .registeredAt, .registeredBy)' > /tmp/gerbonara-task-def.json
+          GERB_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/gerbonara-task-def.json --region $AWS_REGION --query 'taskDefinition.taskDefinitionArn' --output text)
+          aws ecs update-service \
+            --cluster $ECS_CLUSTER \
+            --service betterdfm-gerbonara \
+            --task-definition "$GERB_ARN" \
             --force-new-deployment \
             --region $AWS_REGION
 
