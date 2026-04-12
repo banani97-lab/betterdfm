@@ -216,6 +216,15 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						if isNonElectrical(a.t.NetName) || isNonElectrical(b.t.NetName) {
 							continue
 						}
+						// Skip pairs where either trace has no net. After the
+						// parser's net propagation pass, any trace still without
+						// a net is orphaned copper — text markings, logos, board
+						// IDs, or fab drawing remnants. We can't determine whether
+						// it's on the same or a different net as its neighbour,
+						// so flagging it is speculation, not a real DRC finding.
+						if a.t.NetName == "" || b.t.NetName == "" {
+							continue
+						}
 						dist := segToSegDist(
 							a.t.StartX, a.t.StartY, a.t.EndX, a.t.EndY,
 							b.t.StartX, b.t.StartY, b.t.EndX, b.t.EndY,
@@ -283,6 +292,9 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 					continue
 				}
 				if isNonElectrical(t.NetName) || isNonElectrical(p.NetName) {
+					continue
+				}
+				if t.NetName == "" || p.NetName == "" {
 					continue
 				}
 				// P2.1: closest-point + padEdgeDist for shape-aware clearance.

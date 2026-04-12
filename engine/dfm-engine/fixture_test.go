@@ -21,8 +21,8 @@ func twoTraceBoard(w1, w2, gapMM float64) BoardData {
 	return BoardData{
 		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
 		Traces: []Trace{
-			{Layer: "top_copper", WidthMM: w1, StartX: 5, StartY: y1, EndX: 55, EndY: y1},
-			{Layer: "top_copper", WidthMM: w2, StartX: 5, StartY: y2, EndX: 55, EndY: y2},
+			{Layer: "top_copper", WidthMM: w1, StartX: 5, StartY: y1, EndX: 55, EndY: y1, NetName: "NET_A"},
+			{Layer: "top_copper", WidthMM: w2, StartX: 5, StartY: y2, EndX: 55, EndY: y2, NetName: "NET_B"},
 		},
 		Outline: rectOutline(60, 40),
 	}
