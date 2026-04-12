@@ -19,8 +19,8 @@ interface TarEntry {
 }
 
 /** Encode a string into a fixed-length Uint8Array, null-terminated. */
-function encodeString(str: string, len: number): Uint8Array {
-  const buf = new Uint8Array(len)
+function encodeString(str: string, len: number): Uint8Array<ArrayBuffer> {
+  const buf = new Uint8Array(len) as Uint8Array<ArrayBuffer>
   const encoder = new TextEncoder()
   const encoded = encoder.encode(str.slice(0, len - 1))
   buf.set(encoded)
@@ -28,14 +28,14 @@ function encodeString(str: string, len: number): Uint8Array {
 }
 
 /** Encode a number as a zero-padded octal string of `len` bytes (with trailing null). */
-function encodeOctal(value: number, len: number): Uint8Array {
+function encodeOctal(value: number, len: number): Uint8Array<ArrayBuffer> {
   const str = value.toString(8).padStart(len - 1, '0')
   return encodeString(str, len)
 }
 
 /** Build a 512-byte ustar header for a single file entry. */
-function buildHeader(entry: TarEntry): Uint8Array {
-  const header = new Uint8Array(512)
+function buildHeader(entry: TarEntry): Uint8Array<ArrayBuffer> {
+  const header = new Uint8Array(512) as Uint8Array<ArrayBuffer>
 
   // For paths > 100 chars, split into prefix (155) + name (100).
   let name = entry.path
@@ -89,12 +89,12 @@ export function createTar(entries: TarEntry[]): Blob {
     // Pad data to a multiple of 512 bytes.
     const remainder = entry.data.byteLength % 512
     if (remainder > 0) {
-      parts.push(new Uint8Array(512 - remainder))
+      parts.push(new Uint8Array(512 - remainder) as Uint8Array<ArrayBuffer>)
     }
   }
 
   // End-of-archive marker: two 512-byte zero blocks.
-  parts.push(new Uint8Array(1024))
+  parts.push(new Uint8Array(1024) as Uint8Array<ArrayBuffer>)
 
   return new Blob(parts, { type: 'application/x-tar' })
 }
