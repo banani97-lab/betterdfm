@@ -161,10 +161,19 @@ function drawCopper(
   hiddenLayers: Set<string>,
   polygonsByLayer: Record<string, NonNullable<BoardData['polygons']>>,
 ) {
-  const { minX, minY, maxY, scale: s } = b
+  const { minX, minY, maxX, maxY, scale: s } = b
   const offX = b.offX, offY = b.offY
   const tx = (x: number) => (x - minX) * s + offX
   const ty = (y: number) => (maxY - y) * s + offY
+
+  // Skip fab-drawing features outside the board outline (panel marks,
+  // drill drawings, text at negative Y, etc). Uses same 2mm buffer as
+  // the DFM engine rules.
+  const boardBuf = 2.0
+  const bMinX = minX - boardBuf, bMaxX = maxX + boardBuf
+  const bMinY = minY - boardBuf, bMaxY = maxY + boardBuf
+  const inBoard = (x: number, y: number) =>
+    x >= bMinX && x <= bMaxX && y >= bMinY && y <= bMaxY
 
   // Copper fill polygons (surfaces) — use evenodd so hole contours cut through
   ctx.fillStyle = '#c88020'
@@ -201,6 +210,7 @@ function drawCopper(
     if (hiddenLayers.has(layer)) continue
     if (!isCopperLayer(layer.toLowerCase())) continue
     for (const t of traces) {
+      if (!inBoard((t.startX + t.endX) / 2, (t.startY + t.endY) / 2)) continue
       const x1 = tx(t.startX), y1 = ty(t.startY)
       const x2 = tx(t.endX),   y2 = ty(t.endY)
       if (!ok(x1) || !ok(y1) || !ok(x2) || !ok(y2)) continue
@@ -219,6 +229,7 @@ function drawCopper(
     if (hiddenLayers.has(layer)) continue
     if (!isCopperLayer(layer.toLowerCase())) continue
     for (const p of pads) {
+      if (!inBoard(p.x, p.y)) continue
       const cx = tx(p.x), cy = ty(p.y)
       if (!ok(cx) || !ok(cy)) continue
       const w = Math.max(1, p.widthMM * s)
@@ -256,11 +267,8 @@ function drawCopper(
   }
 
   // Drills — skip fab-drawing drills outside the board outline
-  const { minX: bMinX, maxX: bMaxX, minY: bMinY, maxY: bMaxY } = b
-  const drillBuf = 2.0 // mm buffer, same as DFM rules
   for (const d of boardData?.drills ?? []) {
-    if (d.x < bMinX - drillBuf || d.x > bMaxX + drillBuf ||
-        d.y < bMinY - drillBuf || d.y > bMaxY + drillBuf) continue
+    if (!inBoard(d.x, d.y)) continue
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
     const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
