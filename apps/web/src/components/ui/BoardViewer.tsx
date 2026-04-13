@@ -255,8 +255,12 @@ function drawCopper(
     ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI * 2); ctx.fill()
   }
 
-  // Drills
+  // Drills — skip fab-drawing drills outside the board outline
+  const { minX: bMinX, maxX: bMaxX, minY: bMinY, maxY: bMaxY } = b
+  const drillBuf = 2.0 // mm buffer, same as DFM rules
   for (const d of boardData?.drills ?? []) {
+    if (d.x < bMinX - drillBuf || d.x > bMaxX + drillBuf ||
+        d.y < bMinY - drillBuf || d.y > bMaxY + drillBuf) continue
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
     const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
