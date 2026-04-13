@@ -160,6 +160,9 @@ function drawCopper(
   boardData: BoardData | null | undefined,
   hiddenLayers: Set<string>,
   polygonsByLayer: Record<string, NonNullable<BoardData['polygons']>>,
+  zoom: number,
+  panX: number,
+  panY: number,
 ) {
   const { minX, minY, maxX, maxY, scale: s } = b
   const offX = b.offX, offY = b.offY
@@ -174,6 +177,30 @@ function drawCopper(
   const bMinY = minY - boardBuf, bMaxY = maxY + boardBuf
   const inBoard = (x: number, y: number) =>
     x >= bMinX && x <= bMaxX && y >= bMinY && y <= bMaxY
+
+  // Viewport culling: compute the visible area in board-space coordinates.
+  // The canvas transform is: screenX = viewBoxX * zoom + panX
+  // So viewBoxX = (screenX - panX) / zoom. Then board coords from viewBox.
+  // viewBoxX = (boardX - minX) * s + offX → boardX = (viewBoxX - offX) / s + minX
+  const canvasW = ctx.canvas.width / (window.devicePixelRatio || 1)
+  const canvasH = ctx.canvas.height / (window.devicePixelRatio || 1)
+  const vbLeft   = -panX / zoom
+  const vbRight  = (canvasW - panX) / zoom
+  const vbTop    = -panY / zoom
+  const vbBottom = (canvasH - panY) / zoom
+  // Convert viewBox bounds to board-space
+  const vpMinX = (vbLeft - offX) / s + minX
+  const vpMaxX = (vbRight - offX) / s + minX
+  // Y is flipped: ty = (maxY - y) * s + offY → y = maxY - (viewBoxY - offY) / s
+  const vpMaxY = maxY - (vbTop - offY) / s
+  const vpMinY = maxY - (vbBottom - offY) / s
+  // mm per pixel at current zoom — features smaller than this are sub-pixel
+  const mmPerPx = 1 / (s * zoom)
+  const inViewport = (x: number, y: number, radiusMM: number) => {
+    const buf = radiusMM + mmPerPx * 2 // small buffer for stroke width
+    return x + buf >= vpMinX && x - buf <= vpMaxX &&
+           y + buf >= vpMinY && y - buf <= vpMaxY
+  }
 
   // Copper fill polygons (surfaces) — use evenodd so hole contours cut through
   ctx.fillStyle = '#c88020'
@@ -210,7 +237,9 @@ function drawCopper(
     if (hiddenLayers.has(layer)) continue
     if (!isCopperLayer(layer.toLowerCase())) continue
     for (const t of traces) {
-      if (!inBoard((t.startX + t.endX) / 2, (t.startY + t.endY) / 2)) continue
+      const mx = (t.startX + t.endX) / 2, my = (t.startY + t.endY) / 2
+      if (!inBoard(mx, my)) continue
+      if (!inViewport(mx, my, t.widthMM / 2 + 1)) continue
       const x1 = tx(t.startX), y1 = ty(t.startY)
       const x2 = tx(t.endX),   y2 = ty(t.endY)
       if (!ok(x1) || !ok(y1) || !ok(x2) || !ok(y2)) continue
@@ -230,6 +259,7 @@ function drawCopper(
     if (!isCopperLayer(layer.toLowerCase())) continue
     for (const p of pads) {
       if (!inBoard(p.x, p.y)) continue
+      if (!inViewport(p.x, p.y, Math.max(p.widthMM, p.heightMM) / 2)) continue
       const cx = tx(p.x), cy = ty(p.y)
       if (!ok(cx) || !ok(cy)) continue
       const w = Math.max(1, p.widthMM * s)
@@ -256,6 +286,7 @@ function drawCopper(
   // Vias
   const MAX_VIA_MM = 15  // cap to guard against parser unit artifacts
   for (const v of boardData?.vias ?? []) {
+    if (!inViewport(v.x, v.y, v.outerDiamMM / 2)) continue
     const cx = tx(v.x), cy = ty(v.y)
     if (!ok(cx) || !ok(cy)) continue
     const outerR = Math.max(2, Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s))
@@ -266,9 +297,12 @@ function drawCopper(
     ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI * 2); ctx.fill()
   }
 
-  // Drills — skip fab-drawing drills outside the board outline
+  // Drills — skip out-of-board, out-of-viewport, and sub-pixel drills
   for (const d of boardData?.drills ?? []) {
     if (!inBoard(d.x, d.y)) continue
+    if (!inViewport(d.x, d.y, d.diamMM / 2)) continue
+    // LOD: skip drills smaller than 1.5 pixels at current zoom
+    if (d.diamMM < mmPerPx * 1.5) continue
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
     const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
@@ -714,7 +748,7 @@ export function BoardViewer({
 
     if (bounds && boardData) {
       drawBoardFill(ctx, boardData, bounds)                               // 2: FR4
-      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer) // 3–6
+      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer, zoomRef.current, panRef.current.x, panRef.current.y) // 3–6
       drawRouting(ctx, bounds, tracesByLayer, hiddenLayers)               // 6b: rout cutouts
       drawSoldermask(ctx, boardData, bounds, padsByLayer, hiddenLayers)   // 7: multiply
       drawSilkscreen(ctx, bounds, tracesByLayer, hiddenLayers)            // 8: silk
