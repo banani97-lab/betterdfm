@@ -581,8 +581,15 @@ def _build_features(
             try:
                 x = _coord_to_mm(float(parts[1]), units)
                 y = _coord_to_mm(float(parts[2]), units)
-                # ODB++ P record: P x y sym_num polarity rotation mirror ;attrs
-                # sym_num is at parts[3]; parts[5] is rotation (not sym_num)
+                # ODB++ P record: P x y sym_num polarity dcode mirror rotation
+                # parts[7] is rotation in degrees (0/90/180/270). For RECT and
+                # OVAL pads, 90° and 270° rotations swap width and height.
+                rotation = 0.0
+                if len(parts) >= 8:
+                    try:
+                        rotation = float(parts[7])
+                    except ValueError:
+                        rotation = 0.0
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
                 net = _attr_net(raw) or (net_index.lookup(x, y) if net_index else "")
@@ -623,9 +630,17 @@ def _build_features(
                                 if val in ("2", "3"):  # g_fiducial or l_fiducial
                                     is_fid = True
                                 break
+                    # Apply rotation: 90° and 270° swap width/height for
+                    # non-symmetric pads (RECT, OVAL). CIRCLE is invariant.
+                    pw, ph = sym["w"], sym["h"]
+                    if sym["shape"] in ("RECT", "OVAL") and rotation:
+                        # Normalize to 0-360
+                        r = rotation % 360
+                        if abs(r - 90) < 1 or abs(r - 270) < 1:
+                            pw, ph = ph, pw
                     pads.append(Pad(layer=layer_name, x=x, y=y,
-                                   widthMM=max(0.01, sym["w"]),
-                                   heightMM=max(0.01, sym["h"]),
+                                   widthMM=max(0.01, pw),
+                                   heightMM=max(0.01, ph),
                                    shape=sym["shape"],
                                    netName=net, refDes=ref,
                                    packageClass=pkg_class,
@@ -1648,10 +1663,18 @@ def parse_odb(file_path: str) -> BoardData:
             # Mark via catch-pads: any pad whose center coincides with a
             # drill hit is a through-hole via annular ring, not a component
             # mounting pad. Rules use pad.isViaCatchPad to skip them.
-            _tol = 0.05  # 50 µm
+            # Via catch-pad tagging: two strategies combined.
+            # 1. Drill coincidence (50 µm tolerance) — works when the ODB++
+            #    drill layer has real drill records at each via.
+            # 2. Multi-layer pad coincidence — a pad that appears at the same
+            #    (x,y) on 3+ copper layers is almost certainly a via catch-pad,
+            #    even if the drill layer doesn't have a matching record (e.g.
+            #    when drill markers were sub-minimum-diameter and got filtered).
+            _tol = 0.05
             _tol2 = _tol * _tol
-            _drill_grid: dict[tuple[int, int], list[tuple[float, float]]] = {}
             _cell = 2.0
+            # Pass 1: drill coincidence
+            _drill_grid: dict[tuple[int, int], list[tuple[float, float]]] = {}
             for d in drills:
                 _k = (int(d.x / _cell), int(d.y / _cell))
                 _drill_grid.setdefault(_k, []).append((d.x, d.y))
@@ -1667,8 +1690,36 @@ def parse_odb(file_path: str) -> BoardData:
                             break
                     if p.isViaCatchPad:
                         break
+            # Pass 2: multi-layer pad coincidence
+            # Build a grid of (x,y,layer) → pad index for copper-type layers.
+            _copper_layer_names = {l.name for l in layers
+                                   if l.type in ("COPPER", "POWER_GROUND")}
+            _xy_layers: dict[tuple[int, int], dict[tuple[float, float], set[str]]] = {}
+            for p in pads:
+                if p.layer not in _copper_layer_names:
+                    continue
+                _gx, _gy = int(p.x / _cell), int(p.y / _cell)
+                cell = _xy_layers.setdefault((_gx, _gy), {})
+                # Round coordinates to 0.01mm to cluster near-coincident pads.
+                _xy_key = (round(p.x, 2), round(p.y, 2))
+                cell.setdefault(_xy_key, set()).add(p.layer)
+            # Any (x,y) with 3+ copper layers is a via location.
+            _via_xys: set[tuple[float, float]] = set()
+            for cell in _xy_layers.values():
+                for xy, layer_set in cell.items():
+                    if len(layer_set) >= 3:
+                        _via_xys.add(xy)
+            for p in pads:
+                if p.isViaCatchPad:
+                    continue
+                if p.layer not in _copper_layer_names:
+                    continue
+                if (round(p.x, 2), round(p.y, 2)) in _via_xys:
+                    p.isViaCatchPad = True
             _via_catch_count = sum(1 for p in pads if p.isViaCatchPad)
-            logger.info("ODB++ via catch-pad tagging: %d / %d pads marked", _via_catch_count, len(pads))
+            logger.info("ODB++ via catch-pad tagging: %d / %d pads marked "
+                        "(%d via locations found via multi-layer coincidence)",
+                        _via_catch_count, len(pads), len(_via_xys))
 
             if not outline and outline_layer_name:
                 feat = _find_layer_features(layers_dir, outline_layer_name)
