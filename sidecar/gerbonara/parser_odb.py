@@ -901,9 +901,24 @@ def _infer_polygon_nets(
     for t in traces:
         traces_by_layer.setdefault(t.layer, []).append(t)
 
+    # For polygons with many holes (e.g. ground planes with thousands of
+    # anti-pads), checking _point_in_polygon for every candidate feature is
+    # O(features × hole_vertices) and can take minutes on large boards.
+    # Threshold: if a polygon has more than 200 holes, skip hole checks and
+    # rely on majority voting from the outer-ring test alone. A few anti-pad
+    # pads will be counted (wrong net), but they're outnumbered by the real
+    # thermal-relief pads on the plane's net, so majority still wins.
+    _MAX_HOLES_FOR_EXACT = 200
+
     def _inside(poly, x: float, y: float) -> bool:
-        # Outer ring containment, minus any holes.
-        return _point_in_polygon(x, y, poly)
+        if not _point_in_ring(x, y, poly.points):
+            return False
+        if len(poly.holes) > _MAX_HOLES_FOR_EXACT:
+            return True  # skip hole check, rely on majority vote
+        for hole in poly.holes:
+            if _point_in_ring(x, y, hole):
+                return False
+        return True
 
     def _majority(tally: dict[str, int]) -> str:
         if not tally:
