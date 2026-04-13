@@ -42,7 +42,7 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 	user := lib.GetUser(c)
 	id := c.Param("id")
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
+	if err := h.db.Omit("board_data").First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return echo.NewHTTPError(http.StatusNotFound, "job not found")
 		}
