@@ -7,6 +7,7 @@ func (r *DrillSizeRule) ID() string { return "drill-size" }
 
 func (r *DrillSizeRule) Run(board BoardData, profile ProfileRules) []Violation {
 	var violations []Violation
+	bbox := newBoardBBox(board.Outline, 2.0)
 	checkDiam := func(x, y, diam float64, label string) {
 		if profile.MinDrillDiamMM > 0 && diam < profile.MinDrillDiamMM {
 			msg, sug := msgDrillSizeBelow(label, diam, profile.MinDrillDiamMM)
@@ -44,11 +45,17 @@ func (r *DrillSizeRule) Run(board BoardData, profile ProfileRules) []Violation {
 		if len(violations) >= maxViol {
 			break
 		}
+		if !bbox.contains(d.X, d.Y) {
+			continue
+		}
 		checkDiam(d.X, d.Y, d.DiamMM, "Drill")
 	}
 	for _, v := range board.Vias {
 		if len(violations) >= maxViol {
 			break
+		}
+		if !bbox.contains(v.X, v.Y) {
+			continue
 		}
 		checkDiam(v.X, v.Y, v.DrillDiamMM, "Via drill")
 	}

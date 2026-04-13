@@ -115,6 +115,40 @@ type Rule interface {
 	Run(board BoardData, profile ProfileRules) []Violation
 }
 
+// boardBBox returns the bounding box of the board outline with a buffer.
+// Features outside this box are panel/fab-drawing artifacts and should
+// be skipped by DFM rules.
+type boardBBox struct {
+	minX, maxX, minY, maxY float64
+	valid                  bool
+}
+
+func newBoardBBox(outline []Point, buffer float64) boardBBox {
+	if len(outline) < 3 {
+		return boardBBox{}
+	}
+	b := boardBBox{
+		minX: outline[0].X, maxX: outline[0].X,
+		minY: outline[0].Y, maxY: outline[0].Y,
+		valid: true,
+	}
+	for _, p := range outline[1:] {
+		if p.X < b.minX { b.minX = p.X }
+		if p.X > b.maxX { b.maxX = p.X }
+		if p.Y < b.minY { b.minY = p.Y }
+		if p.Y > b.maxY { b.maxY = p.Y }
+	}
+	b.minX -= buffer
+	b.maxX += buffer
+	b.minY -= buffer
+	b.maxY += buffer
+	return b
+}
+
+func (b boardBBox) contains(x, y float64) bool {
+	return !b.valid || (x >= b.minX && x <= b.maxX && y >= b.minY && y <= b.maxY)
+}
+
 // isTestPoint returns true for refdes prefixes that denote test points,
 // mounting holes, or other non-component features. These should not be
 // subjected to IPC-7351 pad-size checks, package-capability checks, or

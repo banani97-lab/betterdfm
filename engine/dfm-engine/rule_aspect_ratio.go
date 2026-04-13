@@ -31,10 +31,13 @@ func (r *AspectRatioRule) Run(board BoardData, profile ProfileRules) []Violation
 			})
 		}
 	}
+	bbox := newBoardBBox(board.Outline, 2.0)
 	for _, d := range board.Drills {
+		if !bbox.contains(d.X, d.Y) { continue }
 		check(d.X, d.Y, d.DiamMM)
 	}
 	for _, v := range board.Vias {
+		if !bbox.contains(v.X, v.Y) { continue }
 		check(v.X, v.Y, v.DrillDiamMM)
 	}
 	return violations

@@ -28,10 +28,11 @@ func boardSide(layer string) string {
 	n := strings.ToLower(layer)
 	// Full-word matches
 	if strings.Contains(n, "top") || strings.Contains(n, "comp") || strings.Contains(n, "front") ||
-		strings.Contains(n, "f.cu") {
+		strings.Contains(n, "f.cu") || strings.Contains(n, "primary") {
 		return "top"
 	}
-	if strings.Contains(n, "bot") || strings.Contains(n, "back") || strings.Contains(n, "b.cu") {
+	if strings.Contains(n, "bot") || strings.Contains(n, "back") || strings.Contains(n, "b.cu") ||
+		strings.Contains(n, "secondary") {
 		return "bot"
 	}
 	// ODB++ abbreviated layer names (exact match)

@@ -11,9 +11,13 @@ func (r *AnnularRingRule) Run(board BoardData, profile ProfileRules) []Violation
 		return violations
 	}
 	const maxViol = 500
+	bbox := newBoardBBox(board.Outline, 2.0)
 	for _, via := range board.Vias {
 		if len(violations) >= maxViol {
 			break
+		}
+		if !bbox.contains(via.X, via.Y) {
+			continue
 		}
 		if via.OuterDiamMM <= 0 || via.DrillDiamMM <= 0 {
 			continue
