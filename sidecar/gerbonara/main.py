@@ -42,7 +42,7 @@ def health():
     return {"status": "ok"}
 
 
-@app.post("/parse", response_model=BoardData)
+@app.post("/parse")
 def parse(req: ParseRequest):
     tmp_path: str | None = None
     try:
@@ -56,7 +56,12 @@ def parse(req: ParseRequest):
             raise HTTPException(status_code=400, detail=f"Unsupported file type: {req.fileType}")
         board = parse_odb(tmp_path)
         board.sourceFormat = "ODB_PLUS_PLUS"
-        return board
+        # Use model_dump + JSONResponse instead of response_model=BoardData
+        # to avoid Pydantic re-validating the entire response. On large boards
+        # (125K pads, 447K traces), the validation pass doubles memory usage
+        # and can OOM the container.
+        from fastapi.responses import JSONResponse
+        return JSONResponse(content=board.model_dump())
     except Exception as e:
         logger.error("Parse failed: %s", e, exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
