@@ -599,7 +599,12 @@ def _build_features(
                         if outer > hole_diam:
                             vias.append(Via(x=x, y=y, outerDiamMM=outer,
                                             drillDiamMM=hole_diam, netName=net))
-                    drills.append(Drill(x=x, y=y, diamMM=hole_diam, plated=plated))
+                    # Skip sub-minimum drill markers: features below 0.05mm
+                    # (50µm) are pad markers or coordinate references, not
+                    # real drill holes. The smallest laser-drilled microvia
+                    # is ~0.05mm; mechanical drills start at ~0.1mm.
+                    if hole_diam >= 0.05:
+                        drills.append(Drill(x=x, y=y, diamMM=hole_diam, plated=plated))
                 elif ltype == "POWER_GROUND" and sym["shape"] == "DONUT":
                     pass
                 elif sym["shape"] == "DONUT":
