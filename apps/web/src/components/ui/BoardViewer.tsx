@@ -179,25 +179,26 @@ function drawCopper(
     x >= bMinX && x <= bMaxX && y >= bMinY && y <= bMaxY
 
   // Viewport culling: compute the visible area in board-space coordinates.
-  // The canvas transform is: screenX = viewBoxX * zoom + panX
-  // So viewBoxX = (screenX - panX) / zoom. Then board coords from viewBox.
-  // viewBoxX = (boardX - minX) * s + offX → boardX = (viewBoxX - offX) / s + minX
-  const canvasW = ctx.canvas.width / (window.devicePixelRatio || 1)
-  const canvasH = ctx.canvas.height / (window.devicePixelRatio || 1)
-  const vbLeft   = -panX / zoom
-  const vbRight  = (canvasW - panX) / zoom
-  const vbTop    = -panY / zoom
-  const vbBottom = (canvasH - panY) / zoom
-  // Convert viewBox bounds to board-space
-  const vpMinX = (vbLeft - offX) / s + minX
-  const vpMaxX = (vbRight - offX) / s + minX
-  // Y is flipped: ty = (maxY - y) * s + offY → y = maxY - (viewBoxY - offY) / s
-  const vpMaxY = maxY - (vbTop - offY) / s
-  const vpMinY = maxY - (vbBottom - offY) / s
-  // mm per pixel at current zoom — features smaller than this are sub-pixel
-  const mmPerPx = 1 / (s * zoom)
+  // Disabled when zoom=0 (rotation active — the inverse transform is wrong).
+  const cullingEnabled = zoom > 0
+  let vpMinX = bMinX, vpMaxX = bMaxX, vpMinY = bMinY, vpMaxY = bMaxY
+  let mmPerPx = 0
+  if (cullingEnabled) {
+    const canvasW = ctx.canvas.width / (window.devicePixelRatio || 1)
+    const canvasH = ctx.canvas.height / (window.devicePixelRatio || 1)
+    const vbLeft   = -panX / zoom
+    const vbRight  = (canvasW - panX) / zoom
+    const vbTop    = -panY / zoom
+    const vbBottom = (canvasH - panY) / zoom
+    vpMinX = (vbLeft - offX) / s + minX
+    vpMaxX = (vbRight - offX) / s + minX
+    vpMaxY = maxY - (vbTop - offY) / s
+    vpMinY = maxY - (vbBottom - offY) / s
+    mmPerPx = 1 / (s * zoom)
+  }
   const inViewport = (x: number, y: number, radiusMM: number) => {
-    const buf = radiusMM + mmPerPx * 2 // small buffer for stroke width
+    if (!cullingEnabled) return true
+    const buf = radiusMM + mmPerPx * 2
     return x + buf >= vpMinX && x - buf <= vpMaxX &&
            y + buf >= vpMinY && y - buf <= vpMaxY
   }
@@ -302,7 +303,7 @@ function drawCopper(
     if (!inBoard(d.x, d.y)) continue
     if (!inViewport(d.x, d.y, d.diamMM / 2)) continue
     // LOD: skip drills smaller than 1.5 pixels at current zoom
-    if (d.diamMM < mmPerPx * 1.5) continue
+    if (cullingEnabled && d.diamMM < mmPerPx * 1.5) continue
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
     const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
@@ -748,7 +749,9 @@ export function BoardViewer({
 
     if (bounds && boardData) {
       drawBoardFill(ctx, boardData, bounds)                               // 2: FR4
-      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer, zoomRef.current, panRef.current.x, panRef.current.y) // 3–6
+      drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer,
+        rotationRef.current === 0 ? zoomRef.current : 0,  // disable viewport culling when rotated
+        panRef.current.x, panRef.current.y) // 3–6
       drawRouting(ctx, bounds, tracesByLayer, hiddenLayers)               // 6b: rout cutouts
       drawSoldermask(ctx, boardData, bounds, padsByLayer, hiddenLayers)   // 7: multiply
       drawSilkscreen(ctx, bounds, tracesByLayer, hiddenLayers)            // 8: silk
