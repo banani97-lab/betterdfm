@@ -57,22 +57,23 @@ type CapabilityProfile struct {
 }
 
 type Violation struct {
-	ID         string `gorm:"primaryKey"`
-	OrgID      string
-	JobID      string
-	RuleID     string
-	Severity   string
-	Layer      string
-	X          float64
-	Y          float64
-	Message    string
-	Suggestion string
-	Count      int
-	MeasuredMM float64
-	LimitMM    float64
-	Unit       string
-	NetName    string
-	RefDes     string
-	X2         float64
-	Y2         float64
+	ID         string  `gorm:"primaryKey" json:"id"`
+	OrgID      string  `json:"orgId"`
+	JobID      string  `json:"jobId"`
+	RuleID     string  `json:"ruleId"`
+	Severity   string  `json:"severity"`
+	Layer      string  `json:"layer"`
+	X          float64 `json:"x"`
+	Y          float64 `json:"y"`
+	Message    string  `json:"message"`
+	Suggestion string  `json:"suggestion"`
+	Count      int     `json:"count"`
+	MeasuredMM float64 `json:"measuredMM"`
+	LimitMM    float64 `json:"limitMM"`
+	Unit       string  `json:"unit"`
+	NetName    string  `json:"netName"`
+	RefDes     string  `json:"refDes"`
+	X2         float64 `json:"x2"`
+	Y2         float64 `json:"y2"`
+	Ignored    bool    `gorm:"default:false" json:"ignored"`
 }
