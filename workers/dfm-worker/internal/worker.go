@@ -11,6 +11,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	dfmengine "github.com/betterdfm/dfm-engine"
 	"github.com/google/uuid"
@@ -20,15 +22,19 @@ import (
 type Worker struct {
 	db           *gorm.DB
 	sqsClient    *sqs.Client
+	s3Client     *s3.Client
+	s3Bucket     string
 	sqsQueueURL  string
 	gerbonaraURL string
 	httpClient   *http.Client
 }
 
-func NewWorker(db *gorm.DB, sqsClient *sqs.Client, sqsQueueURL, gerbonaraURL string) *Worker {
+func NewWorker(db *gorm.DB, sqsClient *sqs.Client, s3Client *s3.Client, s3Bucket, sqsQueueURL, gerbonaraURL string) *Worker {
 	return &Worker{
 		db:           db,
 		sqsClient:    sqsClient,
+		s3Client:     s3Client,
+		s3Bucket:     s3Bucket,
 		sqsQueueURL:  sqsQueueURL,
 		gerbonaraURL: gerbonaraURL,
 		httpClient:   &http.Client{Timeout: 5 * time.Minute},
@@ -113,13 +119,37 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	}
 	board = sanitizeBoard(board, jobID)
 
-	// 5.5 Persist board data on the job record for visualization
-	if boardJSON, err := json.Marshal(board); err == nil {
-		job.BoardData = boardJSON
-		if err := w.db.Save(&job).Error; err != nil {
-			log.Printf("WARN: failed to persist board_data for job %s: %v", job.ID, err)
-			// Non-fatal: DFM analysis can still proceed without stored board geometry
+	// 5.5 Upload board data to S3 and store outline in DB for scoring
+	boardJSON, err := json.Marshal(board)
+	if err != nil {
+		return fmt.Errorf("failed to marshal board data: %w", err)
+	}
+	boardKey := fmt.Sprintf("results/%s/board.json", jobID)
+	if w.s3Client != nil {
+		if _, err := w.s3Client.PutObject(ctx, &s3.PutObjectInput{
+			Bucket:      aws.String(w.s3Bucket),
+			Key:         aws.String(boardKey),
+			Body:        bytes.NewReader(boardJSON),
+			ContentType: aws.String("application/json"),
+		}); err != nil {
+			return fmt.Errorf("failed to upload board data to S3: %w", err)
 		}
+		job.BoardDataKey = boardKey
+		log.Printf("job %s: uploaded board.json to S3 (%d bytes)", jobID, len(boardJSON))
+	} else {
+		// Dev mode: no S3, store inline in DB
+		job.BoardData = boardJSON
+	}
+	// Store outline separately for score recalculation (small, ~1 KB)
+	outlineData := struct {
+		Outline      []dfmengine.Point   `json:"outline"`
+		OutlineHoles [][]dfmengine.Point `json:"outlineHoles,omitempty"`
+	}{Outline: board.Outline, OutlineHoles: board.OutlineHoles}
+	if outlineJSON, err := json.Marshal(outlineData); err == nil {
+		job.BoardOutline = outlineJSON
+	}
+	if err := w.db.Save(&job).Error; err != nil {
+		log.Printf("WARN: failed to persist job metadata for %s: %v", job.ID, err)
 	}
 
 	// 6. Run DFM rules
@@ -132,7 +162,7 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	job.MfgGrade = scoreResult.Grade
 	log.Printf("job %s: mfg_score=%d grade=%s", jobID, scoreResult.Score, scoreResult.Grade)
 
-	// 7. Bulk insert violations
+	// 7. Build violation records + bulk insert into DB (for ignore/waive)
 	var dbViolations []Violation
 	for _, v := range engineViolations {
 		dbViolations = append(dbViolations, Violation{
@@ -168,6 +198,25 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 		}
 	}
 	log.Printf("job %s: inserted %d violations", jobID, len(dbViolations))
+
+	// 7.5 Upload violations JSON to S3 for fast bulk reads
+	if w.s3Client != nil {
+		violJSON, err := json.Marshal(dbViolations)
+		if err == nil {
+			violKey := fmt.Sprintf("results/%s/violations.json", jobID)
+			if _, err := w.s3Client.PutObject(ctx, &s3.PutObjectInput{
+				Bucket:      aws.String(w.s3Bucket),
+				Key:         aws.String(violKey),
+				Body:        bytes.NewReader(violJSON),
+				ContentType: aws.String("application/json"),
+			}); err == nil {
+				job.ViolationsKey = violKey
+				log.Printf("job %s: uploaded violations.json to S3 (%d bytes)", jobID, len(violJSON))
+			} else {
+				log.Printf("WARN: failed to upload violations to S3 for job %s: %v", jobID, err)
+			}
+		}
+	}
 
 	// 8. Mark job DONE
 	done := time.Now()

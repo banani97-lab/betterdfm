@@ -252,11 +252,23 @@ export async function getJob(jobId: string): Promise<AnalysisJob> {
 }
 
 export async function getViolations(jobId: string): Promise<Violation[]> {
-  return apiFetch<Violation[]>(`/jobs/${jobId}/violations`)
+  const resp = await apiFetch<{ url: string } | Violation[]>(`/jobs/${jobId}/violations`)
+  if (!Array.isArray(resp) && 'url' in resp) {
+    const s3Resp = await fetch(resp.url)
+    if (!s3Resp.ok) throw new Error(`Failed to fetch violations from S3: ${s3Resp.status}`)
+    return s3Resp.json()
+  }
+  return resp as Violation[]
 }
 
 export async function getBoardData(jobId: string): Promise<BoardData> {
-  return apiFetch<BoardData>(`/jobs/${jobId}/board`)
+  const resp = await apiFetch<{ url: string } | BoardData>(`/jobs/${jobId}/board`)
+  if ('url' in resp && typeof resp.url === 'string') {
+    const s3Resp = await fetch(resp.url)
+    if (!s3Resp.ok) throw new Error(`Failed to fetch board data from S3: ${s3Resp.status}`)
+    return s3Resp.json()
+  }
+  return resp as BoardData
 }
 
 export async function getSubmissionOverview(jobId: string): Promise<SubmissionOverview> {
@@ -527,11 +539,23 @@ export async function getSharedJob(token: string, jobId: string): Promise<Analys
 }
 
 export async function getSharedViolations(token: string, jobId: string): Promise<Violation[]> {
-  return shareFetch<Violation[]>(token, `/jobs/${jobId}/violations`)
+  const resp = await shareFetch<{ url: string } | Violation[]>(token, `/jobs/${jobId}/violations`)
+  if (!Array.isArray(resp) && 'url' in resp) {
+    const s3Resp = await fetch(resp.url)
+    if (!s3Resp.ok) throw new Error(`Failed to fetch violations from S3: ${s3Resp.status}`)
+    return s3Resp.json()
+  }
+  return resp as Violation[]
 }
 
 export async function getSharedBoardData(token: string, jobId: string): Promise<BoardData> {
-  return shareFetch<BoardData>(token, `/jobs/${jobId}/board`)
+  const resp = await shareFetch<{ url: string } | BoardData>(token, `/jobs/${jobId}/board`)
+  if ('url' in resp && typeof resp.url === 'string') {
+    const s3Resp = await fetch(resp.url)
+    if (!s3Resp.ok) throw new Error(`Failed to fetch board data from S3: ${s3Resp.status}`)
+    return s3Resp.json()
+  }
+  return resp as BoardData
 }
 
 export async function sharedUpload(

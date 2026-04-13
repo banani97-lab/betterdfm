@@ -13,11 +13,12 @@ import (
 )
 
 type JobsHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	aws *lib.AWSClients
 }
 
-func NewJobsHandler(database *gorm.DB) *JobsHandler {
-	return &JobsHandler{db: database}
+func NewJobsHandler(database *gorm.DB, awsClients *lib.AWSClients) *JobsHandler {
+	return &JobsHandler{db: database, aws: awsClients}
 }
 
 // jobResponse is AnalysisJob without BoardData — the board geometry is
@@ -68,9 +69,19 @@ func (h *JobsHandler) GetBoardData(c echo.Context) error {
 	user := lib.GetUser(c)
 	id := c.Param("id")
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
+	if err := h.db.Select("id, org_id, board_data_key, board_data").
+		First(&job, "id = ? AND org_id = ?", id, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
+	// New path: serve from S3 via presigned URL
+	if job.BoardDataKey != "" && h.aws != nil && h.aws.S3Presign != nil {
+		url, err := h.aws.PresignGetURL(c.Request().Context(), job.BoardDataKey, 15*time.Minute)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate presigned URL")
+		}
+		return c.JSON(http.StatusOK, map[string]string{"url": url})
+	}
+	// Legacy fallback: inline JSONB
 	if len(job.BoardData) == 0 {
 		return echo.NewHTTPError(http.StatusNotFound, "board data not available")
 	}
@@ -105,10 +116,14 @@ func (h *JobsHandler) UpdateViolation(c echo.Context) error {
 	h.db.Where("job_id = ? AND ignored = false", v.JobID).Find(&activeViolations)
 
 	var job db.AnalysisJob
-	h.db.First(&job, "id = ?", v.JobID)
+	h.db.Omit("board_data").First(&job, "id = ?", v.JobID)
 
 	var board rptBoardData
-	_ = json.Unmarshal(job.BoardData, &board)
+	if len(job.BoardOutline) > 0 {
+		_ = json.Unmarshal(job.BoardOutline, &board)
+	} else {
+		_ = json.Unmarshal(job.BoardData, &board)
+	}
 
 	sr := computeReportScore(activeViolations, board)
 	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
@@ -143,7 +158,7 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 	}
 
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
+	if err := h.db.Omit("board_data").First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 
@@ -159,7 +174,11 @@ func (h *JobsHandler) BulkIgnoreLayerViolations(c echo.Context) error {
 	h.db.Where("job_id = ? AND ignored = false", jobID).Find(&activeViolations)
 
 	var board rptBoardData
-	_ = json.Unmarshal(job.BoardData, &board)
+	if len(job.BoardOutline) > 0 {
+		_ = json.Unmarshal(job.BoardOutline, &board)
+	} else {
+		_ = json.Unmarshal(job.BoardData, &board)
+	}
 
 	sr := computeReportScore(activeViolations, board)
 	h.db.Model(&job).Updates(map[string]interface{}{"mfg_score": sr.Score, "mfg_grade": sr.Grade})
@@ -181,10 +200,20 @@ func (h *JobsHandler) GetViolations(c echo.Context) error {
 
 	// Verify job exists and belongs to user's org
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
+	if err := h.db.Omit("board_data").First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 
+	// New path: serve from S3 via presigned URL
+	if job.ViolationsKey != "" && h.aws != nil && h.aws.S3Presign != nil {
+		url, err := h.aws.PresignGetURL(c.Request().Context(), job.ViolationsKey, 15*time.Minute)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate presigned URL")
+		}
+		return c.JSON(http.StatusOK, map[string]string{"url": url})
+	}
+
+	// Legacy fallback: query violations table
 	var violations []db.Violation
 	if err := h.db.Where("job_id = ?", jobID).Find(&violations).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())

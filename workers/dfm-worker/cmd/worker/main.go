@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/betterdfm/dfm-worker/internal"
 	"gorm.io/driver/postgres"
@@ -36,8 +37,13 @@ func main() {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}
 	sqsClient := sqs.NewFromConfig(cfg)
+	s3Client := s3.NewFromConfig(cfg)
+	s3Bucket := os.Getenv("S3_BUCKET")
+	if s3Bucket == "" {
+		s3Bucket = "betterdfm-uploads"
+	}
 
-	w := internal.NewWorker(db, sqsClient, sqsQueueURL, gerbonaraURL)
+	w := internal.NewWorker(db, sqsClient, s3Client, s3Bucket, sqsQueueURL, gerbonaraURL)
 
 	// Wait for the gerbonara sidecar to be healthy before consuming jobs.
 	// Both containers start simultaneously in Fargate; without this check

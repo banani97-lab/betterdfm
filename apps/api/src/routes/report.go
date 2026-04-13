@@ -256,7 +256,7 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	jobID := c.Param("id")
 
 	var job db.AnalysisJob
-	if err := h.db.First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
+	if err := h.db.Omit("board_data").First(&job, "id = ? AND org_id = ?", jobID, user.OrgID).Error; err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 
@@ -278,7 +278,11 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	_ = json.Unmarshal(profile.Rules, &rules)
 
 	var board rptBoardData
-	_ = json.Unmarshal(job.BoardData, &board)
+	if len(job.BoardOutline) > 0 {
+		_ = json.Unmarshal(job.BoardOutline, &board)
+	} else {
+		_ = json.Unmarshal(job.BoardData, &board)
+	}
 
 	sr := computeReportScore(violations, board)
 

@@ -1,6 +1,7 @@
 package lib
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"time"
@@ -52,6 +53,32 @@ func (a *AWSClients) PresignPutURL(ctx context.Context, key, contentType string)
 		return "", fmt.Errorf("presign put: %w", err)
 	}
 	return req.URL, nil
+}
+
+// PresignGetURL generates a presigned S3 GET URL with the given expiry.
+func (a *AWSClients) PresignGetURL(ctx context.Context, key string, expiry time.Duration) (string, error) {
+	req, err := a.S3Presign.PresignGetObject(ctx, &s3.GetObjectInput{
+		Bucket: aws.String(a.Bucket),
+		Key:    aws.String(key),
+	}, s3.WithPresignExpires(expiry))
+	if err != nil {
+		return "", fmt.Errorf("presign get: %w", err)
+	}
+	return req.URL, nil
+}
+
+// PutObject uploads data to S3.
+func (a *AWSClients) PutObject(ctx context.Context, key string, data []byte, contentType string) error {
+	_, err := a.S3.PutObject(ctx, &s3.PutObjectInput{
+		Bucket:      aws.String(a.Bucket),
+		Key:         aws.String(key),
+		Body:        bytes.NewReader(data),
+		ContentType: aws.String(contentType),
+	})
+	if err != nil {
+		return fmt.Errorf("put object: %w", err)
+	}
+	return nil
 }
 
 // EnqueueJob sends a job message to SQS.

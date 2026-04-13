@@ -108,9 +108,12 @@ type AnalysisJob struct {
 	StartedAt    *time.Time     `json:"startedAt"`
 	CompletedAt  *time.Time     `json:"completedAt"`
 	ErrorMsg     string         `json:"errorMsg"`
-	BoardData    datatypes.JSON `json:"boardData" gorm:"type:jsonb"`
-	MfgScore     int            `json:"mfgScore"`
-	MfgGrade     string         `json:"mfgGrade"`
+	BoardData     datatypes.JSON `json:"boardData" gorm:"type:jsonb"`
+	BoardDataKey  string         `json:"-" gorm:"column:board_data_key"`
+	ViolationsKey string         `json:"-" gorm:"column:violations_key"`
+	BoardOutline  datatypes.JSON `json:"-" gorm:"type:jsonb;column:board_outline"`
+	MfgScore      int            `json:"mfgScore"`
+	MfgGrade      string         `json:"mfgGrade"`
 }
 
 // ShareLink is a token-based share link for customer portal access

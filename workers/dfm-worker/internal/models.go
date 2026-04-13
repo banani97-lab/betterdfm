@@ -28,9 +28,12 @@ type AnalysisJob struct {
 	StartedAt    *time.Time
 	CompletedAt  *time.Time
 	ErrorMsg     string
-	BoardData    []byte     `gorm:"type:jsonb"`
-	MfgScore     int
-	MfgGrade     string
+	BoardData     []byte `gorm:"type:jsonb"`
+	BoardDataKey  string `gorm:"column:board_data_key"`
+	ViolationsKey string `gorm:"column:violations_key"`
+	BoardOutline  []byte `gorm:"type:jsonb;column:board_outline"`
+	MfgScore      int
+	MfgGrade      string
 }
 
 type Submission struct {

@@ -364,8 +364,17 @@ func (h *ShareHandler) GetSharedViolations(c echo.Context) error {
 	link := getShareLink(c)
 	jobID := c.Param("jobId")
 
-	if _, err := h.verifyJobAccess(link, jobID); err != nil {
+	job, err := h.verifyJobAccess(link, jobID)
+	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
+	}
+
+	if job.ViolationsKey != "" && h.aws != nil && h.aws.S3Presign != nil {
+		url, err := h.aws.PresignGetURL(c.Request().Context(), job.ViolationsKey, 60*time.Minute)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate presigned URL")
+		}
+		return c.JSON(http.StatusOK, map[string]string{"url": url})
 	}
 
 	var violations []db.Violation
@@ -383,6 +392,14 @@ func (h *ShareHandler) GetSharedBoardData(c echo.Context) error {
 	job, err := h.verifyJobAccess(link, jobID)
 	if err != nil {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
+	}
+
+	if job.BoardDataKey != "" && h.aws != nil && h.aws.S3Presign != nil {
+		url, err := h.aws.PresignGetURL(c.Request().Context(), job.BoardDataKey, 60*time.Minute)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to generate presigned URL")
+		}
+		return c.JSON(http.StatusOK, map[string]string{"url": url})
 	}
 
 	if len(job.BoardData) == 0 {

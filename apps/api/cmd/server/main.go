@@ -105,7 +105,7 @@ func main() {
 	authHandler := routes.NewAuthHandler(database)
 	submissionsHandler := routes.NewSubmissionsHandler(database, awsClients, quotaService)
 	batchesHandler := routes.NewBatchesHandler(database, awsClients, quotaService)
-	jobsHandler := routes.NewJobsHandler(database)
+	jobsHandler := routes.NewJobsHandler(database, awsClients)
 	reportHandler := routes.NewReportHandler(database)
 	profilesHandler := routes.NewProfilesHandler(database, quotaService)
 	compareHandler := routes.NewCompareHandler(database, quotaService)
