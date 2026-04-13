@@ -1127,17 +1127,27 @@ def _propagate_trace_nets(
                             result.append(j)
             return result
 
+        # Build spatial grid for pad lookup — avoids O(traces × pads) scan
+        # that was taking minutes on 14-layer boards.
+        PAD_CELL = 1.0  # 1mm cells; pads are typically < 5mm
+        pad_grid: dict[tuple[int, int], list] = defaultdict(list)
+        for p in layer_pads:
+            pad_grid[(int(p.x / PAD_CELL), int(p.y / PAD_CELL))].append(p)
+
         def _pad_net_at(x: float, y: float) -> str:
             """Return the net of a pad whose edge is within TOL of (x, y)."""
-            for p in layer_pads:
-                dx, dy = abs(x - p.x), abs(y - p.y)
-                hw, hh = p.widthMM / 2, p.heightMM / 2
-                if p.shape == "CIRCLE":
-                    if (dx * dx + dy * dy) ** 0.5 - hw <= TOL:
-                        return p.netName
-                else:
-                    if max(dx - hw, dy - hh, 0) <= TOL:
-                        return p.netName
+            gx, gy = int(x / PAD_CELL), int(y / PAD_CELL)
+            for ddx in (-1, 0, 1):
+                for ddy in (-1, 0, 1):
+                    for p in pad_grid.get((gx + ddx, gy + ddy), ()):
+                        dx, dy = abs(x - p.x), abs(y - p.y)
+                        hw, hh = p.widthMM / 2, p.heightMM / 2
+                        if p.shape == "CIRCLE":
+                            if (dx * dx + dy * dy) ** 0.5 - hw <= TOL:
+                                return p.netName
+                        else:
+                            if max(dx - hw, dy - hh, 0) <= TOL:
+                                return p.netName
             return ""
 
         # Phase 1: seed from pads.
