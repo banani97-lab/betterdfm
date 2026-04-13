@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/betterdfm/api/src/db"
 	"github.com/betterdfm/api/src/lib"
@@ -19,6 +20,23 @@ func NewJobsHandler(database *gorm.DB) *JobsHandler {
 	return &JobsHandler{db: database}
 }
 
+// jobResponse is AnalysisJob without BoardData — the board geometry is
+// fetched separately via GET /jobs/:id/board and can be several MB on
+// large boards. Including it inline made the job endpoint too slow.
+type jobResponse struct {
+	ID           string     `json:"id"`
+	OrgID        string     `json:"orgId"`
+	SubmissionID string     `json:"submissionId"`
+	ProfileID    string     `json:"profileId"`
+	Status       string     `json:"status"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	StartedAt    *time.Time `json:"startedAt"`
+	CompletedAt  *time.Time `json:"completedAt"`
+	ErrorMsg     string     `json:"errorMsg"`
+	MfgScore     int        `json:"mfgScore"`
+	MfgGrade     string     `json:"mfgGrade"`
+}
+
 // GetJob GET /jobs/:id
 func (h *JobsHandler) GetJob(c echo.Context) error {
 	user := lib.GetUser(c)
@@ -30,7 +48,19 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, job)
+	return c.JSON(http.StatusOK, jobResponse{
+		ID:           job.ID,
+		OrgID:        job.OrgID,
+		SubmissionID: job.SubmissionID,
+		ProfileID:    job.ProfileID,
+		Status:       job.Status,
+		CreatedAt:    job.CreatedAt,
+		StartedAt:    job.StartedAt,
+		CompletedAt:  job.CompletedAt,
+		ErrorMsg:     job.ErrorMsg,
+		MfgScore:     job.MfgScore,
+		MfgGrade:     job.MfgGrade,
+	})
 }
 
 // GetBoardData GET /jobs/:id/board
