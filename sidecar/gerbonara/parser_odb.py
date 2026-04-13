@@ -541,13 +541,36 @@ def _build_features(
                                             _coord_to_mm(float(parts[2]), units)))
                     except ValueError:
                         pass
-            elif rec in ("OS", "OC") and in_island:
+            elif rec == "OS" and in_island:
                 if len(parts) >= 3:
                     try:
                         surface_pts.append((_coord_to_mm(float(parts[1]), units),
                                             _coord_to_mm(float(parts[2]), units)))
                     except ValueError:
                         pass
+            elif rec == "OC" and in_island:
+                # ODB++ arc: OC xe ye xc yc cw
+                # xe/ye = end point, xc/yc = center, cw = Y/N clockwise.
+                # Expand into line segments so circular anti-pads render
+                # correctly instead of collapsing to a 2-point diamond.
+                if len(parts) >= 6 and surface_pts:
+                    try:
+                        xe = _coord_to_mm(float(parts[1]), units)
+                        ye = _coord_to_mm(float(parts[2]), units)
+                        xc = _coord_to_mm(float(parts[3]), units)
+                        yc = _coord_to_mm(float(parts[4]), units)
+                        cw = parts[5].upper() == "Y"
+                        x1, y1 = surface_pts[-1]  # arc starts from previous point
+                        segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw, n=16)
+                        for _, _, sx2, sy2 in segs:
+                            surface_pts.append((sx2, sy2))
+                    except ValueError:
+                        # Fallback: treat like a line segment
+                        try:
+                            surface_pts.append((_coord_to_mm(float(parts[1]), units),
+                                                _coord_to_mm(float(parts[2]), units)))
+                        except ValueError:
+                            pass
             elif rec == "OE" and in_island:
                 _flush_island()
                 in_island = False
