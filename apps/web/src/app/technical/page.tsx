@@ -239,7 +239,7 @@ export default function TechnicalPage() {
       fontFamily: '"Segoe UI", system-ui, -apple-system, sans-serif',
     }}>
       {/* Hero */}
-      <div style={{
+      <div className="tech-hero" style={{
         background: 'linear-gradient(180deg, rgba(212,137,26,0.06) 0%, transparent 100%)',
         borderBottom: '1px solid #1e2432',
         padding: '4rem 2rem 3rem',
@@ -299,9 +299,9 @@ export default function TechnicalPage() {
       </div>
 
       {/* Layout: TOC + Content */}
-      <div style={{
+      <div className="tech-layout" style={{
         display: 'grid',
-        gridTemplateColumns: '220px 1fr',
+        gridTemplateColumns: '1fr',
         maxWidth: '1100px',
         margin: '0 auto',
         gap: '0',
@@ -344,7 +344,7 @@ export default function TechnicalPage() {
         </aside>
 
         {/* Main content */}
-        <main style={{ padding: '3rem 0 6rem', maxWidth: '760px' }}>
+        <main className="tech-main" style={{ padding: '3rem 0 6rem', maxWidth: '760px', minWidth: 0 }}>
 
           {/* ─── OVERVIEW ─────────────────────────────────── */}
           <SectionAnchor id="overview" />
@@ -391,7 +391,7 @@ export default function TechnicalPage() {
             </p>
 
             {/* Architecture diagram */}
-            <div style={{
+            <div className="tech-arch-diagram" style={{
               background: '#0d1117',
               border: '1px solid #1e2432',
               borderRadius: '12px',
@@ -1144,7 +1144,7 @@ NET {
               GitHub Actions runs two pipelines: one for CI (tests + builds on every push/PR), one for deployment (path-filtered, only rebuilds changed services).
             </p>
 
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
+            <div className="tech-cicd-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem', marginTop: '1.25rem' }}>
               <div style={{ background: '#111418', border: '1px solid #1e2432', borderRadius: '8px', padding: '1.25rem' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.75rem' }}>CI Pipeline</div>
                 {[
@@ -1213,6 +1213,13 @@ NET {
       <style>{`
         @media (min-width: 768px) {
           .tech-toc { display: block !important; }
+          .tech-layout { grid-template-columns: 220px 1fr !important; }
+        }
+        @media (max-width: 767px) {
+          .tech-hero { padding: 2.5rem 1.25rem 2rem !important; }
+          .tech-arch-diagram { padding: 1.25rem 1rem !important; }
+          .tech-cicd-grid { grid-template-columns: 1fr !important; }
+          .tech-main { padding: 2rem 0 4rem !important; }
         }
       `}</style>
     </div>
