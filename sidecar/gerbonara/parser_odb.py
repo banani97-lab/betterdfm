@@ -589,10 +589,18 @@ def _build_features(
                 x2 = _coord_to_mm(float(parts[3]), units)
                 y2 = _coord_to_mm(float(parts[4]), units)
                 sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
+                trace_w = sym["w"]
+                # Skip sub-minimum trace widths on copper layers. Below 0.05mm
+                # (50µm) is not a manufacturable trace — it's a coordinate
+                # marker, alignment reference, or fab-drawing feature that
+                # ODB++ uses the L record for. Real copper traces start at
+                # ~0.075mm (3 mil) on standard fabs, 0.05mm on premium.
+                if ltype in ("COPPER", "POWER_GROUND") and trace_w < 0.05:
+                    continue
                 mid_x = (x1 + x2) / 2
                 mid_y = (y1 + y2) / 2
                 net = _attr_net(raw) or (net_index.lookup(mid_x, mid_y) if net_index else "")
-                traces.append(Trace(layer=layer_name, widthMM=max(0.01, sym["w"]),
+                traces.append(Trace(layer=layer_name, widthMM=max(0.01, trace_w),
                                     startX=x1, startY=y1, endX=x2, endY=y2,
                                     netName=net))
             except (ValueError, IndexError):
@@ -687,7 +695,11 @@ def _build_features(
                 yc = _coord_to_mm(float(parts[6]), units)
                 cw = parts[7].upper() == "Y"
                 sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
-                w = max(0.01, sym["w"])
+                trace_w = sym["w"]
+                # Skip sub-minimum arcs on copper — same rationale as L records.
+                if ltype in ("COPPER", "POWER_GROUND") and trace_w < 0.05:
+                    continue
+                w = max(0.01, trace_w)
                 net = _attr_net(raw) or (net_index.lookup(xc, yc) if net_index else "")
                 segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw)
                 for sx1, sy1, sx2, sy2 in segs:
