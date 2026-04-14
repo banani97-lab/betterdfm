@@ -387,7 +387,7 @@ export default function TechnicalPage() {
           <section style={{ marginBottom: '4rem' }}>
             <h2 style={h2Style}>Architecture</h2>
             <p style={pStyle}>
-              Five services in a monorepo, orchestrated via Docker Compose locally and GitHub Actions for production deploys. The key principle: the API never touches file bytes — uploads go directly from the browser to S3 via presigned URLs.
+              Five services in a monorepo, orchestrated via Docker Compose locally and GitHub Actions for production deploys. The key principle: the API never touches file bytes — uploads go directly from the browser to S3 via presigned URLs, and analysis result blobs (board geometry, violations) are served back the same way.
             </p>
 
             {/* Architecture diagram */}
@@ -428,22 +428,40 @@ export default function TechnicalPage() {
                   <Arrow label="⑤ BoardData JSON" dir="left" />
                 </div>
 
-                {/* Row 4: Worker → DFM → DB */}
+                {/* Row 4: Worker → DFM → DB + S3 result blobs */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <ServiceBox label="Go Worker" sub="ECS · 5 goroutines" color="#00acd7" />
                   <Arrow label="⑥ run 16 rules" />
                   <ServiceBox label="DFM Engine" sub="Go library" color="#d4891a" />
-                  <Arrow label="⑦ bulk insert violations" />
+                  <Arrow label="⑦ score + metadata" />
                   <ServiceBox label="PostgreSQL" sub="RDS · GORM" color="#336791" />
                 </div>
 
-                {/* Row 5: Frontend poll */}
+                {/* Row 5: Worker → S3 result blobs */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <ServiceBox label="Go Worker" sub="ECS · 5 goroutines" color="#00acd7" />
+                  <Arrow label="⑧ PUT board.json + violations.json" />
+                  <ServiceBox label="Amazon S3" sub="results/{jobId}/" color="#ff9900" />
+                  <div style={{ color: '#475569', fontSize: '11px', marginLeft: '0.5rem', maxWidth: '180px', lineHeight: 1.4 }}>
+                    Large geometric blobs offloaded; DB stores S3 keys only.
+                  </div>
+                </div>
+
+                {/* Row 6: Frontend poll + presigned fetch */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <ServiceBox label="Browser" sub="Next.js 14" color="#4a9eff" />
-                  <Arrow label="⑧ poll GET /jobs/:id" />
+                  <Arrow label="⑨ poll · then GET /jobs/:id/board" />
                   <ServiceBox label="Go API" sub="Echo · :8080" color="#00acd7" />
+                  <Arrow label="⑩ {url: presigned}" dir="left" />
+                </div>
+
+                {/* Row 7: Browser → S3 direct fetch */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                  <ServiceBox label="Browser" sub="Next.js 14" color="#4a9eff" />
+                  <Arrow label="⑪ GET presigned URL" />
+                  <ServiceBox label="Amazon S3" sub="results/{jobId}/" color="#ff9900" />
                   <div style={{ color: '#475569', fontSize: '11px', marginLeft: '0.5rem', maxWidth: '200px', lineHeight: 1.4 }}>
-                    Polls until <code style={{ color: '#d4891a', fontFamily: 'ui-monospace, monospace', fontSize: '11px' }}>status=DONE</code>, renders SVG board viewer.
+                    Browser pulls board + violations directly from S3, renders SVG board viewer.
                   </div>
                 </div>
               </div>
@@ -735,7 +753,22 @@ while (true) {
 
             <h3 style={h3Style}>Worker goroutine pool</h3>
             <p style={pStyle}>
-              The worker runs five goroutines, all consuming from a shared <code style={inlineCode}>jobs</code> channel fed by SQS long-polling (20-second wait, up to 10 messages per batch). Each goroutine processes one job at a time: fetch from S3, parse, run rules, store violations, mark DONE.
+              The worker runs five goroutines, all consuming from a shared <code style={inlineCode}>jobs</code> channel fed by SQS long-polling (20-second wait, up to 10 messages per batch). Each goroutine processes one job at a time: fetch ODB++ from S3, parse, run rules, write the result blobs back to S3, persist score + S3 keys to PostgreSQL, mark DONE.
+            </p>
+
+            <h3 style={h3Style}>Result blobs in S3</h3>
+            <p style={pStyle}>
+              A single 14-layer board can contain 125,000+ pads, hundreds of thousands of trace segments, and tens of thousands of violations. Stuffing that into a PostgreSQL JSONB column blows up row size, kills replica replication latency, and forces every <code style={inlineCode}>SELECT</code> to drag megabytes through the API process. So once the worker finishes the run, it writes two blobs to S3 under <code style={inlineCode}>results/{`{jobId}`}/</code>:
+            </p>
+            <ul style={{ ...pStyle, paddingLeft: '1.5rem', listStyle: 'disc' }}>
+              <li><code style={inlineCode}>board.json</code> — full <code style={inlineCode}>BoardData</code> (layers, traces, pads, vias, drills, polygons)</li>
+              <li><code style={inlineCode}>violations.json</code> — the entire violation array from the rule run</li>
+            </ul>
+            <p style={pStyle}>
+              PostgreSQL keeps only lightweight metadata: the score, grade, the two S3 keys (<code style={inlineCode}>board_data_key</code>, <code style={inlineCode}>violations_key</code>), and a small <code style={inlineCode}>board_outline</code> JSONB (~1 KB) used for server-side score recalculation when a user waives a violation. The <code style={inlineCode}>violations</code> table itself is retained only for ignore/waive mutations — it is no longer the source of truth for bulk delivery.
+            </p>
+            <p style={pStyle}>
+              When the frontend calls <code style={inlineCode}>GET /jobs/:id/board</code> or <code style={inlineCode}>GET /jobs/:id/violations</code>, the API responds with <code style={inlineCode}>{`{ url: <presigned-s3-url> }`}</code> (15-minute expiry; 60 minutes for share links). The browser then fetches the blob directly from S3, bypassing the API entirely. Old jobs predating the migration still have inline JSONB <code style={inlineCode}>board_data</code>; the API transparently falls back to that path when the S3 key is empty.
             </p>
 
             <h3 style={h3Style}>SQS recovery loop</h3>
@@ -1003,6 +1036,9 @@ NET {
             <p style={pStyle}>
               The board visualiser is split into two modules: a pure <code style={inlineCode}>boardPainter.ts</code> (testable, no DOM dependencies) and an impure <code style={inlineCode}>canvasRenderer.ts</code> that owns the canvas context. The viewer renders directly to SVG with pan/zoom state, making it straightforward to implement compare mode — two viewers sharing a synchronised transform via a callback.
             </p>
+            <p style={pStyle}>
+              The board geometry and violations the viewer needs are not embedded in the API response. <code style={inlineCode}>getBoardData()</code> and <code style={inlineCode}>getViolations()</code> in <code style={inlineCode}>src/lib/api.ts</code> hit the API, detect the <code style={inlineCode}>{`{ url: ... }`}</code> envelope, and follow the presigned URL straight to S3. Result: the API process never has to read or stream multi-megabyte blobs, and a busy results page produces almost no API load at all.
+            </p>
 
             <div style={{
               display: 'grid',
@@ -1062,6 +1098,10 @@ NET {
               {
                 title: 'Presigned URL delegation',
                 body: 'The API never handles file bytes. The bandwidth cost of large ODB++ files (50–100 MB) would be prohibitive through an App Runner instance with limited egress. Presigned URLs push the transfer directly to S3.',
+              },
+              {
+                title: 'Result blobs in S3, not PostgreSQL',
+                body: 'A 14-layer board produces board.json and violations.json blobs in the multi-MB range. Storing them as JSONB columns blew up row size, hurt replica replication, and forced the API to drag megabytes through every read. The worker now writes both blobs to results/{jobId}/ in S3 and the database keeps only the S3 keys plus the score. The API responds to GET /jobs/:id/board with {url: presigned} and the browser fetches directly — the API process never sees the bytes. Inline JSONB is kept as a fallback for jobs predating the migration.',
               },
               {
                 title: 'Epsilon tolerance (geomEps = 1e-6)',
