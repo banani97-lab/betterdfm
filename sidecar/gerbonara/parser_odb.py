@@ -738,6 +738,7 @@ def _parse_features(
         return
 
     lines = text.splitlines()
+    units = _features_file_units(lines, units, layer_name, warnings)
     symbols = _parse_symbol_table(lines, units, warnings=warnings, layer_name=layer_name)
     tokens = _tokenize_features(lines)
 
@@ -751,6 +752,33 @@ def _parse_features(
                     polygons=polygons)
 
 
+def _features_file_units(lines: list[str], step_units: str,
+                         layer_name: str,
+                         warnings: list[str] | None) -> str:
+    """Resolve UNITS for a single feature file.
+
+    ODB++ lets each feature file declare its own `UNITS=` line that overrides
+    the step-level UNITS from stephdr. Real-world HDI designs sometimes mix
+    units — e.g. every copper/mask layer is MM but the drill layer is INCH.
+    Missing the override squashes all coordinates ~25× and mis-scales symbol
+    diameters, which on the drill layer silently discards ~99% of drills
+    via the sub-50µm marker filter in _build_features.
+    """
+    for line in lines[:10]:
+        s = line.strip()
+        if s.startswith("UNITS="):
+            file_units = s.split("=", 1)[1].strip().upper()
+            if file_units in ("MM", "INCH") and file_units != step_units.upper():
+                if warnings is not None:
+                    warnings.append(
+                        f"Layer {layer_name!r}: feature file UNITS={file_units} "
+                        f"overrides step-level UNITS={step_units}"
+                    )
+                return file_units
+            break
+    return step_units
+
+
 def _parse_rout(features_path: Path, units: str, drills: list) -> None:
     """Parse ODB++ rout layer features for drill holes (P records only)."""
     try:
@@ -758,6 +786,7 @@ def _parse_rout(features_path: Path, units: str, drills: list) -> None:
     except OSError:
         return
     lines = text.splitlines()
+    units = _features_file_units(lines, units, "rout", None)
     symbols = _parse_symbol_table(lines, units)
     for line in lines:
         raw = line.strip()
