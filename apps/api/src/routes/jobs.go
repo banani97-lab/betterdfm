@@ -24,18 +24,24 @@ func NewJobsHandler(database *gorm.DB, awsClients *lib.AWSClients) *JobsHandler 
 // jobResponse is AnalysisJob without BoardData — the board geometry is
 // fetched separately via GET /jobs/:id/board and can be several MB on
 // large boards. Including it inline made the job endpoint too slow.
+//
+// When the job is DONE and result blobs live in S3, we also inline
+// presigned URLs for board + violations so the client skips a round-trip
+// and can kick off both S3 fetches in parallel.
 type jobResponse struct {
-	ID           string     `json:"id"`
-	OrgID        string     `json:"orgId"`
-	SubmissionID string     `json:"submissionId"`
-	ProfileID    string     `json:"profileId"`
-	Status       string     `json:"status"`
-	CreatedAt    time.Time  `json:"createdAt"`
-	StartedAt    *time.Time `json:"startedAt"`
-	CompletedAt  *time.Time `json:"completedAt"`
-	ErrorMsg     string     `json:"errorMsg"`
-	MfgScore     int        `json:"mfgScore"`
-	MfgGrade     string     `json:"mfgGrade"`
+	ID            string     `json:"id"`
+	OrgID         string     `json:"orgId"`
+	SubmissionID  string     `json:"submissionId"`
+	ProfileID     string     `json:"profileId"`
+	Status        string     `json:"status"`
+	CreatedAt     time.Time  `json:"createdAt"`
+	StartedAt     *time.Time `json:"startedAt"`
+	CompletedAt   *time.Time `json:"completedAt"`
+	ErrorMsg      string     `json:"errorMsg"`
+	MfgScore      int        `json:"mfgScore"`
+	MfgGrade      string     `json:"mfgGrade"`
+	BoardURL      string     `json:"boardUrl,omitempty"`
+	ViolationsURL string     `json:"violationsUrl,omitempty"`
 }
 
 // GetJob GET /jobs/:id
@@ -49,7 +55,7 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	return c.JSON(http.StatusOK, jobResponse{
+	resp := jobResponse{
 		ID:           job.ID,
 		OrgID:        job.OrgID,
 		SubmissionID: job.SubmissionID,
@@ -61,7 +67,21 @@ func (h *JobsHandler) GetJob(c echo.Context) error {
 		ErrorMsg:     job.ErrorMsg,
 		MfgScore:     job.MfgScore,
 		MfgGrade:     job.MfgGrade,
-	})
+	}
+	if job.Status == "DONE" && h.aws != nil && h.aws.S3Presign != nil {
+		ctx := c.Request().Context()
+		if job.BoardDataKey != "" {
+			if url, err := h.aws.PresignGetURL(ctx, job.BoardDataKey, 15*time.Minute); err == nil {
+				resp.BoardURL = url
+			}
+		}
+		if job.ViolationsKey != "" {
+			if url, err := h.aws.PresignGetURL(ctx, job.ViolationsKey, 15*time.Minute); err == nil {
+				resp.ViolationsURL = url
+			}
+		}
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetBoardData GET /jobs/:id/board

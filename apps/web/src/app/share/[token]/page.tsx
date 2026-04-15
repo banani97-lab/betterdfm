@@ -9,6 +9,8 @@ import {
   getSharedViolations,
   getSharedBoardData,
   getSharedSubmissions,
+  fetchBoardFromUrl,
+  fetchViolationsFromUrl,
   sharedUpload,
   sharedAnalyze,
   uploadToS3,
@@ -79,14 +81,19 @@ export default function SharedPage() {
         track('SharePage Viewed', { token: token.slice(0, 8), shareType: info.shareType })
 
         if (info.shareType === 'job' && info.jobId) {
-          // Load job data directly
-          const [jobData, violationsData] = await Promise.all([
-            getSharedJob(token, info.jobId),
-            getSharedViolations(token, info.jobId),
-          ])
+          const jobId = info.jobId
+          const jobData = await getSharedJob(token, jobId)
           setJob(jobData)
+          // Fire board fetch in parallel with violations; skip the API
+          // round-trip when inline presigned URLs are present on the job.
+          ;(jobData.boardUrl
+            ? fetchBoardFromUrl(jobData.boardUrl)
+            : getSharedBoardData(token, jobId)
+          ).then(setBoardData).catch(() => {})
+          const violationsData = await (jobData.violationsUrl
+            ? fetchViolationsFromUrl(jobData.violationsUrl)
+            : getSharedViolations(token, jobId))
           setViolations(violationsData ?? [])
-          getSharedBoardData(token, info.jobId).then(setBoardData).catch(() => {})
         } else if (info.shareType === 'project') {
           const subs = await getSharedSubmissions(token)
           setSubmissions(subs ?? [])
@@ -111,13 +118,16 @@ export default function SharedPage() {
     if (!selectedJobId) return
     const load = async () => {
       try {
-        const [jobData, violationsData] = await Promise.all([
-          getSharedJob(token, selectedJobId),
-          getSharedViolations(token, selectedJobId),
-        ])
+        const jobData = await getSharedJob(token, selectedJobId)
         setJob(jobData)
+        ;(jobData.boardUrl
+          ? fetchBoardFromUrl(jobData.boardUrl)
+          : getSharedBoardData(token, selectedJobId)
+        ).then(setBoardData).catch(() => {})
+        const violationsData = await (jobData.violationsUrl
+          ? fetchViolationsFromUrl(jobData.violationsUrl)
+          : getSharedViolations(token, selectedJobId))
         setViolations(violationsData ?? [])
-        getSharedBoardData(token, selectedJobId).then(setBoardData).catch(() => {})
       } catch {
         setError('Failed to load job results')
       }

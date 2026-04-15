@@ -63,6 +63,11 @@ export interface AnalysisJob {
   errorMsg?: string
   mfgScore: number
   mfgGrade: string
+  // Presigned S3 URLs inlined when the job is DONE. Lets the client skip the
+  // /jobs/:id/board and /jobs/:id/violations round-trips and fetch both blobs
+  // from S3 directly in parallel.
+  boardUrl?: string
+  violationsUrl?: string
 }
 
 export interface Violation {
@@ -251,12 +256,24 @@ export async function getJob(jobId: string): Promise<AnalysisJob> {
   return apiFetch<AnalysisJob>(`/jobs/${jobId}`)
 }
 
+async function fetchJSONFromS3<T>(url: string, label: string): Promise<T> {
+  const s3Resp = await fetch(url)
+  if (!s3Resp.ok) throw new Error(`Failed to fetch ${label} from S3: ${s3Resp.status}`)
+  return s3Resp.json()
+}
+
+export async function fetchBoardFromUrl(url: string): Promise<BoardData> {
+  return fetchJSONFromS3<BoardData>(url, 'board data')
+}
+
+export async function fetchViolationsFromUrl(url: string): Promise<Violation[]> {
+  return fetchJSONFromS3<Violation[]>(url, 'violations')
+}
+
 export async function getViolations(jobId: string): Promise<Violation[]> {
   const resp = await apiFetch<{ url: string } | Violation[]>(`/jobs/${jobId}/violations`)
   if (!Array.isArray(resp) && 'url' in resp) {
-    const s3Resp = await fetch(resp.url)
-    if (!s3Resp.ok) throw new Error(`Failed to fetch violations from S3: ${s3Resp.status}`)
-    return s3Resp.json()
+    return fetchViolationsFromUrl(resp.url)
   }
   return resp as Violation[]
 }
@@ -264,9 +281,7 @@ export async function getViolations(jobId: string): Promise<Violation[]> {
 export async function getBoardData(jobId: string): Promise<BoardData> {
   const resp = await apiFetch<{ url: string } | BoardData>(`/jobs/${jobId}/board`)
   if ('url' in resp && typeof resp.url === 'string') {
-    const s3Resp = await fetch(resp.url)
-    if (!s3Resp.ok) throw new Error(`Failed to fetch board data from S3: ${s3Resp.status}`)
-    return s3Resp.json()
+    return fetchBoardFromUrl(resp.url)
   }
   return resp as BoardData
 }
@@ -541,9 +556,7 @@ export async function getSharedJob(token: string, jobId: string): Promise<Analys
 export async function getSharedViolations(token: string, jobId: string): Promise<Violation[]> {
   const resp = await shareFetch<{ url: string } | Violation[]>(token, `/jobs/${jobId}/violations`)
   if (!Array.isArray(resp) && 'url' in resp) {
-    const s3Resp = await fetch(resp.url)
-    if (!s3Resp.ok) throw new Error(`Failed to fetch violations from S3: ${s3Resp.status}`)
-    return s3Resp.json()
+    return fetchViolationsFromUrl(resp.url)
   }
   return resp as Violation[]
 }
@@ -551,9 +564,7 @@ export async function getSharedViolations(token: string, jobId: string): Promise
 export async function getSharedBoardData(token: string, jobId: string): Promise<BoardData> {
   const resp = await shareFetch<{ url: string } | BoardData>(token, `/jobs/${jobId}/board`)
   if ('url' in resp && typeof resp.url === 'string') {
-    const s3Resp = await fetch(resp.url)
-    if (!s3Resp.ok) throw new Error(`Failed to fetch board data from S3: ${s3Resp.status}`)
-    return s3Resp.json()
+    return fetchBoardFromUrl(resp.url)
   }
   return resp as BoardData
 }

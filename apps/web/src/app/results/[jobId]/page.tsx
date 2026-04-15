@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
-import { API_URL, getJob, getViolations, getBoardData, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
+import { API_URL, getJob, getViolations, getBoardData, fetchBoardFromUrl, fetchViolationsFromUrl, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
@@ -124,21 +124,28 @@ export default function ResultsPage() {
     if (!isLoggedIn()) { router.replace('/login'); return }
     const load = async () => {
       try {
-        const [jobData, violationsData] = await Promise.all([
-          getJob(jobId),
-          getViolations(jobId),
-        ])
+        const jobData = await getJob(jobId)
         setJob(jobData)
-        setViolations(violationsData ?? [])
         track('Analysis Viewed', { jobId, score: jobData.mfgScore, grade: jobData.mfgGrade })
         track('BoardViewer Started', { jobId })
         const boardStart = Date.now()
-        getBoardData(jobId).then((bd) => {
+        // Kick off the board S3 fetch in parallel with violations so the
+        // viewer isn't blocked waiting for the violations list. When the job
+        // response inlines presigned URLs we skip the /board and /violations
+        // round-trips entirely and go straight to S3.
+        const boardP = jobData.boardUrl
+          ? fetchBoardFromUrl(jobData.boardUrl)
+          : getBoardData(jobId)
+        boardP.then((bd) => {
           setBoardData(bd)
           track('BoardViewer Loaded', { jobId, durationMs: Date.now() - boardStart })
         }).catch(() => {
           track('BoardViewer Failed', { jobId, durationMs: Date.now() - boardStart })
         })
+        const violationsData = await (jobData.violationsUrl
+          ? fetchViolationsFromUrl(jobData.violationsUrl)
+          : getViolations(jobId))
+        setViolations(violationsData ?? [])
         // Find the current submission's projectId for compare scoping
         getSubmissions().then(subs => {
           const current = subs?.find(s => s.id === jobData.submissionId)

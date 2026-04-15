@@ -348,7 +348,7 @@ func (h *ShareHandler) GetSharedJob(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusNotFound, "job not found")
 	}
 
-	return c.JSON(http.StatusOK, map[string]interface{}{
+	resp := map[string]interface{}{
 		"id":           job.ID,
 		"submissionId": job.SubmissionID,
 		"status":       job.Status,
@@ -356,7 +356,21 @@ func (h *ShareHandler) GetSharedJob(c echo.Context) error {
 		"mfgGrade":     job.MfgGrade,
 		"startedAt":    job.StartedAt,
 		"completedAt":  job.CompletedAt,
-	})
+	}
+	if job.Status == "DONE" && h.aws != nil && h.aws.S3Presign != nil {
+		ctx := c.Request().Context()
+		if job.BoardDataKey != "" {
+			if url, err := h.aws.PresignGetURL(ctx, job.BoardDataKey, 60*time.Minute); err == nil {
+				resp["boardUrl"] = url
+			}
+		}
+		if job.ViolationsKey != "" {
+			if url, err := h.aws.PresignGetURL(ctx, job.ViolationsKey, 60*time.Minute); err == nil {
+				resp["violationsUrl"] = url
+			}
+		}
+	}
+	return c.JSON(http.StatusOK, resp)
 }
 
 // GetSharedViolations GET /shared/:token/jobs/:jobId/violations

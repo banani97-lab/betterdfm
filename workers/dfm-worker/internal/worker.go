@@ -2,6 +2,7 @@ package internal
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -126,16 +127,21 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	}
 	boardKey := fmt.Sprintf("results/%s/board.json", jobID)
 	if w.s3Client != nil {
+		gzBody, err := gzipBytes(boardJSON)
+		if err != nil {
+			return fmt.Errorf("failed to gzip board data: %w", err)
+		}
 		if _, err := w.s3Client.PutObject(ctx, &s3.PutObjectInput{
-			Bucket:      aws.String(w.s3Bucket),
-			Key:         aws.String(boardKey),
-			Body:        bytes.NewReader(boardJSON),
-			ContentType: aws.String("application/json"),
+			Bucket:          aws.String(w.s3Bucket),
+			Key:             aws.String(boardKey),
+			Body:            bytes.NewReader(gzBody),
+			ContentType:     aws.String("application/json"),
+			ContentEncoding: aws.String("gzip"),
 		}); err != nil {
 			return fmt.Errorf("failed to upload board data to S3: %w", err)
 		}
 		job.BoardDataKey = boardKey
-		log.Printf("job %s: uploaded board.json to S3 (%d bytes)", jobID, len(boardJSON))
+		log.Printf("job %s: uploaded board.json to S3 (%d bytes raw, %d bytes gzipped)", jobID, len(boardJSON), len(gzBody))
 	} else {
 		// Dev mode: no S3, store inline in DB
 		job.BoardData = boardJSON
@@ -203,17 +209,23 @@ func (w *Worker) ProcessJob(ctx context.Context, jobID string) error {
 	if w.s3Client != nil {
 		violJSON, err := json.Marshal(dbViolations)
 		if err == nil {
-			violKey := fmt.Sprintf("results/%s/violations.json", jobID)
-			if _, err := w.s3Client.PutObject(ctx, &s3.PutObjectInput{
-				Bucket:      aws.String(w.s3Bucket),
-				Key:         aws.String(violKey),
-				Body:        bytes.NewReader(violJSON),
-				ContentType: aws.String("application/json"),
-			}); err == nil {
-				job.ViolationsKey = violKey
-				log.Printf("job %s: uploaded violations.json to S3 (%d bytes)", jobID, len(violJSON))
+			gzBody, gzErr := gzipBytes(violJSON)
+			if gzErr != nil {
+				log.Printf("WARN: failed to gzip violations for job %s: %v", jobID, gzErr)
 			} else {
-				log.Printf("WARN: failed to upload violations to S3 for job %s: %v", jobID, err)
+				violKey := fmt.Sprintf("results/%s/violations.json", jobID)
+				if _, err := w.s3Client.PutObject(ctx, &s3.PutObjectInput{
+					Bucket:          aws.String(w.s3Bucket),
+					Key:             aws.String(violKey),
+					Body:            bytes.NewReader(gzBody),
+					ContentType:     aws.String("application/json"),
+					ContentEncoding: aws.String("gzip"),
+				}); err == nil {
+					job.ViolationsKey = violKey
+					log.Printf("job %s: uploaded violations.json to S3 (%d bytes raw, %d bytes gzipped)", jobID, len(violJSON), len(gzBody))
+				} else {
+					log.Printf("WARN: failed to upload violations to S3 for job %s: %v", jobID, err)
+				}
 			}
 		}
 	}
@@ -357,6 +369,20 @@ func sanitizeBoard(board dfmengine.BoardData, jobID string) dfmengine.BoardData 
 	}
 
 	return board
+}
+
+// gzipBytes returns src gzip-compressed at the default compression level.
+func gzipBytes(src []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	gw := gzip.NewWriter(&buf)
+	if _, err := gw.Write(src); err != nil {
+		gw.Close()
+		return nil, err
+	}
+	if err := gw.Close(); err != nil {
+		return nil, err
+	}
+	return buf.Bytes(), nil
 }
 
 // truncate returns the first n characters of s, or all of s if shorter.
