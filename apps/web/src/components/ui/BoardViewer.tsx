@@ -290,12 +290,13 @@ function drawCopper(
     if (!inViewport(v.x, v.y, v.outerDiamMM / 2)) continue
     const cx = tx(v.x), cy = ty(v.y)
     if (!ok(cx) || !ok(cy)) continue
-    const outerR = Math.max(2, Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s))
-    const innerR = Math.max(0.8, Math.min((v.drillDiamMM / 2) * s, outerR * 0.85))
+    const outerR = Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s)
+    const innerR = Math.min((v.drillDiamMM / 2) * s, outerR * 0.85)
+    if (outerR < 0.5) continue
     ctx.fillStyle = '#d4a840'
     ctx.beginPath(); ctx.arc(cx, cy, outerR, 0, Math.PI * 2); ctx.fill()
     ctx.fillStyle = '#060606'
-    ctx.beginPath(); ctx.arc(cx, cy, innerR, 0, Math.PI * 2); ctx.fill()
+    ctx.beginPath(); ctx.arc(cx, cy, Math.max(0.3, innerR), 0, Math.PI * 2); ctx.fill()
   }
 
   // Drills — skip out-of-board, out-of-viewport, and sub-pixel drills
@@ -306,7 +307,8 @@ function drawCopper(
     if (cullingEnabled && d.diamMM < mmPerPx * 1.5) continue
     const cx = tx(d.x), cy = ty(d.y)
     if (!ok(cx) || !ok(cy)) continue
-    const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
+    const r = Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s)
+    if (r < 0.5) continue
     ctx.fillStyle = d.plated ? '#d4a840' : '#3a3a3a'
     ctx.globalAlpha = 0.7
     ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill()
