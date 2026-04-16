@@ -66,6 +66,17 @@ class Polygon(BaseModel):
     netName: str = ""
 
 
+class Component(BaseModel):
+    refDes: str
+    x: float
+    y: float
+    side: str = ""         # "top" | "bot" | ""
+    partName: str = ""     # raw part/package name as parsed
+    packageClass: str = "" # IPC class (e.g. "0402") when classifiable
+    heightMM: float = 0.0  # from ODB++ `.comp_height`, 0 if not declared
+    mountType: str = ""    # "smt" | "thmt" | "pressfit" | "manual" | "other"
+
+
 class BoardData(BaseModel):
     layers: list[Layer]
     traces: list[Trace]
@@ -77,4 +88,5 @@ class BoardData(BaseModel):
     warnings: list[str] = []
     polygons: list[Polygon] = []
     outlineHoles: list[list[Point]] = []  # inner cutout boundaries (slots, step-outs)
+    components: list[Component] = []      # for component-level rules (height, etc.)
     sourceFormat: str = ""  # "ODB_PLUS_PLUS"

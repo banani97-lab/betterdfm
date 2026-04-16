@@ -112,6 +112,21 @@ func msgUnclassifiedComponents(count int) (string, string) {
 		"Package classification is based on ODB++ metadata. Unclassified components are skipped."
 }
 
+func msgComponentHeight(refDes, side string, heightMM, limitMM float64) string {
+	sideLabel := side
+	if sideLabel == "bot" {
+		sideLabel = "bottom"
+	} else if sideLabel == "" {
+		sideLabel = "?"
+	}
+	return fmt.Sprintf("Component %s on %s side is %.2f mm tall, exceeds %.2f mm limit",
+		refDes, sideLabel, heightMM, limitMM)
+}
+
+func msgComponentsMissingHeight(count int) string {
+	return fmt.Sprintf("%d SMT components skipped (no .comp_height in ODB++ metadata)", count)
+}
+
 func msgTraceImbalance(refDes string, wide, narrow, ratio float64) string {
 	return fmt.Sprintf("Trace width imbalance on %s: %.3f mm vs %.3f mm (%.1f:1 ratio)", refDes, wide, narrow, ratio)
 }

@@ -72,7 +72,7 @@ def test_parse_components_reads_mirror_flag(tmp_path):
         "CMP 1 10.0 10.0 0 M C1 0603 ;\n"
     )
     comps = _parse_components(cmp_file, "MM")
-    sides = {c[2]: c[4] for c in comps}
+    sides = {c["refDes"]: c["side"] for c in comps}
     assert sides == {"U1": "top", "C1": "bot"}
 
 
@@ -85,4 +85,57 @@ def test_parse_components_side_hint_wins(tmp_path):
         "CMP 0 10.0 10.0 0 M C1 0603 ;\n"  # mirror=M → would be bot
     )
     comps = _parse_components(cmp_file, "MM", side_hint="top")
-    assert comps[0][4] == "top"
+    assert comps[0]["side"] == "top"
+
+
+def test_parse_components_reads_comp_height_and_mount_type(tmp_path):
+    """ODB++ CMP records carry .comp_height (physical units) and .comp_mount_type
+    (enum: 0=other, 1=smt, 2=thmt, 3=pressfit, 4=manual). The parser must
+    decode both so the component-height rule can filter SMT parts."""
+    cmp_file = tmp_path / "components"
+    cmp_file.write_text(
+        "UNITS=MM\n"
+        "@0 .comp_height\n"
+        "@1 .comp_mount_type\n"
+        "\n"
+        "CMP 0 10.0 10.0 0 N C1 0402 ;0=0.55,1=1\n"
+        "CMP 1 20.0 20.0 0 N J1 HDR ;0=11.0,1=2\n"
+        "CMP 2 30.0 30.0 0 N FID1 FID ;0=0,1=1\n"
+    )
+    comps = _parse_components(cmp_file, "MM")
+    by_ref = {c["refDes"]: c for c in comps}
+    assert abs(by_ref["C1"]["heightMM"] - 0.55) < 1e-6
+    assert by_ref["C1"]["mountType"] == "smt"
+    assert abs(by_ref["J1"]["heightMM"] - 11.0) < 1e-6
+    assert by_ref["J1"]["mountType"] == "thmt"
+    assert by_ref["FID1"]["heightMM"] == 0.0   # zero height preserved, rule filters
+    assert by_ref["FID1"]["mountType"] == "smt"
+
+
+def test_parse_components_inch_height_scales_to_mm(tmp_path):
+    """INCH files declare .comp_height in inches; parser returns mm."""
+    cmp_file = tmp_path / "components"
+    cmp_file.write_text(
+        "UNITS=INCH\n"
+        "@0 .comp_height\n"
+        "@1 .comp_mount_type\n"
+        "\n"
+        "CMP 0 0.0 0.0 0 N C1 PKG ;0=0.25,1=1\n"  # 0.25" = 6.35 mm
+    )
+    comps = _parse_components(cmp_file, "INCH")
+    assert abs(comps[0]["heightMM"] - 6.35) < 1e-3
+
+
+def test_parse_components_falls_back_to_prp_geometry_height(tmp_path):
+    """When .comp_height attr is absent, a `PRP Geometry.Height '1.2MM'`
+    property should be used as a fallback."""
+    cmp_file = tmp_path / "components"
+    cmp_file.write_text(
+        "UNITS=MM\n"
+        "@0 .comp_mount_type\n"
+        "\n"
+        "CMP 0 10.0 10.0 0 N C1 0402 ;0=1\n"
+        "PRP Geometry.Height '1.2MM'\n"
+    )
+    comps = _parse_components(cmp_file, "MM")
+    assert abs(comps[0]["heightMM"] - 1.2) < 1e-6

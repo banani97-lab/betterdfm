@@ -34,6 +34,8 @@ const DEFAULT_RULES: ProfileRules = {
   smallestPackageClass: '',
   maxTraceImbalanceRatio: 2.0,
   enableSilkscreenOnPadCheck: true,
+  maxComponentHeightTopMM: 10,
+  maxComponentHeightBottomMM: 5,
 }
 
 const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc?: string }> = [
@@ -49,6 +51,8 @@ const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string;
   { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01' },
   { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005' },
   { key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1', desc: 'Flag when one trace on a 2-pad component is wider than this ratio' },
+  { key: 'maxComponentHeightTopMM', label: 'Max Component Height (Top)', unit: 'mm', step: '0.5', desc: 'SMT-only — reflow and stencil clearance on the top side' },
+  { key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5', desc: 'SMT-only — wave-solder / conveyor clearance on the bottom side' },
 ]
 
 export default function AdminProfilePage() {

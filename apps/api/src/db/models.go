@@ -53,6 +53,8 @@ type ProfileRules struct {
 	MinCopperSliverMM          float64 `json:"minCopperSliverMM"`
 	MaxTraceImbalanceRatio     float64 `json:"maxTraceImbalanceRatio"`
 	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
+	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
+	MaxComponentHeightBottomMM float64 `json:"maxComponentHeightBottomMM"`
 }
 
 // Project groups related submissions

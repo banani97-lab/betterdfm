@@ -10,7 +10,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 
-from models import BoardData, Layer, Trace, Pad, Via, Drill, Point, Polygon
+from models import BoardData, Layer, Trace, Pad, Via, Drill, Point, Polygon, Component
 from units import _coord_to_mm, _sym_to_mm
 
 logger = logging.getLogger(__name__)
@@ -1447,11 +1447,27 @@ def _classify_by_bbox(w_mm: float, h_mm: float) -> str:
     return ""
 
 
+_MOUNT_TYPE_BY_INT: dict[str, str] = {
+    "0": "other",
+    "1": "smt",
+    "2": "thmt",
+    "3": "pressfit",
+    "4": "manual",
+}
+
+
 def _parse_components(
     comp_path: Path, units: str, eda_pkgs: dict[int, dict] | None = None,
     side_hint: str | None = None,
-) -> list:
-    """Parse ODB++ CMP file → [(x_mm, y_mm, refdes, part_name, side)].
+) -> list[dict]:
+    """Parse ODB++ CMP file into a list of component dicts.
+
+    Each dict carries:
+        x, y              — mm
+        refDes, partName  — strings
+        side              — "top" | "bot" | ""
+        heightMM          — from `.comp_height` attr, 0.0 if not declared
+        mountType         — "smt" | "thmt" | "pressfit" | "manual" | "other" | ""
 
     If eda_pkgs is provided, uses PKG name/bbox as fallback for classification.
 
@@ -1462,13 +1478,40 @@ def _parse_components(
        "M" = mirrored = bottom) — fallback when the path is ambiguous.
     """
     eda_pkgs = eda_pkgs or {}
-    components: list[tuple[float, float, str, str, str]] = []
+    components: list[dict] = []
     try:
         text = comp_path.read_text(errors="replace")
     except OSError:
         return components
 
     lines = text.splitlines()
+
+    # Parse @N attribute-name table to find .comp_height and .comp_mount_type
+    # indices. The CMP record's attr suffix uses integer keys that reference
+    # these names; without the table we can't decode them.
+    height_attr_idx: int | None = None
+    mount_attr_idx: int | None = None
+    for ln in lines:
+        s = ln.strip()
+        if s.startswith("@"):
+            split = s.split(None, 1)
+            if len(split) != 2:
+                continue
+            try:
+                idx = int(split[0][1:])
+            except ValueError:
+                continue
+            name = split[1].strip()
+            if name == ".comp_height":
+                height_attr_idx = idx
+            elif name == ".comp_mount_type":
+                mount_attr_idx = idx
+
+    # Height values in the CMP attr are in file UNITS. Coord-style scaling
+    # (inches → mm) applies because .comp_height denotes a physical length
+    # in the same unit system as the board coords.
+    height_scale = 25.4 if units.upper() == "INCH" else 1.0
+
     i = 0
     while i < len(lines):
         s = lines[i].strip()
@@ -1476,8 +1519,9 @@ def _parse_components(
         if not s or not s.startswith("CMP "):
             continue
         attr_pos = s.find(";")
-        s = s[:attr_pos].strip() if attr_pos >= 0 else s
-        parts = s.split()
+        attr_str = s[attr_pos + 1:].strip() if attr_pos >= 0 else ""
+        s_head = s[:attr_pos].strip() if attr_pos >= 0 else s
+        parts = s_head.split()
         if len(parts) < 7:
             continue
         try:
@@ -1497,6 +1541,31 @@ def _parse_components(
             else:
                 side = ""
 
+            # Pull .comp_height and .comp_mount_type from the CMP's attr
+            # suffix. Values look like `0=0.550000,1=1;ID=674464`; we only
+            # need the k=v part before any trailing `;ID=...` tag.
+            height_mm = 0.0
+            mount_type = ""
+            if height_attr_idx is not None or mount_attr_idx is not None:
+                attr_payload = attr_str.split(";", 1)[0]
+                for kv in attr_payload.split(","):
+                    kv = kv.strip()
+                    if "=" not in kv:
+                        continue
+                    k, v = kv.split("=", 1)
+                    try:
+                        ki = int(k.strip())
+                    except ValueError:
+                        continue
+                    if ki == height_attr_idx:
+                        try:
+                            height_mm = float(v.strip()) * height_scale
+                        except ValueError:
+                            pass
+                    elif ki == mount_attr_idx:
+                        v = v.strip()
+                        mount_type = _MOUNT_TYPE_BY_INT.get(v, v.lower())
+
             # Read PRP (property) lines that follow this CMP record
             prp_pkg = ""
             while i < len(lines):
@@ -1504,6 +1573,27 @@ def _parse_components(
                 if not prp_line.startswith("PRP "):
                     break
                 i += 1
+                # Fallback: Geometry.Height string property in mm or mil
+                # (format `PRP Geometry.Height '1.2MM'`). Only read when the
+                # numeric .comp_height attr was missing or zero.
+                if height_mm <= 0 and "Geometry.Height" in prp_line:
+                    q1 = prp_line.find("'"); q2 = prp_line.rfind("'")
+                    if 0 <= q1 < q2:
+                        raw = prp_line[q1+1:q2].strip().upper()
+                        num_end = 0
+                        while num_end < len(raw) and (raw[num_end].isdigit()
+                                                      or raw[num_end] in ".-"):
+                            num_end += 1
+                        if num_end > 0:
+                            try:
+                                val = float(raw[:num_end])
+                                unit_suffix = raw[num_end:].strip()
+                                if unit_suffix in ("MIL", "MILS"):
+                                    height_mm = val * 0.0254
+                                else:  # default MM
+                                    height_mm = val
+                            except ValueError:
+                                pass
                 # Extract package class from common property names
                 if not prp_pkg:
                     for prop_key in ("Imperial_Package_/_Case", "Case/Package"):
@@ -1531,7 +1621,10 @@ def _parse_components(
                     if pkg_from_bbox:
                         part_name = f"{part_name}_{pkg_from_bbox}" if part_name else pkg_from_bbox
 
-            components.append((x_mm, y_mm, refdes, part_name, side))
+            components.append({
+                "x": x_mm, "y": y_mm, "refDes": refdes, "partName": part_name,
+                "side": side, "heightMM": height_mm, "mountType": mount_type,
+            })
         except (ValueError, IndexError):
             pass
 
@@ -1557,8 +1650,13 @@ class _RefdesIndex:
         self._cell_size = cell_size
         self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str]]] = {}
         for entry in components:
-            # Accept both legacy 4-tuples and new 5-tuples for safety.
-            if len(entry) == 5:
+            # Accept dicts (current shape) plus legacy 4-/5-tuples for safety.
+            if isinstance(entry, dict):
+                cx = entry["x"]; cy = entry["y"]
+                refdes = entry.get("refDes", "")
+                part_name = entry.get("partName", "")
+                side = entry.get("side", "")
+            elif len(entry) == 5:
                 cx, cy, refdes, part_name, side = entry
             else:
                 cx, cy, refdes, part_name = entry
@@ -1941,8 +2039,25 @@ def parse_odb(file_path: str) -> BoardData:
         logger.error("ODB++ parse failed: %s", e, exc_info=True)
         warnings.append(f"Parse aborted: {e}")
 
-    logger.info("ODB++ done: %d layers, %d traces, %d pads, %d vias, %d drills, %d polygons",
-                len(layers), len(traces), len(pads), len(vias), len(drills), len(polygons))
+    # Materialize component records for the BoardData payload. Downstream
+    # rules (e.g. component-height) operate on these; the existing
+    # refdes-lookup path above uses the same list internally.
+    comp_models: list[Component] = []
+    for c in components:
+        if isinstance(c, dict):
+            comp_models.append(Component(
+                refDes=c.get("refDes", ""),
+                x=c.get("x", 0.0), y=c.get("y", 0.0),
+                side=c.get("side", ""),
+                partName=c.get("partName", ""),
+                packageClass=_classify_package(c.get("partName", "")) or "",
+                heightMM=float(c.get("heightMM", 0.0) or 0.0),
+                mountType=c.get("mountType", ""),
+            ))
+
+    logger.info("ODB++ done: %d layers, %d traces, %d pads, %d vias, %d drills, %d polygons, %d components",
+                len(layers), len(traces), len(pads), len(vias), len(drills), len(polygons), len(comp_models))
     return BoardData(layers=layers, traces=traces, pads=pads, vias=vias,
                      drills=drills, outline=outline, boardThicknessMM=1.6,
-                     warnings=warnings, polygons=polygons, outlineHoles=outline_holes)
+                     warnings=warnings, polygons=polygons, outlineHoles=outline_holes,
+                     components=comp_models)

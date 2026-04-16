@@ -42,6 +42,11 @@ func ruleWeight(id string) float64 {
 		return 1.5
 	case "silkscreen-on-pad":
 		return 1.5
+	case "component-height":
+		// Tier-2: tall SMT parts on the wrong side are "board can't be
+		// assembled on this line" issues, same severity class as
+		// edge-clearance or drill-to-copper.
+		return 2.0
 	case "solder-mask-dam":
 		return 1.0
 	case "copper-sliver":
@@ -130,19 +135,24 @@ func ruleMaxContribution(id string) float64 {
 	case "tombstoning-risk":
 		return 5.0
 	case "pad-size-for-package":
-		return 4.0
+		return 3.0
 	case "silkscreen-on-pad":
-		return 4.0
+		return 3.0
 	case "solder-mask-dam":
-		return 4.0
+		return 3.0
+	case "component-height":
+		// Tier-2 cap. One over-height SMT part per side can brick an
+		// assembly line, so cap at 5 — on par with trace-imbalance /
+		// tombstoning-risk rather than the cosmetic rules at 3.
+		return 5.0
 	case "copper-sliver":
-		return 3.0
+		return 2.0
 	case "fiducial-count":
-		return 3.0
+		return 2.0
 	default:
 		return 3.0
 	}
-	// Sum: 14+12+8+7+7+7+6+6+5+5+5+4+4+4+3+3 = 100
+	// Sum: 14+12+8+7+7+7+6+6+5+5+5+5+3+3+3+2+2 = 100
 }
 
 // outlineBBox returns the width and height of the bounding box of outline points in mm.

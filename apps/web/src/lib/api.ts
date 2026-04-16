@@ -125,6 +125,8 @@ export interface ProfileRules {
   smallestPackageClass?: string
   maxTraceImbalanceRatio?: number
   enableSilkscreenOnPadCheck?: boolean
+  maxComponentHeightTopMM?: number
+  maxComponentHeightBottomMM?: number
 }
 
 export interface CapabilityProfile {

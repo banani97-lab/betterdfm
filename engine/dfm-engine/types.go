@@ -2,17 +2,18 @@ package dfmengine
 
 // BoardData is the normalized representation of a parsed PCB file
 type BoardData struct {
-	Layers           []Layer   `json:"layers"`
-	Traces           []Trace   `json:"traces"`
-	Pads             []Pad     `json:"pads"`
-	Vias             []Via     `json:"vias"`
-	Drills           []Drill   `json:"drills"`
-	Outline          []Point    `json:"outline"`
-	OutlineHoles     [][]Point  `json:"outlineHoles,omitempty"` // inner cutout boundaries (slots, step-outs)
-	BoardThicknessMM float64    `json:"boardThicknessMM"`
-	Warnings         []string   `json:"warnings,omitempty"`
-	Polygons         []Polygon  `json:"polygons,omitempty"`
-	SourceFormat     string     `json:"sourceFormat,omitempty"` // "ODB_PLUS_PLUS"
+	Layers           []Layer     `json:"layers"`
+	Traces           []Trace     `json:"traces"`
+	Pads             []Pad       `json:"pads"`
+	Vias             []Via       `json:"vias"`
+	Drills           []Drill     `json:"drills"`
+	Outline          []Point     `json:"outline"`
+	OutlineHoles     [][]Point   `json:"outlineHoles,omitempty"` // inner cutout boundaries (slots, step-outs)
+	BoardThicknessMM float64     `json:"boardThicknessMM"`
+	Warnings         []string    `json:"warnings,omitempty"`
+	Polygons         []Polygon   `json:"polygons,omitempty"`
+	Components       []Component `json:"components,omitempty"`
+	SourceFormat     string      `json:"sourceFormat,omitempty"` // "ODB_PLUS_PLUS"
 }
 
 type Layer struct {
@@ -72,6 +73,21 @@ type Polygon struct {
 	NetName string    `json:"netName,omitempty"`
 }
 
+// Component is a single placed part from the ODB++ CMP records.
+// Emitted by the sidecar with side + height + mount-type metadata so
+// rules that operate on whole components (e.g. component-height) can
+// filter SMT-only parts without scanning pads.
+type Component struct {
+	RefDes       string  `json:"refDes"`
+	X            float64 `json:"x"`
+	Y            float64 `json:"y"`
+	Side         string  `json:"side,omitempty"`         // "top" | "bot" | ""
+	PartName     string  `json:"partName,omitempty"`
+	PackageClass string  `json:"packageClass,omitempty"` // IPC class like "0402" if classifiable
+	HeightMM     float64 `json:"heightMM,omitempty"`     // 0 when not declared
+	MountType    string  `json:"mountType,omitempty"`    // "smt" | "thmt" | "pressfit" | "manual" | "other"
+}
+
 // ProfileRules defines the CM's manufacturing capabilities
 type ProfileRules struct {
 	MinTraceWidthMM    float64 `json:"minTraceWidthMM"`
@@ -88,6 +104,10 @@ type ProfileRules struct {
 	SmallestPackageClass string  `json:"smallestPackageClass,omitempty"` // e.g. "0402" — smallest passive the CM can place
 	MaxTraceImbalanceRatio    float64 `json:"maxTraceImbalanceRatio"`
 	EnableSilkscreenOnPadCheck *bool  `json:"enableSilkscreenOnPadCheck"`
+	// SMT component height caps per side. Set either side to 0 to disable
+	// that half of the check. Applies to components with mountType=="smt".
+	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
+	MaxComponentHeightBottomMM float64 `json:"maxComponentHeightBottomMM"`
 }
 
 // Violation is a single DFM issue found.

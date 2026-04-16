@@ -28,6 +28,7 @@ func NewRunner() *Runner {
 			&PackageCapabilityRule{},
 			&TraceImbalanceRule{},
 			&FiducialRule{},
+			&ComponentHeightRule{},
 		},
 	}
 }
