@@ -10,4 +10,8 @@ RUN pip install --no-cache-dir fastapi "uvicorn[standard]" boto3 "pydantic>=2.7.
 COPY main.py models.py units.py parser_odb.py storage.py ./
 
 EXPOSE 8001
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+# --no-access-log drops the per-request stdout line (ECS tasks on Fargate get
+# hit by the ALB health check every few seconds; those lines were a large
+# share of the CloudWatch Logs ingestion bill). App-level logging via
+# logging.basicConfig(INFO) is unaffected.
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]

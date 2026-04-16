@@ -74,7 +74,15 @@ func main() {
 	e.HideBanner = true
 
 	// Middleware
-	e.Use(middleware.Logger())
+	// Skip request logging for the App Runner health-check path. At ~one hit
+	// per second, /health would otherwise dominate CloudWatch Logs ingestion
+	// without adding any diagnostic value.
+	e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
+		Skipper: func(c echo.Context) bool {
+			return c.Path() == "/health"
+		},
+		Format: `{"time":"${time_rfc3339}","method":"${method}","uri":"${uri}","status":${status},"latency_ms":${latency_human}}` + "\n",
+	}))
 	e.Use(middleware.Recover())
 	e.Use(middleware.GzipWithConfig(middleware.GzipConfig{Level: 5}))
 	e.Use(middleware.CORSWithConfig(middleware.CORSConfig{
