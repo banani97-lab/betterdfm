@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Plus, Trash2 } from 'lucide-react'
+import { Save, Plus, Trash2, HelpCircle } from 'lucide-react'
 import {
   getProfiles,
   createProfile,
@@ -38,21 +38,35 @@ const DEFAULT_RULES: ProfileRules = {
   maxComponentHeightBottomMM: 5,
 }
 
-const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc?: string }> = [
-  { key: 'minTraceWidthMM', label: 'Min Trace Width', unit: 'mm', step: '0.01' },
-  { key: 'minClearanceMM', label: 'Min Clearance', unit: 'mm', step: '0.01' },
-  { key: 'minDrillDiamMM', label: 'Min Drill Diameter', unit: 'mm', step: '0.01' },
-  { key: 'maxDrillDiamMM', label: 'Max Drill Diameter', unit: 'mm', step: '0.1' },
-  { key: 'minAnnularRingMM', label: 'Min Annular Ring', unit: 'mm', step: '0.01' },
-  { key: 'maxAspectRatio', label: 'Max Aspect Ratio', unit: ':1', step: '0.5' },
-  { key: 'minSolderMaskDamMM', label: 'Min Solder Mask Dam', unit: 'mm', step: '0.01' },
-  { key: 'minEdgeClearanceMM', label: 'Min Edge Clearance', unit: 'mm', step: '0.01' },
-  { key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01' },
-  { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01' },
-  { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005' },
-  { key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1', desc: 'Flag when one trace on a 2-pad component is wider than this ratio' },
-  { key: 'maxComponentHeightTopMM', label: 'Max Component Height (Top)', unit: 'mm', step: '0.5', desc: 'SMT-only — reflow and stencil clearance on the top side' },
-  { key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5', desc: 'SMT-only — wave-solder / conveyor clearance on the bottom side' },
+const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc: string }> = [
+  { key: 'minTraceWidthMM', label: 'Min Trace Width', unit: 'mm', step: '0.01',
+    desc: 'Flag trace segments narrower than this. Thinner traces are harder to etch cleanly and carry less current.' },
+  { key: 'minClearanceMM', label: 'Min Clearance', unit: 'mm', step: '0.01',
+    desc: 'Minimum spacing between different-net copper features. Below this, you risk shorts during fabrication or bridging during assembly.' },
+  { key: 'minDrillDiamMM', label: 'Min Drill Diameter', unit: 'mm', step: '0.01',
+    desc: 'Smallest mechanical drill the fab can reliably produce. Below this you need laser drilling.' },
+  { key: 'maxDrillDiamMM', label: 'Max Drill Diameter', unit: 'mm', step: '0.1',
+    desc: 'Largest drill the fab will accept before routing is required instead. Tooling holes commonly exceed this.' },
+  { key: 'minAnnularRingMM', label: 'Min Annular Ring', unit: 'mm', step: '0.01',
+    desc: 'Copper ring remaining around a drill hit after drilling tolerances. Below this, drill breakout can sever the connection.' },
+  { key: 'maxAspectRatio', label: 'Max Aspect Ratio', unit: ':1', step: '0.5',
+    desc: 'Ratio of board thickness to smallest drill diameter. Higher ratios require premium electroplating — 10:1 is standard, 12:1 is HDI.' },
+  { key: 'minSolderMaskDamMM', label: 'Min Solder Mask Dam', unit: 'mm', step: '0.01',
+    desc: 'Narrowest solder mask web between two pad openings. Below this the mask flakes off during reflow and you lose solder bridge protection.' },
+  { key: 'minEdgeClearanceMM', label: 'Min Edge Clearance', unit: 'mm', step: '0.01',
+    desc: 'Minimum distance from copper features to the board outline. Features too close risk exposure on the routed edge.' },
+  { key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01',
+    desc: 'Edge-to-edge spacing between drill holes. Below this, adjacent drill walls can break through into each other.' },
+  { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01',
+    desc: 'Drill hole edge to nearest other-net copper. Protects against drill bit wander clipping a neighboring trace.' },
+  { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005',
+    desc: 'Thinnest copper feature width that will survive etching. Thinner slivers become acid traps or shorts.' },
+  { key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1',
+    desc: 'Flag when the two traces on a 2-pad component differ in width by more than this ratio. Thermal asymmetry is a major cause of tombstoning during reflow.' },
+  { key: 'maxComponentHeightTopMM', label: 'Max Component Height (Top)', unit: 'mm', step: '0.5',
+    desc: 'SMT-only cap on top-side component height. Limited by stencil printer head clearance and reflow oven conveyor height. Typical is 10 mm; precision assembly lines may need lower.' },
+  { key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5',
+    desc: 'SMT-only cap on bottom-side component height. Limited by wave-solder pallet clearance and reflow pallet support height. Typical is 5 mm.' },
 ]
 
 export default function AdminProfilePage() {
@@ -226,7 +240,10 @@ export default function AdminProfilePage() {
               <div className="grid grid-cols-2 gap-4">
                 {RULE_FIELDS.map(({ key, label, unit, step, desc }) => (
                   <div key={key}>
-                    <Label className="mb-1 block text-xs">{label}</Label>
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <Label className="block text-xs">{label}</Label>
+                      <RuleHelp text={desc} />
+                    </div>
                     <div className="flex items-center gap-2">
                       <Input
                         type="number"
@@ -238,7 +255,6 @@ export default function AdminProfilePage() {
                       />
                       <span className="text-xs text-muted-foreground w-8 flex-shrink-0">{unit}</span>
                     </div>
-                    {desc && <p className="text-xs text-muted-foreground mt-1">{desc}</p>}
                   </div>
                 ))}
               </div>
@@ -300,5 +316,28 @@ export default function AdminProfilePage() {
         </div>
       </main>
     </div>
+  )
+}
+
+// RuleHelp renders a small ? icon that reveals a popover with the rule's
+// explanation on hover/focus. CSS-only via Tailwind's `group-hover` — no
+// portal/positioning library needed since the panel is short and the form
+// has ample horizontal space.
+function RuleHelp({ text }: { text: string }) {
+  return (
+    <span className="group relative inline-flex">
+      <HelpCircle
+        className="h-3.5 w-3.5 text-muted-foreground hover:text-foreground transition-colors cursor-help"
+        tabIndex={0}
+        role="button"
+        aria-label="Rule details"
+      />
+      <span
+        role="tooltip"
+        className="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 absolute left-5 top-1/2 -translate-y-1/2 z-20 w-64 rounded-md border bg-card text-foreground px-3 py-2 text-xs leading-relaxed shadow-lg transition-opacity"
+      >
+        {text}
+      </span>
+    </span>
   )
 }
