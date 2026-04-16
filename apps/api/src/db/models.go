@@ -51,6 +51,7 @@ type ProfileRules struct {
 	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
 	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
 	MinCopperSliverMM          float64 `json:"minCopperSliverMM"`
+	SmallestPackageClass       string  `json:"smallestPackageClass,omitempty"`
 	MaxTraceImbalanceRatio     float64 `json:"maxTraceImbalanceRatio"`
 	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
