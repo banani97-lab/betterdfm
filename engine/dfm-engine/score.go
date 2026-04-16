@@ -180,18 +180,21 @@ func outlineBBox(outline []Point) (w, h float64) {
 }
 
 // scoreGrade returns the letter grade and verdict text for a numeric score.
+// ASCII-only: the PDF report uses a Latin-1 Arial font and can't render
+// em-dashes (U+2014) correctly, which also throws off MultiCell width
+// calculation and causes the verdict to overflow the score column.
 func scoreGrade(score int) (string, string) {
 	switch {
 	case score >= 90:
-		return "A", "Production Ready — no significant issues"
+		return "A", "Production Ready - no significant issues"
 	case score >= 75:
-		return "B", "Minor Issues — review recommended before submission"
+		return "B", "Minor Issues - review recommended before submission"
 	case score >= 60:
-		return "C", "Moderate Issues — rework required"
+		return "C", "Moderate Issues - rework required"
 	case score >= 40:
-		return "D", "Significant Issues — major redesign required"
+		return "D", "Significant Issues - major redesign required"
 	default:
-		return "F", "Not Manufacturable — critical failures present"
+		return "F", "Not Manufacturable - critical failures present"
 	}
 }
 
