@@ -107,39 +107,60 @@ func connectedCopperWidth(pad Pad, traces []Trace, polygons []Polygon, copperLay
 	// Check if pad is connected to a same-net copper polygon on the same layer.
 	// Only same-net polygons can be thermally connected — a GND pour's anti-pad
 	// edge near a signal pad does NOT constitute a thermal connection.
+	//
+	// Prefer polygons the pad sits *inside*. Only fall back to "pad near an
+	// edge" proximity when no inside match exists. An adjacent same-net pour
+	// whose edge grazes the pad (within 0.5 mm) is rarely a real thermal
+	// connection — it's typically the next island of the same net on the
+	// other side of a clearance gap. Treating it as equivalent to the pour
+	// the pad actually lives in produces false positives (see Dalsa C421:
+	// a neighboring 48VIN island 21.5 mm wide outranked the 10.6 mm pour
+	// the pad was inside, flagging a 2:1 imbalance that didn't exist).
 	padRadius := math.Max(pad.WidthMM, pad.HeightMM) / 2
 	proximity := padRadius + 0.5
+	var insideW, nearEdgeW float64
 	for _, poly := range polygons {
 		if poly.Layer != pad.Layer || !copperLayers[poly.Layer] {
 			continue
 		}
-		// Net filter: only match polygons on the pad's net.
 		if poly.NetName == "" || poly.NetName != pad.NetName {
 			continue
 		}
-		connected := pointInPolygon(pad.X, pad.Y, poly.Points)
-		if !connected {
-			n := len(poly.Points)
-			for i := 0; i < n && !connected; i++ {
-				a := poly.Points[i]
-				b := poly.Points[(i+1)%n]
-				if ptToSegDist(pad.X, pad.Y, a.X, a.Y, b.X, b.Y) <= proximity {
-					connected = true
-				}
+		if pointInPolygon(pad.X, pad.Y, poly.Points) {
+			if s := polyShortDim(poly); s > insideW {
+				insideW = s
 			}
+			continue
 		}
-		if connected {
-			// Use the polygon's shortest bbox dimension as equivalent width
-			// instead of a hardcoded constant. A 2 mm routing island and a
-			// 200 mm ground plane have very different thermal mass.
-			pourWidth := polyShortDim(poly)
-			if pourWidth > maxWidth {
-				maxWidth = pourWidth
+		// Skip the edge scan if this pour couldn't improve the running
+		// near-edge candidate — avoids the O(segments) loop in the hot path.
+		if polyShortDim(poly) <= nearEdgeW {
+			continue
+		}
+		n := len(poly.Points)
+		for i := 0; i < n; i++ {
+			a := poly.Points[i]
+			b := poly.Points[(i+1)%n]
+			if ptToSegDist(pad.X, pad.Y, a.X, a.Y, b.X, b.Y) <= proximity {
+				if s := polyShortDim(poly); s > nearEdgeW {
+					nearEdgeW = s
+				}
+				break
 			}
-			break
 		}
 	}
 
+	// Use the polygon's shortest bbox dimension as equivalent width
+	// (a 2 mm routing island and a 200 mm ground plane have very
+	// different thermal mass). Inside match wins outright; near-edge
+	// is the fallback only when the pad is not inside any pour.
+	pourWidth := insideW
+	if pourWidth == 0 {
+		pourWidth = nearEdgeW
+	}
+	if pourWidth > maxWidth {
+		maxWidth = pourWidth
+	}
 	return maxWidth
 }
 
