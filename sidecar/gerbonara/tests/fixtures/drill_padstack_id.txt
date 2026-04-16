@@ -1,0 +1,27 @@
+UNITS=INCH
+#
+#Num Features
+#
+F 2
+
+#
+#Feature symbol names
+#
+$0 r10
+
+#
+#Feature attribute names
+#
+@0 .geometry
+@1 .padstack_id
+
+#
+#Feature attribute text strings
+#
+&0 STANDARDVIA
+
+#
+#Layer features
+#
+P 0.393701 -0.787402 0 P 1 8 0;0=0,1=335;ID=100
+P 1.181102 -1.574803 0 P 1 8 0;0=0,1=336;ID=200

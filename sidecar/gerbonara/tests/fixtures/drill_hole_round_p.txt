@@ -1,0 +1,25 @@
+UNITS=MM
+#
+#Num Features
+#
+F 1
+
+#
+#Feature symbol names
+#
+$0 r250
+
+#
+#Feature attribute names
+#
+@0 .geometry
+
+#
+#Feature attribute text strings
+#
+&0 hole0.25_round0.5_p
+
+#
+#Layer features
+#
+P 5.000000 -10.000000 0 P 1 8 0;0=0;ID=400

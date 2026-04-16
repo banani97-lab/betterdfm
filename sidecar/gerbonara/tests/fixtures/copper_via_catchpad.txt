@@ -1,0 +1,27 @@
+UNITS=MM
+#
+#Num Features
+#
+F 2
+
+#
+#Feature symbol names
+#
+$0 r508
+
+#
+#Feature attribute names
+#
+@0 .geometry
+@1 .padstack_id
+
+#
+#Feature attribute text strings
+#
+&0 STANDARDVIA
+
+#
+#Layer features
+#
+P 10.000000 -20.000000 0 P 0 0 0;0=0,1=335;ID=1
+P 30.000000 -40.000000 0 P 0 0 0;0=0,1=336;ID=2

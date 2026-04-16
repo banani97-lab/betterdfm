@@ -58,3 +58,94 @@ def test_non_copper_layer_skips_l_records():
     traces, pads, vias, polygons = [], [], [], []
     _parse_features(feat, "mask", "SOLDER_MASK", "INCH", traces, pads, vias, polygons=polygons)
     assert len(traces) == 0, "SOLDER_MASK layer should not produce traces from L records"
+
+
+# ── Via emission via .padstack_id cross-reference ─────────────────────────────
+
+def test_via_from_padstack_id_cross_reference():
+    """Copper parsed first populates the map; drill lookup emits a Via."""
+    from parser_odb import _parse_features
+    traces, pads, vias, polygons, drills = [], [], [], [], []
+    padstack_outer_mm: dict = {}
+
+    # Pass 1: copper layer populates padstack 335 → 0.508mm and 336 → 0.508mm
+    _parse_features(FIXTURES / "copper_via_catchpad.txt", "art01", "COPPER",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=padstack_outer_mm)
+    assert padstack_outer_mm[335] == pytest.approx(0.508)
+    assert padstack_outer_mm[336] == pytest.approx(0.508)
+    assert len(vias) == 0  # copper pass emits pads, not vias
+
+    # Pass 2: drill layer with padstack_id attrs but no regex-matchable geometry
+    _parse_features(FIXTURES / "drill_padstack_id.txt", "drill", "DRILL",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=padstack_outer_mm)
+
+    assert len(vias) == 2, f"expected 2 vias from padstack cross-ref, got {len(vias)}"
+    for v in vias:
+        assert v.outerDiamMM == pytest.approx(0.508)
+        assert v.drillDiamMM == pytest.approx(0.254, abs=0.001)
+
+
+def test_via_padstack_id_picks_min_outer_across_layers():
+    """Inner-layer catch-pad (r406 → 0.406) must beat top-layer (r508 → 0.508)."""
+    from parser_odb import _parse_features
+    traces, pads, vias, polygons, drills = [], [], [], [], []
+    padstack_outer_mm: dict = {}
+
+    _parse_features(FIXTURES / "copper_via_catchpad.txt", "art01", "COPPER",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=padstack_outer_mm)
+    _parse_features(FIXTURES / "copper_via_catchpad_inner.txt", "art07", "COPPER",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=padstack_outer_mm)
+    assert padstack_outer_mm[335] == pytest.approx(0.406)  # inner wins
+
+    _parse_features(FIXTURES / "drill_padstack_id.txt", "drill", "DRILL",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=padstack_outer_mm)
+    via_335 = [v for v in vias if abs(v.outerDiamMM - 0.406) < 0.001]
+    assert len(via_335) == 1, "padstack 335 via must use the smaller inner OD"
+
+
+def test_via_regex_D_H_still_works():
+    """Regression: the D...H... regex path still emits a Via. Values are
+    scaled via _sym_to_mm: microns for MM files, mils for INCH files."""
+    from parser_odb import _via_geometry_mm
+    outer, hole = _via_geometry_mm("0=0", {0: "D500H250"}, "MM")   # 500µm / 250µm
+    assert outer == pytest.approx(0.5)
+    assert hole == pytest.approx(0.25)
+    outer, hole = _via_geometry_mm("0=0", {0: "D20H10"}, "INCH")    # 20mil / 10mil
+    assert outer == pytest.approx(0.508)
+    assert hole == pytest.approx(0.254)
+
+
+def test_via_hole_round_p_regex_still_works():
+    """Regression: the hole0.1_round0.25_p regex path still emits a Via."""
+    traces, pads, vias, polygons, drills = [], [], [], [], []
+    _parse_features(FIXTURES / "drill_hole_round_p.txt", "drill", "DRILL",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons)
+    assert len(vias) == 1
+    assert vias[0].outerDiamMM == pytest.approx(0.5)
+    assert vias[0].drillDiamMM == pytest.approx(0.25)
+
+
+def test_via_altium_vxh_regex():
+    """New regex: Altium-style 'VIA 600x300' in an MM file → 0.6 / 0.3 mm."""
+    from parser_odb import _via_geometry_mm
+    outer, hole = _via_geometry_mm("0=0", {0: "VIA 600x300"}, "MM")
+    assert outer == pytest.approx(0.6)
+    assert hole == pytest.approx(0.3)
+
+
+def test_no_padstack_map_does_not_crash():
+    """Passing no padstack_outer_mm falls back to existing behavior
+    (drill record added, no Via when regex can't match)."""
+    from parser_odb import _parse_features
+    traces, pads, vias, polygons, drills = [], [], [], [], []
+    _parse_features(FIXTURES / "drill_padstack_id.txt", "drill", "DRILL",
+                    "MM", traces, pads, vias, drills=drills,
+                    polygons=polygons, padstack_outer_mm=None)
+    assert len(drills) == 2, "drill records still emitted"
+    assert len(vias) == 0, "no vias without padstack map and no regex match"

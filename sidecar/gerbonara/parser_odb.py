@@ -318,6 +318,25 @@ def _arc_segments(
 
 _VIA_ROUND_RE = re.compile(r"D([0-9.]+)H([0-9.]+)", re.IGNORECASE)
 _VIA_ALLEGRO_RE = re.compile(r"(?:microvia|via)([0-9.]+)_round([0-9.]+)", re.IGNORECASE)
+# "VIA 0.5x0.25" (Altium-style, outer x hole).
+_VIA_ALTIUM_RE = re.compile(r"VIA\s+([0-9.]+)\s*[xX]\s*([0-9.]+)", re.IGNORECASE)
+
+
+def _attr_int_value(attrs_str: str, attr_idx: int) -> int | None:
+    """Pull the integer value for attr index `attr_idx` from an ODB++ attrs
+    suffix like `"0=10,1=1,2=0,4=335"`. Returns None if absent or malformed.
+    """
+    key = f"{attr_idx}="
+    for segment in attrs_str.split(";"):
+        for pair in segment.split(","):
+            pair = pair.strip()
+            if not pair.startswith(key):
+                continue
+            try:
+                return int(pair[len(key):])
+            except ValueError:
+                return None
+    return None
 
 
 def _parse_attr_tables(lines: list[str]) -> tuple[dict[int, str], dict[int, str]]:
@@ -363,6 +382,11 @@ def _via_geometry_mm(
                 m3 = re.match(r"hole([0-9.]+)_round([0-9.]+)_p", value_text, re.IGNORECASE)
                 if m3:
                     return (float(m3.group(2)), float(m3.group(1)))
+                m4 = _VIA_ALTIUM_RE.search(value_text)
+                if m4:
+                    outer = _sym_to_mm(float(m4.group(1)), units)
+                    hole = _sym_to_mm(float(m4.group(2)), units)
+                    return (outer, hole)
             except (ValueError, IndexError):
                 pass
     return None
@@ -413,11 +437,19 @@ def _build_features(
     drill_attr_values: dict | None = None,
     polygons: list | None = None,
     attr_names: dict[int, str] | None = None,
+    padstack_outer_mm: dict[int, float] | None = None,
     *,
     net_index: _NetIndex | None = None,
     refdes_index: _RefdesIndex | None = None,
 ) -> None:
-    """Build geometry from a token list produced by _tokenize_features."""
+    """Build geometry from a token list produced by _tokenize_features.
+
+    `padstack_outer_mm` is an optional mutable map of `.padstack_id` → minimum
+    copper outer diameter (mm) across copper layers. Populated on copper-layer
+    passes and consulted on drill-layer passes to synthesize Via records when
+    the regex-based attr parsing in `_via_geometry_mm` can't see explicit
+    (outer, hole) dimensions. See the two-pass invocation in `parse_odb`.
+    """
     if net_index is None and net_points:
         net_index = _NetIndex(net_points)
     if refdes_index is None and components:
@@ -425,11 +457,13 @@ def _build_features(
 
     # Find the attribute index for .pad_usage to detect fiducials
     _pad_usage_idx: int | None = None
+    _padstack_id_idx: int | None = None
     if attr_names:
         for idx, name in attr_names.items():
             if name == ".pad_usage":
                 _pad_usage_idx = idx
-                break
+            elif name == ".padstack_id":
+                _padstack_id_idx = idx
     # Pre-compute the side of this layer once — used to filter the refdes
     # spatial lookup so top-side features aren't attributed to bottom-side
     # components that happen to sit directly underneath (and vice versa).
@@ -637,6 +671,21 @@ def _build_features(
                         if outer > hole_diam:
                             vias.append(Via(x=x, y=y, outerDiamMM=outer,
                                             drillDiamMM=hole_diam, netName=net))
+                    elif plated and padstack_outer_mm and _padstack_id_idx is not None:
+                        # Fallback: cross-reference .padstack_id against the
+                        # outer-diameter map populated during the copper-layer
+                        # pass. Dalsa (and most ODB++ exports that use symbolic
+                        # .geometry values like "STANDARDVIA") don't carry
+                        # numeric dimensions the regexes above can extract, but
+                        # every via catch-pad on copper shares the same
+                        # padstack_id integer with its drill record — that join
+                        # gives us the outer diameter.
+                        ps_id = _attr_int_value(token["attrs"], _padstack_id_idx)
+                        if ps_id is not None:
+                            outer = padstack_outer_mm.get(ps_id)
+                            if outer is not None and outer > hole_diam:
+                                vias.append(Via(x=x, y=y, outerDiamMM=outer,
+                                                drillDiamMM=hole_diam, netName=net))
                     # Skip sub-minimum drill markers: features below 0.05mm
                     # (50µm) are pad markers or coordinate references, not
                     # real drill holes. The smallest laser-drilled microvia
@@ -676,6 +725,23 @@ def _build_features(
                                    netName=net, refDes=ref,
                                    packageClass=pkg_class,
                                    isFiducial=is_fid))
+                    # Capture padstack_id → min outer diameter seen across
+                    # copper layers. Used during the drill pass to synthesize
+                    # Via records when attr values don't carry numeric
+                    # dimensions. We take min(w, h) for rect/oval catch-pads
+                    # because annular-ring math is driven by the shorter
+                    # dimension, and we keep the minimum across layers because
+                    # inner-layer catch-pads are often smaller than the
+                    # top/bottom cover pads on the same via.
+                    if (padstack_outer_mm is not None
+                            and _padstack_id_idx is not None
+                            and ltype in ("COPPER", "POWER_GROUND")):
+                        ps_id = _attr_int_value(token["attrs"], _padstack_id_idx)
+                        if ps_id is not None:
+                            od = min(pw, ph)
+                            prev = padstack_outer_mm.get(ps_id)
+                            if prev is None or od < prev:
+                                padstack_outer_mm[ps_id] = od
             except (ValueError, IndexError):
                 pass
 
@@ -727,6 +793,7 @@ def _parse_features(
     drills: list | None = None,
     warnings: list[str] | None = None,
     polygons: list | None = None,
+    padstack_outer_mm: dict[int, float] | None = None,
 ) -> None:
     """Parse ODB++ features file and append geometry to traces/pads/vias/polygons."""
     net_points = net_points or []
@@ -749,6 +816,7 @@ def _parse_features(
                     warnings=warnings,
                     drill_attr_values=attr_values if ltype == "DRILL" else None,
                     attr_names=attr_names,
+                    padstack_outer_mm=padstack_outer_mm,
                     polygons=polygons)
 
 
@@ -1687,28 +1755,57 @@ def parse_odb(file_path: str) -> BoardData:
             layers_dir = step_root / "layers"
             outline_layer_name: str | None = None
 
+            # Padstack-ID → minimum copper outer-diameter map, populated
+            # during the first (copper-only) pass and read during the
+            # second (drill + everything else) pass. Lets us synthesize
+            # Via records when a board encodes via geometry as symbolic
+            # padstack names (`STANDARDVIA`, `LARGEVIA`, etc.) instead of
+            # numeric dimensions in attr values.
+            padstack_outer_mm: dict[int, float] = {}
+
+            # Pre-resolve every layer's features path + ltype once so we
+            # don't walk the directory twice, and preserve layer order by
+            # appending to `layers` in the original matrix/matrix order.
+            resolved: list[tuple[dict, Path | None, str | None]] = []
             for ld in layer_defs:
                 ltype = _matrix_type_to_ltype(ld["type"])
                 feat = _find_layer_features(layers_dir, ld["name"])
-                if feat is None:
+                resolved.append((ld, feat, ltype))
+                if feat is None and ltype is not None:
                     logger.debug("ODB++ layer %r: features file not found (tried multiple cases)", ld["name"])
-                    if ltype is not None:
-                        warnings.append(f"Layer {ld['name']!r}: features file not found")
-                    elif ld["type"].upper() in ("ODB_BOARD_OUTLINE", "ROUT"):
-                        outline_layer_name = ld["name"]
-                    continue
-                if ltype is None:
-                    if ld["type"].upper() in ("ODB_BOARD_OUTLINE", "ROUT"):
-                        outline_layer_name = ld["name"]
-                    continue
+                    warnings.append(f"Layer {ld['name']!r}: features file not found")
+                if ltype is None and ld["type"].upper() in ("ODB_BOARD_OUTLINE", "ROUT"):
+                    outline_layer_name = ld["name"]
+                if ltype is not None:
+                    layers.append(Layer(name=ld["name"], type=ltype))
+
+            def _run_layer(ld: dict, feat: Path, ltype: str) -> None:
                 layer_name = ld["name"]
-                layers.append(Layer(name=layer_name, type=ltype))
                 before = len(traces) + len(pads) + len(vias)
                 _parse_features(feat, layer_name, ltype, units, traces, pads, vias,
                                  net_points=net_points, components=components, drills=drills,
-                                 warnings=warnings, polygons=polygons)
+                                 warnings=warnings, polygons=polygons,
+                                 padstack_outer_mm=padstack_outer_mm)
                 after = len(traces) + len(pads) + len(vias)
                 logger.info("ODB++ %s (%s): %d features", layer_name, ltype, after - before)
+
+            # Pass 1: copper layers only — populates padstack_outer_mm so
+            # the drill pass can cross-reference .padstack_id for via OD.
+            for ld, feat, ltype in resolved:
+                if feat is None or ltype not in ("COPPER", "POWER_GROUND"):
+                    continue
+                _run_layer(ld, feat, ltype)
+
+            logger.info("ODB++ padstack map: %d distinct padstack_ids captured from copper",
+                        len(padstack_outer_mm))
+
+            # Pass 2: everything else (drill, rout, silk, mask, paste, ...).
+            for ld, feat, ltype in resolved:
+                if feat is None or ltype is None:
+                    continue
+                if ltype in ("COPPER", "POWER_GROUND"):
+                    continue
+                _run_layer(ld, feat, ltype)
 
             # Backfill net names on pour polygons whose S record carried no
             # `.net=` attribute — inferred from features (pads, traces,
@@ -1784,6 +1881,53 @@ def parse_odb(file_path: str) -> BoardData:
             logger.info("ODB++ via catch-pad tagging: %d / %d pads marked "
                         "(%d via locations found via multi-layer coincidence)",
                         _via_catch_count, len(pads), len(_via_xys))
+
+            # Last-resort via synthesis. If neither _via_geometry_mm nor the
+            # padstack-ID cross-reference emitted any vias, but the multi-
+            # layer pad coincidence pass above identified via locations,
+            # fabricate Via records by joining each _via_xys point to the
+            # nearest drill hit. Outer diameter is the smallest pad OD seen
+            # at that xy across copper layers. This only fires when every
+            # other path fails — healthy boards skip it entirely.
+            if not vias and _via_xys and drills:
+                _xy_min_od: dict[tuple[float, float], float] = {}
+                for p in pads:
+                    if p.layer not in _copper_layer_names:
+                        continue
+                    xy_key = (round(p.x, 2), round(p.y, 2))
+                    if xy_key not in _via_xys:
+                        continue
+                    od = min(p.widthMM, p.heightMM)
+                    prev = _xy_min_od.get(xy_key)
+                    if prev is None or od < prev:
+                        _xy_min_od[xy_key] = od
+                _drill_by_cell: dict[tuple[int, int], list[tuple[float, float, float]]] = {}
+                for d in drills:
+                    _k = (int(d.x / _cell), int(d.y / _cell))
+                    _drill_by_cell.setdefault(_k, []).append((d.x, d.y, d.diamMM))
+                _synth_added = 0
+                for xy, od in _xy_min_od.items():
+                    gx, gy = int(xy[0] / _cell), int(xy[1] / _cell)
+                    best: tuple[float, float, float] | None = None
+                    best_d2 = _tol2
+                    for _dx in (-1, 0, 1):
+                        for _dy in (-1, 0, 1):
+                            for (drx, dry, diam) in _drill_by_cell.get((gx + _dx, gy + _dy), ()):
+                                d2 = (drx - xy[0]) ** 2 + (dry - xy[1]) ** 2
+                                if d2 <= best_d2:
+                                    best = (drx, dry, diam)
+                                    best_d2 = d2
+                    if best is not None and od > best[2]:
+                        vias.append(Via(x=best[0], y=best[1],
+                                        outerDiamMM=od, drillDiamMM=best[2],
+                                        netName=""))
+                        _synth_added += 1
+                if _synth_added:
+                    logger.info("ODB++ via synthesis (coincidence fallback): +%d vias", _synth_added)
+                    warnings.append(
+                        f"Synthesized {_synth_added} Via records from multi-layer pad "
+                        "coincidence — no .padstack_id or numeric via attrs found"
+                    )
 
             if not outline and outline_layer_name:
                 feat = _find_layer_features(layers_dir, outline_layer_name)
