@@ -191,6 +191,23 @@ func isTestPoint(refDes string) bool {
 	return false
 }
 
+// outerSolderMaskLayerNames returns the first and last SOLDER_MASK layer
+// names in stack order. Used by component-scoped rules (e.g.
+// component-height) to attribute a violation to the correct mask layer
+// so the viewer can auto-focus visibility to the side where the part
+// lives. Empty strings returned for sides that don't have a mask layer.
+func outerSolderMaskLayerNames(layers []Layer) (top, bot string) {
+	for _, l := range layers {
+		if l.Type == "SOLDER_MASK" {
+			if top == "" {
+				top = l.Name
+			}
+			bot = l.Name
+		}
+	}
+	return
+}
+
 // outerCopperLayerSet returns the set of outermost copper layer names from
 // the board stack — the first and last layer with type COPPER or POWER_GROUND
 // in stack order. Component mounting pads can only exist on these layers;

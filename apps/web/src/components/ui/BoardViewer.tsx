@@ -461,21 +461,32 @@ function drawComponentHighlight(
   const color = SEV_COLOR[violation.severity] ?? '#7090a8'
 
   const matchingPads = pads.filter(p => p.refDes === violation.refDes)
-  if (!matchingPads.length) return
-
-  // Bounding box of all component pads in canvas coordinates
   let minCX = Infinity, minCY = Infinity, maxCX = -Infinity, maxCY = -Infinity
-  for (const p of matchingPads) {
-    const cx = tx(p.x), cy = ty(p.y)
-    if (!ok(cx) || !ok(cy)) continue
-    const hw = Math.max(3, (p.widthMM * s) / 2)
-    const hh = Math.max(3, (p.heightMM * s) / 2)
-    minCX = Math.min(minCX, cx - hw)
-    minCY = Math.min(minCY, cy - hh)
-    maxCX = Math.max(maxCX, cx + hw)
-    maxCY = Math.max(maxCY, cy + hh)
+
+  if (matchingPads.length) {
+    for (const p of matchingPads) {
+      const cx = tx(p.x), cy = ty(p.y)
+      if (!ok(cx) || !ok(cy)) continue
+      const hw = Math.max(3, (p.widthMM * s) / 2)
+      const hh = Math.max(3, (p.heightMM * s) / 2)
+      minCX = Math.min(minCX, cx - hw)
+      minCY = Math.min(minCY, cy - hh)
+      maxCX = Math.max(maxCX, cx + hw)
+      maxCY = Math.max(maxCY, cy + hh)
+    }
   }
-  if (!isFinite(minCX)) return
+
+  // Fallback: no pads carry this refDes (spatial lookup miss, or a rule
+  // whose violation refers to a whole component without a pad context,
+  // e.g. component-height). Draw a standard-size box at the violation's
+  // own (x, y) so the user still sees which part was flagged.
+  if (!isFinite(minCX)) {
+    const cx = tx(violation.x), cy = ty(violation.y)
+    if (!ok(cx) || !ok(cy)) return
+    const half = 16
+    minCX = cx - half; maxCX = cx + half
+    minCY = cy - half; maxCY = cy + half
+  }
 
   const pad = 8
   ctx.save()
@@ -859,12 +870,15 @@ export function BoardViewer({
       preFocusHiddenRef.current = new Set(hiddenLayersRef.current)
     }
 
-    // For drill/outline/rout violations, show the violation's layer PLUS
-    // outer copper layers for context — a drill layer alone shows holes
-    // but no surrounding copper, making it hard to orient.
+    // For drill/outline/rout/mask violations, show the violation's layer
+    // PLUS outer copper layers for context — any of those layers alone
+    // reads as floating shapes without the copper pads underneath.
     const vLayerLower = v.layer.toLowerCase()
-    const needsContext = vLayerLower === 'drill' || vLayerLower.includes('drill') ||
-      vLayerLower.includes('outline') || vLayerLower === 'rout'
+    const layerType = layers.find(l => l.name === v.layer)?.type
+    const needsContext = layerType === 'DRILL' || layerType === 'SOLDER_MASK' ||
+      vLayerLower === 'drill' || vLayerLower.includes('drill') ||
+      vLayerLower.includes('outline') || vLayerLower === 'rout' ||
+      vLayerLower.includes('mask')
 
     const visible = new Set<string>([v.layer])
     if (needsContext) {

@@ -22,6 +22,26 @@ func (ComponentHeightRule) Run(board BoardData, profile ProfileRules) []Violatio
 		return nil
 	}
 
+	// Resolve outer solder-mask layer names so the viewer can narrow
+	// visibility to the correct side when a violation is focused. Falls
+	// back to outer copper when the board has no mask layers at all.
+	topMask, botMask := outerSolderMaskLayerNames(board.Layers)
+	if topMask == "" || botMask == "" {
+		outer := outerCopperLayerSet(board.Layers)
+		if topMask == "" {
+			for name := range outer {
+				if topMask == "" {
+					topMask = name
+				}
+			}
+		}
+		if botMask == "" {
+			for name := range outer {
+				botMask = name
+			}
+		}
+	}
+
 	var violations []Violation
 	var missingHeight int
 
@@ -42,11 +62,14 @@ func (ComponentHeightRule) Run(board BoardData, profile ProfileRules) []Violatio
 		}
 
 		var limit float64
+		var layer string
 		switch c.Side {
 		case "top":
 			limit = topLimit
+			layer = topMask
 		case "bot":
 			limit = botLimit
+			layer = botMask
 		default:
 			// Side couldn't be determined — skip rather than guess.
 			continue
@@ -60,6 +83,7 @@ func (ComponentHeightRule) Run(board BoardData, profile ProfileRules) []Violatio
 		violations = append(violations, Violation{
 			RuleID:     "component-height",
 			Severity:   "ERROR",
+			Layer:      layer,
 			X:          c.X,
 			Y:          c.Y,
 			Message:    msgComponentHeight(c.RefDes, c.Side, c.HeightMM, limit),
