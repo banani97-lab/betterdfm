@@ -373,10 +373,14 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.CellFormat(18, 11, sr.Grade, "", 0, "L", false, 0, "")
 	f.SetFont("Arial", "B", 10)
 	f.SetTextColor(40, 40, 40)
-	f.CellFormat(20, 11, fmt.Sprintf("%d/100", sr.Score), "", 0, "L", false, 0, "")
+	f.CellFormat(colL-18, 11, fmt.Sprintf("%d/100", sr.Score), "", 1, "L", false, 0, "")
+	// Verdict wraps on its own line across the full left column so it
+	// can't overflow into the right-column DESIGN SUMMARY.
+	f.SetX(15)
 	f.SetFont("Arial", "", 8)
 	f.SetTextColor(90, 90, 90)
-	f.CellFormat(colL-38, 11, tr(sr.Verdict), "", 1, "L", false, 0, "")
+	f.MultiCell(colL, 4, tr(sr.Verdict), "", "L", false)
+	leftColBottomY := f.GetY()
 
 	// Right: design summary
 	f.SetXY(15+colL+4, sectionY)
@@ -408,8 +412,8 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	}
 
 	afterColumnsY := f.GetY()
-	if barY+barH+13 > afterColumnsY {
-		afterColumnsY = barY + barH + 13
+	if leftColBottomY > afterColumnsY {
+		afterColumnsY = leftColBottomY
 	}
 	f.SetY(afterColumnsY + 6)
 
