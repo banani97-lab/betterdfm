@@ -110,7 +110,9 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 
 ## DFM rules
 
-11 rules in `engine/dfm-engine/rule_*.go`, each implementing the `Rule` interface (`ID() string`, `Run(board, profile) []Violation`):
+17 rules in `engine/dfm-engine/rule_*.go`, each implementing the `Rule` interface (`ID() string`, `Run(board, profile) []Violation`). Split into bare-board (fab) and assembly checks.
+
+**Bare-board / fab (11):**
 
 | Rule | Severity | What it checks |
 |------|----------|---------------|
@@ -126,7 +128,23 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | copper-sliver | WARNING | Copper feature width >= minCopperSliverMM |
 | silkscreen-on-pad | INFO | Silkscreen does not overlap pads |
 
-**Scoring** (`score.go`): weighted penalties by rule (clearance=3.0 is heaviest) and severity (ERROR=10x, WARNING=3x, INFO=0.5x). Score 0-100, grades A/B/C/D.
+**Assembly (6):**
+
+| Rule | Severity | What it checks |
+|------|----------|---------------|
+| fiducial-count | WARNING | Board has >= 3 fiducials for pick-and-place (skipped if parser found none) |
+| pad-size-for-package | ERROR / INFO | Pad geometry within IPC-7351 envelope for the detected passive package class |
+| package-capability | ERROR | No component uses a package class smaller than `profile.SmallestPackageClass` |
+| tombstoning-risk | ERROR | Pad area ratio on small 2-pad passives (01005-0603) <= 1.3 |
+| trace-imbalance | ERROR | Trace/pour width ratio into a 2-pad component <= `profile.MaxTraceImbalanceRatio` |
+| component-height | ERROR / INFO | SMT component height within per-side limits (`MaxComponentHeightTop/BottomMM`) |
+
+**Scoring** (`score.go`):
+- Per-violation penalty: `ruleWeight * severityWeight * marginMult` (margin scales by how far measured deviates from limit).
+- Severity multipliers: ERROR=10×, WARNING=3×, INFO=0.5×.
+- Heaviest rule weights: `clearance`=3.0, `trace-width`/`annular-ring`=2.5, then a tier of 2.0 (drill-*, edge-clearance, package-capability, component-height).
+- **Per-rule cap**: each rule's contribution is bounded so a single rule hitting the 500-violation ceiling can't single-handedly zero the score. Caps sum to exactly 100, so all rules maxed = score 0.
+- Score 0-100, grades A (>=90), B (>=75), C (>=60), D (>=40), F (<40).
 
 ## Environment variables
 

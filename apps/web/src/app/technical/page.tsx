@@ -431,7 +431,7 @@ export default function TechnicalPage() {
                 {/* Row 4: Worker → DFM → DB + S3 result blobs */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <ServiceBox label="Go Worker" sub="ECS · 5 goroutines" color="#00acd7" />
-                  <Arrow label="⑥ run 16 rules" />
+                  <Arrow label="⑥ run 17 rules" />
                   <ServiceBox label="DFM Engine" sub="Go library" color="#d4891a" />
                   <Arrow label="⑦ score + metadata" />
                   <ServiceBox label="PostgreSQL" sub="RDS · GORM" color="#336791" />
@@ -509,7 +509,7 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
 }`}</Code>
 
             <p style={pStyle}>
-              All 16 rules run concurrently via <code style={inlineCode}>sync.WaitGroup</code>. Since every rule receives read-only board data, there's no contention — no mutexes needed inside individual rules.
+              All 17 rules run concurrently via <code style={inlineCode}>sync.WaitGroup</code>. Since every rule receives read-only board data, there's no contention — no mutexes needed inside individual rules.
             </p>
 
             {/* Rules table */}
@@ -1129,7 +1129,7 @@ NET {
               },
               {
                 title: 'Concurrent rule execution',
-                body: 'All 16 rules receive the same read-only BoardData struct. No synchronisation is needed inside individual rules. The WaitGroup pattern keeps the runner simple and the per-rule code free of concurrency concerns.',
+                body: 'All 17 rules receive the same read-only BoardData struct. No synchronisation is needed inside individual rules. The WaitGroup pattern keeps the runner simple and the per-rule code free of concurrency concerns.',
               },
             ].map(({ title, body }, i) => (
               <Callout key={title} number={i + 1} title={title}>{body}</Callout>

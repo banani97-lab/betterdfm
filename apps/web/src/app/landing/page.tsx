@@ -66,7 +66,7 @@ export default function LandingPage() {
           <span className="text-[#4fc3f7]">Start Screening Them Automatically.</span>
         </h1>
         <p className="mt-6 text-lg sm:text-xl text-slate-300 max-w-2xl mx-auto leading-relaxed">
-          RapidDFM runs 16 manufacturability checks on every incoming ODB++ file in under 30 seconds — before your CAM team ever opens them. Reduce first-pass review time by up to 80%, standardize quoting decisions, and eliminate revision loops with customers.
+          RapidDFM runs 17 manufacturability checks on every incoming ODB++ file in under 30 seconds — before your CAM team ever opens them. Reduce first-pass review time by up to 80%, standardize quoting decisions, and eliminate revision loops with customers.
         </p>
         <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
           <a
@@ -91,7 +91,7 @@ export default function LandingPage() {
       <section data-section="stats" className="border-y border-white/10 bg-white/[0.02]">
         <div className="max-w-6xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-x-12 gap-y-4 text-center">
           <div>
-            <div className="text-3xl font-bold text-[#4fc3f7]">16</div>
+            <div className="text-3xl font-bold text-[#4fc3f7]">17</div>
             <div className="text-sm text-slate-400">Automated DFM Checks</div>
           </div>
           <div>
@@ -132,7 +132,7 @@ export default function LandingPage() {
           <div className="rounded-2xl border border-[#1565c0]/30 bg-[#1565c0]/5 p-6">
             <h3 className="text-lg font-semibold text-[#4fc3f7] mb-4">With RapidDFM</h3>
             <ul className="space-y-3 text-sm text-slate-300">
-              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Every incoming design gets the same 16 checks in under 30 seconds. Before anyone opens a CAM tool.</li>
+              <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Every incoming design gets the same 17 checks in under 30 seconds. Before anyone opens a CAM tool.</li>
               <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Same rules, same thresholds, same results — regardless of who&apos;s working. Day shift or night shift.</li>
               <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Send your customer a link. They see every violation, upload a fix, and you track the improvement. No emails.</li>
               <li className="flex gap-3"><Check className="h-4 w-4 text-[#4fc3f7] mt-0.5 shrink-0" />Process more RFQs with the same team. Your engineers focus on engineering, not file screening.</li>
@@ -153,7 +153,7 @@ export default function LandingPage() {
             Upload a file. Get a scored manufacturability report. Share it with your customer. Done.
           </p>
           <p className="text-slate-400 max-w-xl mx-auto text-sm">
-            RapidDFM applies your shop&apos;s capability limits — trace widths, clearances, drill sizes, annular rings, solder mask dams, and 11 more checks — against every incoming design. No setup per job. No inconsistency between reviewers. Just upload and know.
+            RapidDFM applies your shop&apos;s capability limits — trace widths, clearances, drill sizes, annular rings, solder mask dams, and 12 more checks — against every incoming design. No setup per job. No inconsistency between reviewers. Just upload and know.
           </p>
         </div>
       </section>
@@ -167,7 +167,7 @@ export default function LandingPage() {
           {[
             { step: '1', title: 'Upload', desc: 'Drop an ODB++ archive or folder. No file prep, no extraction.' },
             { step: '2', title: 'Apply Your Rules', desc: 'Select a capability profile that matches your process line.' },
-            { step: '3', title: 'Instant Analysis', desc: '16 DFM checks run in under 30 seconds. Every violation scored and mapped.' },
+            { step: '3', title: 'Instant Analysis', desc: '17 DFM checks run in under 30 seconds. Every violation scored and mapped.' },
             { step: '4', title: 'Review & Share', desc: 'Send a branded report link to your customer. Track revisions until it\'s fab-ready.' },
           ].map((s) => (
             <div key={s.step}>
