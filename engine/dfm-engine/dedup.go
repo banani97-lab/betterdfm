@@ -1,6 +1,9 @@
 package dfmengine
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // dedupeViolations collapses violations that fall within the same spatial grid
 // cell (keyed by layer + rule + grid coords) into a single representative
@@ -44,5 +47,20 @@ func dedupeViolations(violations []Violation, cellMM float64) []Violation {
 		b.v.Count = b.count
 		result = append(result, b.v)
 	}
+	// Map iteration above is non-deterministic. Sort so that callers — and the
+	// v1↔v2 diff feature in particular — see byte-stable output across runs
+	// on identical input.
+	sort.Slice(result, func(i, j int) bool {
+		if result[i].Layer != result[j].Layer {
+			return result[i].Layer < result[j].Layer
+		}
+		if result[i].RuleID != result[j].RuleID {
+			return result[i].RuleID < result[j].RuleID
+		}
+		if result[i].X != result[j].X {
+			return result[i].X < result[j].X
+		}
+		return result[i].Y < result[j].Y
+	})
 	return result
 }

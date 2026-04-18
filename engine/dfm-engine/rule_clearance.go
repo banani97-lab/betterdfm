@@ -166,7 +166,21 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		return net == "$NONE$"
 	}
 
-	for layer, traces := range tracesByLayer {
+	// Iterate layers in sorted order for determinism. Combined with the
+	// per-layer cap below, this guarantees identical output across runs on
+	// identical input — the v1↔v2 diff feature relies on it.
+	layerNames := make([]string, 0, len(tracesByLayer))
+	for name := range tracesByLayer {
+		layerNames = append(layerNames, name)
+	}
+	sort.Strings(layerNames)
+
+	for _, layer := range layerNames {
+		traces := tracesByLayer[layer]
+		// Per-layer cap: each copper layer gets its own maxClearanceViolations
+		// budget. The previous global cap let whichever layer iterated first
+		// (random map order) consume the entire budget, starving the others.
+		layerViolations := 0
 		// P4.3: 2D grid hash for trace-to-trace clearance.
 		// Cell size = 2*minC ensures any violating pair occupies the same or adjacent cells.
 		// This eliminates the O(n·k) worst case for vertically-dense designs.
@@ -189,7 +203,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		}
 
 		for i, a := range traces {
-			if len(violations) >= maxClearanceViolations {
+			if layerViolations >= maxClearanceViolations {
 				break
 			}
 			// Query all cells this trace's expanded bbox overlaps.
@@ -205,7 +219,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 							continue // each pair checked once; skip self
 						}
 						seenJ[j] = true
-						if len(violations) >= maxClearanceViolations {
+						if layerViolations >= maxClearanceViolations {
 							break
 						}
 						b := traces[j]
@@ -250,6 +264,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 								X2:         (b.t.StartX + b.t.EndX) / 2,
 								Y2:         (b.t.StartY + b.t.EndY) / 2,
 							})
+							layerViolations++
 						}
 					}
 				}
@@ -266,7 +281,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		sort.Slice(pads, func(i, j int) bool { return pads[i].X < pads[j].X })
 
 		for _, tb := range traces {
-			if len(violations) >= maxClearanceViolations {
+			if layerViolations >= maxClearanceViolations {
 				break
 			}
 			t := tb.t
@@ -275,7 +290,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				return pads[k].X >= tb.minX-minC-1.0
 			})
 			for k := lo; k < len(pads); k++ {
-				if len(violations) >= maxClearanceViolations {
+				if layerViolations >= maxClearanceViolations {
 					break
 				}
 				p := pads[k]
@@ -320,6 +335,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						X2:         p.X,
 						Y2:         p.Y,
 					})
+					layerViolations++
 				}
 			}
 		}

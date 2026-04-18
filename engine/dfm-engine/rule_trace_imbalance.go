@@ -1,6 +1,9 @@
 package dfmengine
 
-import "math"
+import (
+	"math"
+	"sort"
+)
 
 // TraceImbalanceRule flags 2-pad components where the traces connected to each
 // pad differ in width by more than the configured ratio.
@@ -38,7 +41,21 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 	flagged := map[string]bool{}
 	var violations []Violation
 
-	for key, pads := range padsByRefLayer {
+	// Sort keys so map iteration randomness can't pick a different (ref, layer)
+	// winner across runs when a refdes appears on multiple layers.
+	keys := make([]refLayer, 0, len(padsByRefLayer))
+	for k := range padsByRefLayer {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].ref != keys[j].ref {
+			return keys[i].ref < keys[j].ref
+		}
+		return keys[i].layer < keys[j].layer
+	})
+
+	for _, key := range keys {
+		pads := padsByRefLayer[key]
 		if len(pads) != 2 || flagged[key.ref] {
 			continue
 		}

@@ -60,7 +60,15 @@ func (r *SolderMaskDamRule) Run(board BoardData, profile ProfileRules) []Violati
 
 	minDam := profile.MinSolderMaskDamMM
 
-	for _, pads := range byLayer {
+	// Iterate layers in sorted order so cap-bound runs always pick the same
+	// winners across runs (Go map iteration is otherwise random).
+	layerNames := make([]string, 0, len(byLayer))
+	for name := range byLayer {
+		layerNames = append(layerNames, name)
+	}
+	sort.Strings(layerNames)
+	for _, layer := range layerNames {
+		pads := byLayer[layer]
 		if len(violations) >= maxViol {
 			break
 		}

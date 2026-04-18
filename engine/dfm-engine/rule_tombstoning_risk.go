@@ -1,5 +1,7 @@
 package dfmengine
 
+import "sort"
+
 // smallPassiveClasses are package classes susceptible to tombstoning.
 var smallPassiveClasses = map[string]bool{
 	"01005": true,
@@ -49,7 +51,21 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 
 	flagged := map[string]bool{}
 	var violations []Violation
-	for key, padInfos := range groups {
+	// Iterate in sorted key order so cap-bound runs always pick the same
+	// RefDes winners. Without this, Go's random map iteration produces
+	// different violation sets across runs on identical input.
+	keys := make([]refLayer, 0, len(groups))
+	for k := range groups {
+		keys = append(keys, k)
+	}
+	sort.Slice(keys, func(i, j int) bool {
+		if keys[i].ref != keys[j].ref {
+			return keys[i].ref < keys[j].ref
+		}
+		return keys[i].layer < keys[j].layer
+	})
+	for _, key := range keys {
+		padInfos := groups[key]
 		if len(violations) >= maxViolations {
 			break
 		}
