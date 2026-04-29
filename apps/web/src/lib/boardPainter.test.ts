@@ -198,51 +198,64 @@ describe('buildPaintList', () => {
     expect(fr4!.holes).toBeUndefined()
   })
 
-  // Drill-span visibility: a drill is physically visible from any copper layer
-  // it intersects, so the painter must show D_1_10 (SIGNAL_1↔SIGNAL_10) drills
-  // when SIGNAL_1 alone is visible, while hiding D_5_6 (FLEX_5↔FLEX_6) drills
-  // because they're buried below SIGNAL_1's stack-up position.
-  it('shows drills whose span includes a visible copper layer (D_1_10 with SIGNAL_1 only)', () => {
+  // Strict per-drill-layer toggle: hiding a drill layer hides every drill
+  // record on it, regardless of which copper layers are also visible. This
+  // is what the user sees when they click the D_1_2 toggle in the panel —
+  // a no-op span-aware variant where copper visibility kept the drill on
+  // was the bug we're fixing.
+  it('hides drills when their drill layer is hidden, even if copper layers are visible', () => {
     const board = makeBoard({
       layers: [
         { name: 'SIGNAL_1', type: 'COPPER' },
+        { name: 'SIGNAL_2', type: 'COPPER' },
+        { name: 'D_1_2', type: 'DRILL', startLayer: 'SIGNAL_1', endLayer: 'SIGNAL_2' },
+      ],
+      drills: [{ x: 10, y: 10, diamMM: 0.3, plated: true, layer: 'D_1_2' }],
+    })
+    // Copper visible, drill layer hidden — drill must NOT render.
+    const hidden = new Set(['D_1_2'])
+    const result = buildPaintList(board, makeBounds(), [], hidden, undefined, false)
+    const drillCircles = result.filter(i => i.type === 'drawCircle')
+    const at10 = drillCircles.filter((c: any) => Math.abs(c.cx - 150) < 2 && Math.abs(c.cy - 150) < 2)
+    expect(at10.length).toBe(0)
+  })
+
+  it('shows drills only on visible drill layers (D_1_2 vs D_5_6)', () => {
+    const board = makeBoard({
+      layers: [
+        { name: 'SIGNAL_1', type: 'COPPER' },
+        { name: 'SIGNAL_2', type: 'COPPER' },
         { name: 'FLEX_5', type: 'POWER_GROUND' },
         { name: 'FLEX_6', type: 'POWER_GROUND' },
-        { name: 'SIGNAL_10', type: 'COPPER' },
-        { name: 'D_1_10', type: 'DRILL', startLayer: 'SIGNAL_1', endLayer: 'SIGNAL_10' },
+        { name: 'D_1_2', type: 'DRILL', startLayer: 'SIGNAL_1', endLayer: 'SIGNAL_2' },
         { name: 'D_5_6', type: 'DRILL', startLayer: 'FLEX_5', endLayer: 'FLEX_6' },
       ],
       drills: [
-        { x: 10, y: 10, diamMM: 0.3, plated: true, layer: 'D_1_10' },
+        { x: 10, y: 10, diamMM: 0.3, plated: true, layer: 'D_1_2' },
         { x: 30, y: 30, diamMM: 0.1, plated: true, layer: 'D_5_6' },
       ],
     })
-    // Only SIGNAL_1 is visible — every other layer is hidden, including
-    // both drill layers themselves.
-    const hidden = new Set(['FLEX_5', 'FLEX_6', 'SIGNAL_10', 'D_1_10', 'D_5_6'])
+    // Hide D_5_6, leave D_1_2 visible.
+    const hidden = new Set(['D_5_6'])
     const result = buildPaintList(board, makeBounds(), [], hidden, undefined, false)
-
-    // D_1_10 drill at (10, 10) renders (outer copper + inner hole = 2 circles).
-    // D_5_6 drill at (30, 30) does not, because its span is buried.
     const drillCircles = result.filter(i => i.type === 'drawCircle')
     const at10 = drillCircles.filter((c: any) => Math.abs(c.cx - 150) < 2 && Math.abs(c.cy - 150) < 2)
     const at30 = drillCircles.filter((c: any) => Math.abs(c.cx - 350) < 2 && Math.abs(c.cy - 350) < 2)
-    expect(at10.length).toBeGreaterThan(0)
-    expect(at30.length).toBe(0)
+    expect(at10.length).toBeGreaterThan(0) // D_1_2 visible
+    expect(at30.length).toBe(0)            // D_5_6 hidden
   })
 
-  it('hides drill when neither its drill layer nor any spanned copper layer is visible', () => {
+  it('falls back to anyCopperVisible for records with no layer attribution', () => {
+    // Older parser output: drills may be missing the layer field. The
+    // legacy gate (any copper or drill layer visible) keeps them rendering
+    // so existing jobs in the cache don't blank out after a re-deploy.
     const board = makeBoard({
-      layers: [
-        { name: 'SIGNAL_1', type: 'COPPER' },
-        { name: 'SIGNAL_10', type: 'COPPER' },
-        { name: 'D_1_10', type: 'DRILL', startLayer: 'SIGNAL_1', endLayer: 'SIGNAL_10' },
-      ],
-      drills: [{ x: 10, y: 10, diamMM: 0.3, plated: true, layer: 'D_1_10' }],
+      layers: [{ name: 'SIGNAL_1', type: 'COPPER' }],
+      drills: [{ x: 10, y: 10, diamMM: 0.3, plated: true } as any],
     })
-    const hidden = new Set(['SIGNAL_1', 'SIGNAL_10', 'D_1_10'])
-    const result = buildPaintList(board, makeBounds(), [], hidden, undefined, false)
+    const result = buildPaintList(board, makeBounds(), [], new Set(), undefined, false)
     const drillCircles = result.filter(i => i.type === 'drawCircle')
-    expect(drillCircles.length).toBe(0)
+    const at10 = drillCircles.filter((c: any) => Math.abs(c.cx - 150) < 2 && Math.abs(c.cy - 150) < 2)
+    expect(at10.length).toBeGreaterThan(0)
   })
 })
