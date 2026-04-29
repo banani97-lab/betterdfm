@@ -277,16 +277,33 @@ function drawCopper(
     }
   }
 
-  // Vias and drills — only render when copper or drill layers are visible
+  // Vias and drills.
+  //
+  // A Drill (and Via) is rendered iff its drill-layer toggle is on. Strict
+  // model: clicking D_1_2 off hides every drill record tagged Layer=D_1_2,
+  // regardless of which copper layers are visible. This is what the layer
+  // toggle promises in the panel — predictable on/off control. The drill
+  // layer's start/end span (Layer.startLayer/endLayer in the matrix) is
+  // documentation, not a visibility input.
+  //
+  // Records with no layer attribution (older parser output, last-resort
+  // synthesis) fall back to the legacy "any copper or drill layer visible"
+  // gate so they don't disappear from old jobs.
   const allLayers = boardData?.layers ?? []
   const anyCopperVisible = allLayers.some(
     l => !hiddenLayers.has(l.name) && (l.type === 'COPPER' || l.type === 'DRILL')
   )
   if (!anyCopperVisible) return
 
+  const drillLayerOn = (layer: string | undefined): boolean => {
+    if (!layer) return anyCopperVisible // legacy fallback
+    return !hiddenLayers.has(layer)
+  }
+
   // Vias
   const MAX_VIA_MM = 15  // cap to guard against parser unit artifacts
   for (const v of boardData?.vias ?? []) {
+    if (!drillLayerOn(v.layer)) continue
     if (!inViewport(v.x, v.y, v.outerDiamMM / 2)) continue
     const cx = tx(v.x), cy = ty(v.y)
     if (!ok(cx) || !ok(cy)) continue
@@ -301,6 +318,7 @@ function drawCopper(
 
   // Drills — skip out-of-board, out-of-viewport, and sub-pixel drills
   for (const d of boardData?.drills ?? []) {
+    if (!drillLayerOn(d.layer)) continue
     if (!inBoard(d.x, d.y)) continue
     if (!inViewport(d.x, d.y, d.diamMM / 2)) continue
     // LOD: skip drills smaller than 1.5 pixels at current zoom
