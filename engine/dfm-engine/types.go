@@ -19,6 +19,11 @@ type BoardData struct {
 type Layer struct {
 	Name string `json:"name"`
 	Type string `json:"type"` // COPPER | POWER_GROUND | SOLDER_MASK | SOLDER_PASTE | SILK | DRILL | OUTLINE | ROUT
+	// For DRILL layers, the start/end copper layer names from the ODB++
+	// matrix (e.g. D_1_10 → "SIGNAL_1" / "SIGNAL_10"). Empty for non-drill
+	// layers and for boards parsed before this field was added.
+	StartLayer string `json:"startLayer,omitempty"`
+	EndLayer   string `json:"endLayer,omitempty"`
 }
 
 type Point struct {

@@ -92,7 +92,7 @@ export interface Violation {
   ignored:    boolean
 }
 
-export interface BoardLayer { name: string; type: string }
+export interface BoardLayer { name: string; type: string; startLayer?: string; endLayer?: string }
 export interface BoardTrace { layer: string; widthMM: number; startX: number; startY: number; endX: number; endY: number; netName: string }
 export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL' | 'DONUT'; holeMM?: number; netName: string; refDes: string; packageClass?: string }
 export interface BoardVia { x: number; y: number; outerDiamMM: number; drillDiamMM: number; layer?: string; netName?: string }

@@ -17,6 +17,12 @@ class Point(BaseModel):
 class Layer(BaseModel):
     name: str
     type: str  # "COPPER" | "SOLDER_MASK" | "SOLDER_PASTE" | "SILK" | "DRILL" | "OUTLINE"
+    # For DRILL layers, the names of the start/end copper layers the drill
+    # spans (e.g. D_1_10 → start="SIGNAL_1", end="SIGNAL_10"). The viewer uses
+    # these to show drills whenever any spanned copper layer is visible —
+    # physically a through-hole is visible from every layer it intersects.
+    startLayer: str = ""
+    endLayer: str = ""
 
 
 class Trace(BaseModel):
