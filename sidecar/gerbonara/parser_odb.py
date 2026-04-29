@@ -155,11 +155,26 @@ def _parse_symbol_table(lines: list[str], units: str = "INCH",
 # ── Matrix / profile parsing ───────────────────────────────────────────────────
 
 def _read_units(path: Path) -> str:
-    """Read UNITS= from ODB++ step header."""
+    """Read UNITS from ODB++ step header.
+
+    ODB++ accepts two equivalent forms in stephdr and feature files:
+        UNITS=MM   (or =INCH)   — older, more common
+        U MM       (or U INCH)  — Mentor / Cadence variant
+
+    Misreading this defaults the parser to INCH and silently inflates every
+    symbol diameter by 25.4× — drill records on a `U MM` board come out as
+    6mm / 25mm / 127mm holes when the ODB++ source actually says 0.24 / 1.0 /
+    5.0mm. So we accept either form here and in `_features_file_units`.
+    """
     try:
         for line in path.read_text(errors="replace").splitlines():
-            if line.startswith("UNITS="):
-                return line.split("=", 1)[1].strip()
+            s = line.strip()
+            if s.startswith("UNITS="):
+                return s.split("=", 1)[1].strip()
+            if s.startswith("U "):
+                token = s[2:].strip().upper()
+                if token in ("MM", "INCH"):
+                    return token
     except OSError:
         pass
     return "INCH"
@@ -1020,19 +1035,28 @@ def _features_file_units(lines: list[str], step_units: str,
     Missing the override squashes all coordinates ~25× and mis-scales symbol
     diameters, which on the drill layer silently discards ~99% of drills
     via the sub-50µm marker filter in _build_features.
+
+    Accepts both `UNITS=MM` and `U MM` syntaxes; see `_read_units` for
+    background on the two forms.
     """
+    file_units: str | None = None
     for line in lines[:10]:
         s = line.strip()
         if s.startswith("UNITS="):
             file_units = s.split("=", 1)[1].strip().upper()
-            if file_units in ("MM", "INCH") and file_units != step_units.upper():
-                if warnings is not None:
-                    warnings.append(
-                        f"Layer {layer_name!r}: feature file UNITS={file_units} "
-                        f"overrides step-level UNITS={step_units}"
-                    )
-                return file_units
             break
+        if s.startswith("U "):
+            token = s[2:].strip().upper()
+            if token in ("MM", "INCH"):
+                file_units = token
+                break
+    if file_units in ("MM", "INCH") and file_units != step_units.upper():
+        if warnings is not None:
+            warnings.append(
+                f"Layer {layer_name!r}: feature file UNITS={file_units} "
+                f"overrides step-level UNITS={step_units}"
+            )
+        return file_units
     return step_units
 
 
