@@ -154,27 +154,35 @@ def _parse_symbol_table(lines: list[str], units: str = "INCH",
 
 # ── Matrix / profile parsing ───────────────────────────────────────────────────
 
-def _read_units(path: Path) -> str:
-    """Read UNITS from ODB++ step header.
+def _parse_units_decl(stripped_line: str) -> str | None:
+    """Return 'MM' / 'INCH' if the line is an ODB++ units declaration, else None.
 
-    ODB++ accepts two equivalent forms in stephdr and feature files:
+    ODB++ accepts two equivalent forms in stephdr, profile, and feature files:
         UNITS=MM   (or =INCH)   — older, more common
         U MM       (or U INCH)  — Mentor / Cadence variant
 
-    Misreading this defaults the parser to INCH and silently inflates every
-    symbol diameter by 25.4× — drill records on a `U MM` board come out as
-    6mm / 25mm / 127mm holes when the ODB++ source actually says 0.24 / 1.0 /
-    5.0mm. So we accept either form here and in `_features_file_units`.
+    Misreading this defaults a file to INCH and silently inflates every
+    coordinate / symbol diameter by 25.4× — a `U MM` board reads as 6mm /
+    25mm / 127mm "drills" when the ODB++ source actually says 0.24 / 1.0 /
+    5.0mm. Used by every reader that needs to self-resolve a file's units
+    (stephdr, profile, feature files, custom-symbol scans).
     """
+    if stripped_line.startswith("UNITS="):
+        token = stripped_line.split("=", 1)[1].strip().upper()
+    elif stripped_line.startswith("U "):
+        token = stripped_line[2:].strip().upper()
+    else:
+        return None
+    return token if token in ("MM", "INCH") else None
+
+
+def _read_units(path: Path) -> str:
+    """Read UNITS from ODB++ step header (stephdr). Defaults to INCH."""
     try:
         for line in path.read_text(errors="replace").splitlines():
-            s = line.strip()
-            if s.startswith("UNITS="):
-                return s.split("=", 1)[1].strip()
-            if s.startswith("U "):
-                token = s[2:].strip().upper()
-                if token in ("MM", "INCH"):
-                    return token
+            unit = _parse_units_decl(line.strip())
+            if unit is not None:
+                return unit
     except OSError:
         pass
     return "INCH"
@@ -269,6 +277,13 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
     OS entries are straight-segment endpoints. OC entries are arcs of the form
     `OC xe ye xc yc [Y|N]` — tessellated so curved edges (e.g. half-circle
     scallops) don't collapse to a chord and self-intersect the polygon.
+
+    Self-resolves units from the profile file's own header — boards exported
+    by Mentor / Cadence-derived tools declare `U MM` directly in the profile
+    file even when stephdr has no UNITS line at all. Without this the outline
+    falls back to the INCH default, the bbox is read 25.4× too large, and the
+    actual board features render as a tiny smudge in the corner of an
+    enormous empty rectangle.
     """
     boundary: list[Point] = []
     holes: list[list[Point]] = []
@@ -277,14 +292,21 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
     in_island = False
     last_xy: tuple[float, float] | None = None
 
-    def to_mm(v: float) -> float:
-        return _coord_to_mm(v, units)
-
     try:
         text = profile_path.read_text(errors="replace")
     except OSError:
         return boundary, holes
-    for line in text.splitlines():
+
+    lines = text.splitlines()
+    for line in lines[:10]:
+        unit = _parse_units_decl(line.strip())
+        if unit is not None:
+            units = unit
+            break
+
+    def to_mm(v: float) -> float:
+        return _coord_to_mm(v, units)
+    for line in lines:
         s = line.strip()
         if s.startswith("OB "):
             # flush previous ring if open
@@ -368,11 +390,9 @@ def _scan_custom_symbol(features_path: Path, units: str) -> dict | None:
         return None
     file_units = units
     for line in text.splitlines()[:20]:
-        s = line.strip()
-        if s.startswith("UNITS="):
-            u = s.split("=", 1)[1].strip().upper()
-            if u in ("MM", "INCH"):
-                file_units = u
+        unit = _parse_units_decl(line.strip())
+        if unit is not None:
+            file_units = unit
             break
     xs: list[float] = []
     ys: list[float] = []
@@ -1029,28 +1049,22 @@ def _features_file_units(lines: list[str], step_units: str,
                          warnings: list[str] | None) -> str:
     """Resolve UNITS for a single feature file.
 
-    ODB++ lets each feature file declare its own `UNITS=` line that overrides
+    ODB++ lets each feature file declare its own units line that overrides
     the step-level UNITS from stephdr. Real-world HDI designs sometimes mix
     units — e.g. every copper/mask layer is MM but the drill layer is INCH.
     Missing the override squashes all coordinates ~25× and mis-scales symbol
     diameters, which on the drill layer silently discards ~99% of drills
     via the sub-50µm marker filter in _build_features.
 
-    Accepts both `UNITS=MM` and `U MM` syntaxes; see `_read_units` for
-    background on the two forms.
+    Accepts both `UNITS=MM` and `U MM` syntaxes via `_parse_units_decl`.
     """
     file_units: str | None = None
     for line in lines[:10]:
-        s = line.strip()
-        if s.startswith("UNITS="):
-            file_units = s.split("=", 1)[1].strip().upper()
+        unit = _parse_units_decl(line.strip())
+        if unit is not None:
+            file_units = unit
             break
-        if s.startswith("U "):
-            token = s[2:].strip().upper()
-            if token in ("MM", "INCH"):
-                file_units = token
-                break
-    if file_units in ("MM", "INCH") and file_units != step_units.upper():
+    if file_units is not None and file_units != step_units.upper():
         if warnings is not None:
             warnings.append(
                 f"Layer {layer_name!r}: feature file UNITS={file_units} "

@@ -75,3 +75,24 @@ def test_profile_arc_tessellated_not_chord():
     assert len(boundary) > 6, (
         f"Expected arc tessellation samples, got {len(boundary)} points"
     )
+
+
+def test_profile_self_resolves_u_mm_declaration(tmp_path):
+    """Profile files exported by Mentor / Cadence-derived tools declare units
+    as `U MM` directly in the profile file, even when stephdr has no UNITS line
+    at all. The parser must self-resolve from the file header, not just take
+    the caller's step-level units; otherwise a 100mm board outline reads as
+    100" = 2540mm and the actual features render as a smudge in one corner.
+    """
+    p = tmp_path / "profile"
+    p.write_text("#\n#Units\n#\nU MM\n\nOB 0 0 I\nOS 100 0\nOS 100 80\nOS 0 80\nOE\n")
+    # Caller passes "INCH" (the stephdr default); the file's own `U MM`
+    # declaration must override.
+    boundary, _ = _parse_profile(p, "INCH")
+    xs = [pt.x for pt in boundary]
+    ys = [pt.y for pt in boundary]
+    assert max(xs) - min(xs) == pytest.approx(100.0, abs=0.01), (
+        f"expected ~100mm wide outline, got {max(xs) - min(xs):.2f}mm — "
+        "profile parser ignored the file's own U MM declaration"
+    )
+    assert max(ys) - min(ys) == pytest.approx(80.0, abs=0.01)
