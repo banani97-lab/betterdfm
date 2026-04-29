@@ -161,10 +161,17 @@ func (r *AnnularRingRule) Run(board BoardData, profile ProfileRules) []Violation
 			continue
 		}
 		msg, sug := msgAnnularRingBelow(annularRing, profile.MinAnnularRingMM)
+		// Prefer the via's drill-layer attribution so the viewer can highlight
+		// the offending span (e.g. D_1_10). Falls back to the legacy "copper"
+		// pseudo-layer for boards without per-record layer info.
+		layer := via.Layer
+		if layer == "" {
+			layer = "copper"
+		}
 		violations = append(violations, Violation{
 			RuleID:     r.ID(),
 			Severity:   "ERROR",
-			Layer:      "copper",
+			Layer:      layer,
 			X:          via.X,
 			Y:          via.Y,
 			Message:    msg,
