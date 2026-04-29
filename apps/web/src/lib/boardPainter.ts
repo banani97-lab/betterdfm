@@ -133,20 +133,62 @@ export function buildPaintList(
   //
   // Each Drill (and Via) carries a `layer` field naming the ODB++ drill layer
   // it was parsed from (e.g. "D_1_10" for a SIGNAL_1↔SIGNAL_10 through-hole,
-  // "D_5_6" for a flex-only microvia). The viewer toggles a layer by adding it
-  // to hiddenLayers, so a drill should be hidden iff its drill layer is
-  // hidden — without this, toggling D_1_10 vs D_5_6 in the layer list would
-  // look identical because the renderer drew every drill regardless of layer.
-  // Records with no layer (older parser output, last-resort synthesis) fall
-  // back to the legacy "any copper visible" gate.
+  // "D_5_6" for a flex-only microvia). A drill is physically visible from
+  // every copper layer it intersects, so we render it whenever its drill
+  // layer OR any of the copper layers in its span is currently visible. The
+  // span comes from the matrix START_NAME/END_NAME — the drill layer's
+  // startLayer/endLayer fields name the bounding copper layers; everything
+  // between them in stack-up order is considered intersected.
+  //
+  // This matches Altium / KiCad / Allegro behaviour: clicking SIGNAL_1
+  // alone shows D_1_10 drills (they pass through SIGNAL_1) and hides
+  // D_5_6 drills (buried between FLEX_5 and FLEX_6, never reaches signal 1).
+  // Records with no layer attribution (older parser output, last-resort
+  // synthesis) fall back to the legacy "any copper visible" gate.
   const MAX_VIA_MM = 15
-  const anyCopperVisible = (boardData.layers ?? []).some(
+  const layers = boardData.layers ?? []
+  const anyCopperVisible = layers.some(
     l => !hiddenLayers.has(l.name) && (l.type === 'COPPER' || l.type === 'DRILL')
   )
+
+  // Build, per drill layer, the set of copper layer names whose visibility
+  // should imply the drill layer's visibility (the drill layer itself plus
+  // every copper/power-ground layer between startLayer and endLayer in
+  // stack-up order). Cached so repeated drills reuse one Set lookup.
+  const copperOrder: string[] = []
+  for (const l of layers) {
+    if (l.type === 'COPPER' || l.type === 'POWER_GROUND') copperOrder.push(l.name)
+  }
+  const drillSpan = new Map<string, Set<string>>()
+  for (const l of layers) {
+    if (l.type !== 'DRILL') continue
+    const span = new Set<string>([l.name])
+    if (l.startLayer && l.endLayer) {
+      const i = copperOrder.indexOf(l.startLayer)
+      const j = copperOrder.indexOf(l.endLayer)
+      if (i >= 0 && j >= 0) {
+        const [lo, hi] = i <= j ? [i, j] : [j, i]
+        for (let k = lo; k <= hi; k++) span.add(copperOrder[k])
+      }
+    }
+    drillSpan.set(l.name, span)
+  }
+
   const drillLayerVisible = (layer: string | undefined): boolean => {
     if (!layer) return anyCopperVisible
-    return !hiddenLayers.has(layer)
+    const span = drillSpan.get(layer)
+    if (!span) {
+      // Layer name attached to the record but no matching drill layer in the
+      // matrix — could be a non-drill source (mask donut tagged with its
+      // mask layer). Fall back to the simple per-layer visibility check.
+      return !hiddenLayers.has(layer)
+    }
+    for (const name of span) {
+      if (!hiddenLayers.has(name)) return true
+    }
+    return false
   }
+
   for (const v of boardData.vias ?? []) {
     if (!drillLayerVisible(v.layer)) continue
     const cx = tx(v.x), cy = ty(v.y)

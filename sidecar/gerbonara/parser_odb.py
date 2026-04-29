@@ -166,7 +166,14 @@ def _read_units(path: Path) -> str:
 
 
 def _parse_matrix(matrix_path: Path) -> list[dict]:
-    """Parse ODB++ matrix/matrix → [{name, type, row}] sorted by row."""
+    """Parse ODB++ matrix/matrix → [{name, type, row, start, end}] sorted by row.
+
+    For drill layers the matrix encodes the layer span via START_NAME/END_NAME
+    (e.g. D_1_10 has START_NAME=SIGNAL_1, END_NAME=SIGNAL_10). We surface those
+    so the viewer can show a drill whenever any of the copper layers it passes
+    through is visible — physically a through-hole IS visible from every
+    layer it intersects, not only when its own drill-layer toggle is on.
+    """
     layers: list[dict] = []
     current: dict = {}
     in_layer = False
@@ -183,7 +190,9 @@ def _parse_matrix(matrix_path: Path) -> list[dict]:
             if "NAME" in current and "TYPE" in current:
                 try:
                     layers.append({"name": current["NAME"], "type": current["TYPE"],
-                                   "row": int(current.get("ROW", 0))})
+                                   "row": int(current.get("ROW", 0)),
+                                   "start": current.get("START_NAME", ""),
+                                   "end": current.get("END_NAME", "")})
                 except (ValueError, KeyError):
                     pass
             in_layer = False
@@ -2063,7 +2072,9 @@ def parse_odb(file_path: str) -> BoardData:
                 if ltype is None and ld["type"].upper() in ("ODB_BOARD_OUTLINE", "ROUT"):
                     outline_layer_name = ld["name"]
                 if ltype is not None:
-                    layers.append(Layer(name=ld["name"], type=ltype))
+                    layers.append(Layer(name=ld["name"], type=ltype,
+                                        startLayer=ld.get("start", ""),
+                                        endLayer=ld.get("end", "")))
 
             def _run_layer(ld: dict, feat: Path, ltype: str) -> None:
                 layer_name = ld["name"]
