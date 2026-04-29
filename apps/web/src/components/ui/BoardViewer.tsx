@@ -888,32 +888,33 @@ export function BoardViewer({
       preFocusHiddenRef.current = new Set(hiddenLayersRef.current)
     }
 
-    // For drill/outline/rout/mask violations, show the violation's layer
-    // PLUS outer copper layers for context — any of those layers alone
-    // reads as floating shapes without the copper pads underneath.
+    // Show ONLY the violation's own layer. The earlier "context" expansion
+    // (outer copper + every drill layer for drill/mask/outline violations)
+    // was a relic from before drills carried real per-layer attribution —
+    // back then a drill violation said Layer="drill" and the panel had
+    // nothing meaningful to toggle, so it pulled in copper for context.
+    // Now that the violation names its actual drill layer (e.g. "D_1_2"),
+    // showing that layer alone is enough; expanding to SIGNAL_1, SIGNAL_10,
+    // and every other drill layer just clutters the view.
+    //
+    // Legacy fallback: violations with the pseudo-layer "drill" or "copper"
+    // (older worker output, or rules that haven't been updated) stay
+    // expanded since there's no real layer to isolate.
     const vLayerLower = v.layer.toLowerCase()
-    const layerType = layers.find(l => l.name === v.layer)?.type
-    const needsContext = layerType === 'DRILL' || layerType === 'SOLDER_MASK' ||
-      vLayerLower === 'drill' || vLayerLower.includes('drill') ||
-      vLayerLower.includes('outline') || vLayerLower === 'rout' ||
-      vLayerLower.includes('mask')
+    const isLegacyPseudoLayer = vLayerLower === 'drill' || vLayerLower === 'copper'
 
     const visible = new Set<string>([v.layer])
-    if (needsContext) {
+    if (isLegacyPseudoLayer) {
+      // Old payload — show outer copper + every drill layer so the user
+      // at least sees the geometry the violation might pertain to.
       for (const l of layers) {
-        // Add outer copper (first and last COPPER layers) for context
-        if (l.type === 'COPPER' || l.type === 'POWER_GROUND') {
-          visible.add(l.name)
-          break
-        }
+        if (l.type === 'COPPER' || l.type === 'POWER_GROUND') { visible.add(l.name); break }
       }
       for (let i = layers.length - 1; i >= 0; i--) {
         if (layers[i].type === 'COPPER' || layers[i].type === 'POWER_GROUND') {
-          visible.add(layers[i].name)
-          break
+          visible.add(layers[i].name); break
         }
       }
-      // Also show all drill-type layers so holes are visible in the panel
       for (const l of layers) {
         if (l.type === 'DRILL') visible.add(l.name)
       }
