@@ -21,17 +21,22 @@ func (r *DrillToDrillRule) Run(board BoardData, profile ProfileRules) []Violatio
 
 	type hole struct {
 		x, y, radius float64
+		layer        string
 	}
 
 	bbox := newBoardBBox(board.Outline, 2.0)
 	holes := make([]hole, 0, len(board.Drills)+len(board.Vias))
 	for _, d := range board.Drills {
-		if !bbox.contains(d.X, d.Y) { continue }
-		holes = append(holes, hole{d.X, d.Y, d.DiamMM / 2})
+		if !bbox.contains(d.X, d.Y) {
+			continue
+		}
+		holes = append(holes, hole{d.X, d.Y, d.DiamMM / 2, d.Layer})
 	}
 	for _, v := range board.Vias {
-		if !bbox.contains(v.X, v.Y) { continue }
-		holes = append(holes, hole{v.X, v.Y, v.DrillDiamMM / 2})
+		if !bbox.contains(v.X, v.Y) {
+			continue
+		}
+		holes = append(holes, hole{v.X, v.Y, v.DrillDiamMM / 2, v.Layer})
 	}
 
 	if len(holes) < 2 {
@@ -63,10 +68,23 @@ func (r *DrillToDrillRule) Run(board BoardData, profile ProfileRules) []Violatio
 			}
 			if gap < minD {
 				msg, sug := msgDrillToDrillBelow(gap, minD)
+				// Two holes from different drill layers can clash (e.g. a
+				// through-hole on D_1_10 too close to a microvia on D_5_6).
+				// Tag the violation with the first hole's layer if known and
+				// fall back to "drill" — the viewer's focus logic already
+				// shows context layers when a drill-typed violation is
+				// selected, so attribution to either side is informative.
+				layer := a.layer
+				if layer == "" {
+					layer = b.layer
+				}
+				if layer == "" {
+					layer = "drill"
+				}
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),
 					Severity:   "ERROR",
-					Layer:      "drill",
+					Layer:      layer,
 					X:          a.x,
 					Y:          a.y,
 					X2:         b.x,

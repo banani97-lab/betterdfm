@@ -863,10 +863,12 @@ def _build_features(
                 elif sym["shape"] == "DONUT":
                     # Non-copper donut (mask opening, paste relief, etc.) — keep
                     # as Via; renderer paths for those layers don't differentiate
-                    # and rules don't iterate them.
+                    # and rules don't iterate them. Tag with the source layer
+                    # so the painter's drill-layer-visibility filter still
+                    # tracks visibility coherently when toggling layers.
                     vias.append(Via(x=x, y=y,
                                    outerDiamMM=sym["w"], drillDiamMM=sym["inner"],
-                                   netName=net))
+                                   netName=net, layer=layer_name))
                 else:
                     is_fid = False
                     if _pad_usage_idx is not None:

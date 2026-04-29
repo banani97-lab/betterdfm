@@ -111,10 +111,14 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 		edgeDist := oidx.minDist(drill.X, drill.Y) - halfDiam
 		if edgeDist < limit-geomEps {
 			msg := msgEdgeClearanceDrillBelow(edgeDist, limit, drill.DiamMM)
+			layer := drill.Layer
+			if layer == "" {
+				layer = "drill"
+			}
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
-				Layer:      "drill",
+				Layer:      layer,
 				X:          drill.X,
 				Y:          drill.Y,
 				Message:    msg,
