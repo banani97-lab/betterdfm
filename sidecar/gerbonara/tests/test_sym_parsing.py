@@ -3,7 +3,7 @@ from pathlib import Path
 import pytest
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from parser_odb import _parse_sym, _parse_symbol_table
+from parser_odb import _parse_sym, _parse_symbol_table, _scan_custom_symbol, _load_custom_symbols
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -86,3 +86,55 @@ def test_parse_symbol_table_mm(tmp_path):
     assert table[0]["shape"] == "CIRCLE"
     assert table[0]["w"] < 1.0, f"MM pad should be sub-mm, got {table[0]['w']:.3f}mm"
     assert table[0]["w"] > 0.2, f"MM pad too small: {table[0]['w']:.3f}mm"
+
+
+# ── Custom (special_*) symbol geometry ────────────────────────────────────────
+
+def test_scan_custom_symbol_uses_bbox():
+    """A custom symbol's features file → RECT with the union bbox of its surfaces.
+
+    Without this fallback, names like `special_*_domekey_outer_*` lose their
+    encoded geometry and shrink to a 0.1mm circle in the renderer.
+    """
+    shape = _scan_custom_symbol(FIXTURES / "custom_symbol_features.txt", "MM")
+    assert shape is not None
+    assert shape["shape"] == "RECT"
+    assert shape["w"] == pytest.approx(5.0, abs=0.01)
+    assert shape["h"] == pytest.approx(3.0, abs=0.01)
+
+
+def test_load_custom_symbols_returns_empty_for_missing_dir(tmp_path):
+    """Missing symbols/ directory → empty dict, no error."""
+    out = _load_custom_symbols(tmp_path / "no_such_dir", "MM")
+    assert out == {}
+
+
+def test_parse_sym_uses_custom_syms_for_unrecognized_name():
+    """`_parse_sym` prefers a custom_syms entry over the 0.1mm fallback."""
+    custom = {"special_widget_q42": {"shape": "RECT", "w": 4.5, "h": 2.7, "inner": 0.0}}
+    out = _parse_sym("special_widget_q42", "MM", custom_syms=custom)
+    assert out["shape"] == "RECT"
+    assert out["w"] == pytest.approx(4.5)
+    assert out["h"] == pytest.approx(2.7)
+
+
+def test_parse_sym_falls_back_when_custom_syms_misses():
+    """Heuristic still wins for names the symbol scanner didn't see."""
+    out = _parse_sym("r10", "INCH", custom_syms={})
+    assert out["shape"] == "CIRCLE"
+    assert out["w"] == pytest.approx(0.254, abs=0.001)
+
+
+def test_load_custom_symbols_scans_dir_and_lowercases(tmp_path):
+    """End-to-end: directory of `<name>/features` → registry keyed by name + lower."""
+    sym_dir = tmp_path / "MyWidget"
+    sym_dir.mkdir(parents=True)
+    (sym_dir / "features").write_text(
+        "UNITS=MM\nS P 0 ;;ID=1\nOB 0 0 I\nOS 4 0\nOS 4 2\nOS 0 2\nOE\nSE\n"
+    )
+    out = _load_custom_symbols(tmp_path, "MM")
+    assert "MyWidget" in out
+    assert "mywidget" in out  # lowercased so _parse_sym's lower() lookup succeeds
+    assert out["MyWidget"]["shape"] == "RECT"
+    assert out["MyWidget"]["w"] == pytest.approx(4.0)
+    assert out["MyWidget"]["h"] == pytest.approx(2.0)

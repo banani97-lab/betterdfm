@@ -18,13 +18,28 @@ logger = logging.getLogger(__name__)
 
 # ── Symbol parsing ─────────────────────────────────────────────────────────────
 
-def _parse_sym(sym: str, units: str = "INCH", warnings: list[str] | None = None, layer_name: str = "") -> dict:
-    """Parse ODB++ symbol name into shape dict."""
+def _parse_sym(
+    sym: str,
+    units: str = "INCH",
+    warnings: list[str] | None = None,
+    layer_name: str = "",
+    custom_syms: dict[str, dict] | None = None,
+) -> dict:
+    """Parse ODB++ symbol name into shape dict.
+
+    custom_syms is a name → shape dict pre-loaded from the job's symbols/
+    directory; used when the heuristic name parsing falls through (e.g.
+    `special_<vendor>_*` symbols that have no encoded dimensions).
+    """
     tokens = sym.strip().split()
     if not tokens:
         return {"shape": "CIRCLE", "w": 0.1, "h": 0.1, "inner": 0.0}
     sym = tokens[0]
     s = sym.lower()
+    if custom_syms is not None:
+        cs = custom_syms.get(sym) or custom_syms.get(s)
+        if cs is not None:
+            return cs
     try:
         if s.startswith("donut_r"):
             rest = s[7:]
@@ -116,7 +131,8 @@ def _parse_sym(sym: str, units: str = "INCH", warnings: list[str] | None = None,
 
 def _parse_symbol_table(lines: list[str], units: str = "INCH",
                          warnings: list[str] | None = None,
-                         layer_name: str = "") -> dict[int, dict]:
+                         layer_name: str = "",
+                         custom_syms: dict[str, dict] | None = None) -> dict[int, dict]:
     """Scan features file lines for $N symbol_name definitions."""
     symbols: dict[int, dict] = {}
     for line in lines:
@@ -129,7 +145,8 @@ def _parse_symbol_table(lines: list[str], units: str = "INCH",
         try:
             symbols[int(parts[0][1:])] = _parse_sym(parts[1], units,
                                                      warnings=warnings,
-                                                     layer_name=layer_name)
+                                                     layer_name=layer_name,
+                                                     custom_syms=custom_syms)
         except (ValueError, IndexError):
             pass
     return symbols
@@ -224,12 +241,21 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
 
     boundary_points: outer island points (flag "I")
     holes: list of rings, one per "H" block
+
+    OS entries are straight-segment endpoints. OC entries are arcs of the form
+    `OC xe ye xc yc [Y|N]` — tessellated so curved edges (e.g. half-circle
+    scallops) don't collapse to a chord and self-intersect the polygon.
     """
     boundary: list[Point] = []
     holes: list[list[Point]] = []
     current_ring: list[Point] = []
     current_flag: str = "I"
     in_island = False
+    last_xy: tuple[float, float] | None = None
+
+    def to_mm(v: float) -> float:
+        return _coord_to_mm(v, units)
+
     try:
         text = profile_path.read_text(errors="replace")
     except OSError:
@@ -244,21 +270,42 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
                 elif current_flag == "H":
                     holes.append(current_ring)
             current_ring = []
+            last_xy = None
             parts = s.split()
             current_flag = parts[3] if len(parts) >= 4 else "I"
             in_island = True
             if len(parts) >= 3:
                 try:
-                    current_ring.append(Point(x=_coord_to_mm(float(parts[1]), units),
-                                              y=_coord_to_mm(float(parts[2]), units)))
+                    x = to_mm(float(parts[1]))
+                    y = to_mm(float(parts[2]))
+                    current_ring.append(Point(x=x, y=y))
+                    last_xy = (x, y)
                 except ValueError:
                     pass
-        elif s.startswith(("OS ", "OC ")) and in_island:
+        elif s.startswith("OS ") and in_island:
             parts = s.split()
             if len(parts) >= 3:
                 try:
-                    current_ring.append(Point(x=_coord_to_mm(float(parts[1]), units),
-                                              y=_coord_to_mm(float(parts[2]), units)))
+                    x = to_mm(float(parts[1]))
+                    y = to_mm(float(parts[2]))
+                    current_ring.append(Point(x=x, y=y))
+                    last_xy = (x, y)
+                except ValueError:
+                    pass
+        elif s.startswith("OC ") and in_island and last_xy is not None:
+            parts = s.split()
+            if len(parts) >= 6:
+                try:
+                    xe = to_mm(float(parts[1]))
+                    ye = to_mm(float(parts[2]))
+                    xc = to_mm(float(parts[3]))
+                    yc = to_mm(float(parts[4]))
+                    cw = parts[5].upper() == "Y"
+                    x1, y1 = last_xy
+                    segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw, n=24)
+                    for _sx, _sy, ex, ey in segs:
+                        current_ring.append(Point(x=ex, y=ey))
+                    last_xy = (xe, ye)
                 except ValueError:
                     pass
         elif s == "OE" and in_island:
@@ -268,6 +315,7 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
                 elif current_flag == "H":
                     holes.append(list(current_ring))
             current_ring = []
+            last_xy = None
             in_island = False
     # flush any open ring at EOF
     if in_island and current_ring:
@@ -276,6 +324,91 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
         elif current_flag == "H":
             holes.append(current_ring)
     return boundary, holes
+
+
+# ── Custom symbol geometry ────────────────────────────────────────────────────
+
+def _scan_custom_symbol(features_path: Path, units: str) -> dict | None:
+    """Compute a bounding-box shape from a `<job>/symbols/<name>/features` file.
+
+    ODB++ "special" symbols (`special_*`, vendor-specific named shapes, etc.)
+    encode their geometry as one or more positive surfaces (S P 0 ... SE)
+    rather than encoding it in the name. The heuristic in `_parse_sym` can't
+    size them, so without this they fall back to a 0.1mm circle and render
+    as invisible specks. We pick the union bbox of all surface vertices and
+    return it as a RECT — coarse but vastly better than the 0.1mm fallback.
+    """
+    try:
+        text = features_path.read_text(errors="replace")
+    except OSError:
+        return None
+    file_units = units
+    for line in text.splitlines()[:20]:
+        s = line.strip()
+        if s.startswith("UNITS="):
+            u = s.split("=", 1)[1].strip().upper()
+            if u in ("MM", "INCH"):
+                file_units = u
+            break
+    xs: list[float] = []
+    ys: list[float] = []
+    last: tuple[float, float] | None = None
+    for line in text.splitlines():
+        s = line.strip()
+        parts = s.split()
+        if not parts:
+            continue
+        if parts[0] in ("OB", "OS") and len(parts) >= 3:
+            try:
+                x = _coord_to_mm(float(parts[1]), file_units)
+                y = _coord_to_mm(float(parts[2]), file_units)
+                xs.append(x); ys.append(y)
+                last = (x, y)
+            except ValueError:
+                pass
+        elif parts[0] == "OC" and len(parts) >= 6 and last is not None:
+            try:
+                xe = _coord_to_mm(float(parts[1]), file_units)
+                ye = _coord_to_mm(float(parts[2]), file_units)
+                xc = _coord_to_mm(float(parts[3]), file_units)
+                yc = _coord_to_mm(float(parts[4]), file_units)
+                cw = parts[5].upper() == "Y"
+                x1, y1 = last
+                # Tessellate so the bbox captures arc bulges, not just chords.
+                for _sx, _sy, ex, ey in _arc_segments(x1, y1, xe, ye, xc, yc, cw, n=16):
+                    xs.append(ex); ys.append(ey)
+                last = (xe, ye)
+            except ValueError:
+                pass
+    if not xs or not ys:
+        return None
+    w = max(xs) - min(xs)
+    h = max(ys) - min(ys)
+    if w <= 0 or h <= 0:
+        return None
+    return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+
+
+def _load_custom_symbols(symbols_root: Path, units: str) -> dict[str, dict]:
+    """Pre-scan `<job>/symbols/<name>/features` for all custom symbols.
+
+    Returns a name → shape dict keyed by both the original case and the
+    lowercased form, since `_parse_sym` lowercases the input before matching.
+    """
+    out: dict[str, dict] = {}
+    if not symbols_root.is_dir():
+        return out
+    for d in symbols_root.iterdir():
+        if not d.is_dir():
+            continue
+        feat = d / "features"
+        if not feat.exists():
+            continue
+        shape = _scan_custom_symbol(feat, units)
+        if shape is not None:
+            out[d.name] = shape
+            out[d.name.lower()] = shape
+    return out
 
 
 # ── Arc approximation ─────────────────────────────────────────────────────────
@@ -748,9 +881,16 @@ def _build_features(
         elif rec == "A":
             if ltype not in ("COPPER", "POWER_GROUND", "SILK"):
                 continue
+            # ODB++ A record: A xs ys xe ye xc yc sym pol dcode dir
+            # sym is the symbol index immediately before the polarity flag, dir
+            # is two slots after polarity (skipping the dcode). Reading either
+            # field from the wrong slot produces silently broken output: the
+            # direction read here mis-classifies clockwise (Y) arcs as ccw,
+            # making near-tangent arcs sweep ~330° the wrong way and leaving
+            # the trace looping far below the board outline.
             pol_idx = next((i for i in (8, 9, 10) if i < len(parts)
                             and parts[i] in ("P", "N")), None)
-            if pol_idx is None or parts[pol_idx] != "P" or pol_idx + 1 >= len(parts):
+            if pol_idx is None or parts[pol_idx] != "P" or pol_idx + 2 >= len(parts):
                 continue
             try:
                 x1 = _coord_to_mm(float(parts[1]), units)
@@ -759,8 +899,8 @@ def _build_features(
                 ye = _coord_to_mm(float(parts[4]), units)
                 xc = _coord_to_mm(float(parts[5]), units)
                 yc = _coord_to_mm(float(parts[6]), units)
-                cw = parts[7].upper() == "Y"
-                sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
+                cw = parts[pol_idx + 2].upper() == "Y"
+                sym = symbols.get(int(parts[pol_idx - 1]), {"w": 0.1})
                 trace_w = sym["w"]
                 # Skip sub-minimum arcs on copper — same rationale as L records.
                 if ltype in ("COPPER", "POWER_GROUND") and trace_w < 0.05:
@@ -794,6 +934,7 @@ def _parse_features(
     warnings: list[str] | None = None,
     polygons: list | None = None,
     padstack_outer_mm: dict[int, float] | None = None,
+    custom_syms: dict[str, dict] | None = None,
 ) -> None:
     """Parse ODB++ features file and append geometry to traces/pads/vias/polygons."""
     net_points = net_points or []
@@ -806,7 +947,8 @@ def _parse_features(
 
     lines = text.splitlines()
     units = _features_file_units(lines, units, layer_name, warnings)
-    symbols = _parse_symbol_table(lines, units, warnings=warnings, layer_name=layer_name)
+    symbols = _parse_symbol_table(lines, units, warnings=warnings, layer_name=layer_name,
+                                   custom_syms=custom_syms)
     tokens = _tokenize_features(lines)
 
     attr_names, attr_values = _parse_attr_tables(lines)
@@ -1812,6 +1954,12 @@ def parse_odb(file_path: str) -> BoardData:
             outline, outline_holes = _parse_profile(step_root / "profile", units)
             logger.info("ODB++ outline: %d points, %d holes", len(outline), len(outline_holes))
 
+            custom_syms = _load_custom_symbols(job_root / "symbols", units)
+            if custom_syms:
+                # Each named symbol is registered twice (case + lowercased), so
+                # the symbol count is half the dict size.
+                logger.info("ODB++ custom symbols loaded: %d", len(custom_syms) // 2)
+
             netlist_path = step_root / "netlists" / "cadnet" / "netlist"
             _, net_points = _parse_netlist(netlist_path, units)
             logger.info("ODB++ netlist: %d net points", len(net_points))
@@ -1883,7 +2031,8 @@ def parse_odb(file_path: str) -> BoardData:
                 _parse_features(feat, layer_name, ltype, units, traces, pads, vias,
                                  net_points=net_points, components=components, drills=drills,
                                  warnings=warnings, polygons=polygons,
-                                 padstack_outer_mm=padstack_outer_mm)
+                                 padstack_outer_mm=padstack_outer_mm,
+                                 custom_syms=custom_syms)
                 after = len(traces) + len(pads) + len(vias)
                 logger.info("ODB++ %s (%s): %d features", layer_name, ltype, after - before)
 

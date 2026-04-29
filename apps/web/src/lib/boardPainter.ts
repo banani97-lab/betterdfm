@@ -64,9 +64,13 @@ export function buildPaintList(
   // 2. FR4 board fill
   const outlinePts = (boardData.outline ?? []).filter(p => ok(p.x) && ok(p.y))
   if (outlinePts.length > 1) {
+    const outlineHoles = (boardData.outlineHoles ?? [])
+      .map(ring => ring.filter(p => ok(p.x) && ok(p.y)).map(p => ({ x: tx(p.x), y: ty(p.y) })))
+      .filter(ring => ring.length > 1)
     out.push({
       type: 'drawPolygon',
       points: outlinePts.map(p => ({ x: tx(p.x), y: ty(p.y) })),
+      holes: outlineHoles.length > 0 ? outlineHoles : undefined,
       fillStyle: '#1a2e1a',
       close: true,
     })

@@ -105,6 +105,7 @@ export interface BoardData {
   vias: BoardVia[]
   drills: BoardDrill[]
   outline: Array<{ x: number; y: number }>
+  outlineHoles?: Array<Array<{ x: number; y: number }>>
   boardThicknessMM: number
   warnings?: string[]
   polygons?: BoardPolygon[]
