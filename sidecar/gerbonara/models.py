@@ -35,11 +35,12 @@ class Pad(BaseModel):
     y: float
     widthMM: float
     heightMM: float
-    shape: str  # "RECT" | "CIRCLE" | "OVAL" | "POLYGON"
+    shape: str  # "RECT" | "CIRCLE" | "OVAL" | "POLYGON" | "DONUT"
     netName: str = ""
     refDes: str = ""
     packageClass: str = ""  # e.g. "0201", "0402", "0603", "0805", "1206"
     contour: list[Point] = []  # polygon contour when shape == "POLYGON"
+    holeMM: float = 0.0       # inner diameter when shape == "DONUT" (via catch-pad ring)
     isFiducial: bool = False
     isViaCatchPad: bool = False
 
@@ -50,6 +51,8 @@ class Via(BaseModel):
     outerDiamMM: float
     drillDiamMM: float
     netName: str = ""
+    layer: str = ""    # ODB++ drill layer name (e.g. "D_1_10" for SIGNAL_1↔SIGNAL_10),
+                       # so the viewer can hide microvias when only through-hole layers are on.
 
 
 class Drill(BaseModel):
@@ -57,6 +60,8 @@ class Drill(BaseModel):
     y: float
     diamMM: float
     plated: bool
+    layer: str = ""    # ODB++ drill layer (D_1_10, D_5_6, etc.) — the layer span
+                       # is encoded in the name and the matrix START_NAME/END_NAME.
 
 
 class Polygon(BaseModel):

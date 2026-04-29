@@ -115,33 +115,54 @@ export function buildPaintList(
         out.push({ type: 'fillRect', x: cx - w / 2, y: cy - h / 2, w, h, fillStyle: '#e8c050' })
       } else if (p.shape === 'OVAL' && Math.abs(w - h) > 1) {
         out.push({ type: 'drawEllipse', cx, cy, rx: Math.max(1, w / 2), ry: Math.max(1, h / 2), fillStyle: '#e8c050' })
+      } else if (p.shape === 'DONUT' && p.holeMM && p.holeMM > 0) {
+        // Annular catch-pad: outer copper ring with the FR4-coloured hole punched
+        // through. Draw as filled outer + filled inner overlay so the inner
+        // shows the FR4 layer beneath, not the page background.
+        const outerR = Math.max(1, Math.max(w, h) / 2)
+        const innerR = Math.max(0.5, Math.min((p.holeMM / 2) * s, outerR * 0.95))
+        out.push({ type: 'drawCircle', cx, cy, r: outerR, fillStyle: '#e8c050' })
+        out.push({ type: 'drawCircle', cx, cy, r: innerR, fillStyle: '#1a2e1a' })
       } else {
         out.push({ type: 'drawCircle', cx, cy, r: Math.max(1, Math.max(w, h) / 2), fillStyle: '#e8c050' })
       }
     }
   }
 
-  // 5–6. Vias and drills (only when a copper/drill layer is visible)
+  // 5–6. Vias and drills.
+  //
+  // Each Drill (and Via) carries a `layer` field naming the ODB++ drill layer
+  // it was parsed from (e.g. "D_1_10" for a SIGNAL_1↔SIGNAL_10 through-hole,
+  // "D_5_6" for a flex-only microvia). The viewer toggles a layer by adding it
+  // to hiddenLayers, so a drill should be hidden iff its drill layer is
+  // hidden — without this, toggling D_1_10 vs D_5_6 in the layer list would
+  // look identical because the renderer drew every drill regardless of layer.
+  // Records with no layer (older parser output, last-resort synthesis) fall
+  // back to the legacy "any copper visible" gate.
   const MAX_VIA_MM = 15
   const anyCopperVisible = (boardData.layers ?? []).some(
     l => !hiddenLayers.has(l.name) && (l.type === 'COPPER' || l.type === 'DRILL')
   )
-  if (anyCopperVisible) {
-    for (const v of boardData.vias ?? []) {
-      const cx = tx(v.x), cy = ty(v.y)
-      if (!ok(cx) || !ok(cy)) continue
-      const outerR = Math.max(2, Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s))
-      const innerR = Math.max(0.8, Math.min((v.drillDiamMM / 2) * s, outerR * 0.85))
-      out.push({ type: 'drawCircle', cx, cy, r: outerR, fillStyle: '#d4a840' })
-      out.push({ type: 'drawCircle', cx, cy, r: innerR, fillStyle: '#060606' })
-    }
-    for (const d of boardData.drills ?? []) {
-      const cx = tx(d.x), cy = ty(d.y)
-      if (!ok(cx) || !ok(cy)) continue
-      const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
-      out.push({ type: 'drawCircle', cx, cy, r, fillStyle: d.plated ? '#d4a840' : '#3a3a3a', alpha: 0.7 })
-      out.push({ type: 'drawCircle', cx, cy, r: r * 0.6, fillStyle: '#060606' })
-    }
+  const drillLayerVisible = (layer: string | undefined): boolean => {
+    if (!layer) return anyCopperVisible
+    return !hiddenLayers.has(layer)
+  }
+  for (const v of boardData.vias ?? []) {
+    if (!drillLayerVisible(v.layer)) continue
+    const cx = tx(v.x), cy = ty(v.y)
+    if (!ok(cx) || !ok(cy)) continue
+    const outerR = Math.max(2, Math.min((v.outerDiamMM / 2) * s, MAX_VIA_MM * s))
+    const innerR = Math.max(0.8, Math.min((v.drillDiamMM / 2) * s, outerR * 0.85))
+    out.push({ type: 'drawCircle', cx, cy, r: outerR, fillStyle: '#d4a840' })
+    out.push({ type: 'drawCircle', cx, cy, r: innerR, fillStyle: '#060606' })
+  }
+  for (const d of boardData.drills ?? []) {
+    if (!drillLayerVisible(d.layer)) continue
+    const cx = tx(d.x), cy = ty(d.y)
+    if (!ok(cx) || !ok(cy)) continue
+    const r = Math.max(0.8, Math.min((d.diamMM / 2) * s, MAX_VIA_MM * s))
+    out.push({ type: 'drawCircle', cx, cy, r, fillStyle: d.plated ? '#d4a840' : '#3a3a3a', alpha: 0.7 })
+    out.push({ type: 'drawCircle', cx, cy, r: r * 0.6, fillStyle: '#060606' })
   }
 
   // 7. Soldermask (multiply composite tint + pad openings)

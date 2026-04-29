@@ -803,7 +803,8 @@ def _build_features(
                         hole_diam = max(0.01, attr_hole)
                         if outer > hole_diam:
                             vias.append(Via(x=x, y=y, outerDiamMM=outer,
-                                            drillDiamMM=hole_diam, netName=net))
+                                            drillDiamMM=hole_diam, netName=net,
+                                            layer=layer_name))
                     elif plated and padstack_outer_mm and _padstack_id_idx is not None:
                         # Fallback: cross-reference .padstack_id against the
                         # outer-diameter map populated during the copper-layer
@@ -818,16 +819,51 @@ def _build_features(
                             outer = padstack_outer_mm.get(ps_id)
                             if outer is not None and outer > hole_diam:
                                 vias.append(Via(x=x, y=y, outerDiamMM=outer,
-                                                drillDiamMM=hole_diam, netName=net))
+                                                drillDiamMM=hole_diam, netName=net,
+                                                layer=layer_name))
                     # Skip sub-minimum drill markers: features below 0.05mm
                     # (50µm) are pad markers or coordinate references, not
                     # real drill holes. The smallest laser-drilled microvia
                     # is ~0.05mm; mechanical drills start at ~0.1mm.
                     if hole_diam >= 0.05:
-                        drills.append(Drill(x=x, y=y, diamMM=hole_diam, plated=plated))
-                elif ltype == "POWER_GROUND" and sym["shape"] == "DONUT":
-                    pass
+                        drills.append(Drill(x=x, y=y, diamMM=hole_diam, plated=plated,
+                                            layer=layer_name))
+                elif sym["shape"] == "DONUT" and ltype in ("COPPER", "POWER_GROUND"):
+                    # A donut on a copper layer is the catch-pad of a through-hole
+                    # via on that specific layer. Older revisions of this parser
+                    # converted every donut into a Via, which produced one Via
+                    # record per copper layer at the same (x, y) — N stacked
+                    # rings on multi-layer boards, and a per-layer annular-ring
+                    # rule that depended on the duplication for coverage. We
+                    # now keep each layer's catch-pad as a per-layer Pad with
+                    # shape="DONUT" so the renderer can filter by layer and the
+                    # rule can check each layer's annular ring against the
+                    # actual drill diameter (rule_annular_ring.go).
+                    outer = sym["w"]
+                    inner = sym["inner"]
+                    pads.append(Pad(layer=layer_name, x=x, y=y,
+                                   widthMM=max(0.01, outer),
+                                   heightMM=max(0.01, outer),
+                                   shape="DONUT",
+                                   holeMM=max(0.0, inner),
+                                   netName=net, refDes=ref,
+                                   packageClass=pkg_class,
+                                   isViaCatchPad=True))
+                    # Populate padstack_outer_mm so the matching drill record
+                    # (path 2 in the DRILL branch above) can synthesize a
+                    # single Via with the correct outer diameter. Uses min
+                    # across layers — same reasoning as the rect/oval path.
+                    if (padstack_outer_mm is not None
+                            and _padstack_id_idx is not None):
+                        ps_id = _attr_int_value(token["attrs"], _padstack_id_idx)
+                        if ps_id is not None:
+                            prev = padstack_outer_mm.get(ps_id)
+                            if prev is None or outer < prev:
+                                padstack_outer_mm[ps_id] = outer
                 elif sym["shape"] == "DONUT":
+                    # Non-copper donut (mask opening, paste relief, etc.) — keep
+                    # as Via; renderer paths for those layers don't differentiate
+                    # and rules don't iterate them.
                     vias.append(Via(x=x, y=y,
                                    outerDiamMM=sym["w"], drillDiamMM=sym["inner"],
                                    netName=net))
@@ -989,14 +1025,15 @@ def _features_file_units(lines: list[str], step_units: str,
     return step_units
 
 
-def _parse_rout(features_path: Path, units: str, drills: list) -> None:
+def _parse_rout(features_path: Path, units: str, drills: list,
+                layer_name: str = "rout") -> None:
     """Parse ODB++ rout layer features for drill holes (P records only)."""
     try:
         text = features_path.read_text(errors="replace")
     except OSError:
         return
     lines = text.splitlines()
-    units = _features_file_units(lines, units, "rout", None)
+    units = _features_file_units(lines, units, layer_name, None)
     symbols = _parse_symbol_table(lines, units)
     for line in lines:
         raw = line.strip()
@@ -1010,7 +1047,8 @@ def _parse_rout(features_path: Path, units: str, drills: list) -> None:
                 x = _coord_to_mm(float(parts[1]), units)
                 y = _coord_to_mm(float(parts[2]), units)
                 sym = symbols.get(int(parts[3]), {"w": 0.3})
-                drills.append(Drill(x=x, y=y, diamMM=max(0.01, sym["w"]), plated=True))
+                drills.append(Drill(x=x, y=y, diamMM=max(0.01, sym["w"]),
+                                    plated=True, layer=layer_name))
             except (ValueError, IndexError):
                 pass
 
@@ -2148,26 +2186,26 @@ def parse_odb(file_path: str) -> BoardData:
                     prev = _xy_min_od.get(xy_key)
                     if prev is None or od < prev:
                         _xy_min_od[xy_key] = od
-                _drill_by_cell: dict[tuple[int, int], list[tuple[float, float, float]]] = {}
+                _drill_by_cell: dict[tuple[int, int], list[tuple[float, float, float, str]]] = {}
                 for d in drills:
                     _k = (int(d.x / _cell), int(d.y / _cell))
-                    _drill_by_cell.setdefault(_k, []).append((d.x, d.y, d.diamMM))
+                    _drill_by_cell.setdefault(_k, []).append((d.x, d.y, d.diamMM, d.layer))
                 _synth_added = 0
                 for xy, od in _xy_min_od.items():
                     gx, gy = int(xy[0] / _cell), int(xy[1] / _cell)
-                    best: tuple[float, float, float] | None = None
+                    best: tuple[float, float, float, str] | None = None
                     best_d2 = _tol2
                     for _dx in (-1, 0, 1):
                         for _dy in (-1, 0, 1):
-                            for (drx, dry, diam) in _drill_by_cell.get((gx + _dx, gy + _dy), ()):
+                            for (drx, dry, diam, dlayer) in _drill_by_cell.get((gx + _dx, gy + _dy), ()):
                                 d2 = (drx - xy[0]) ** 2 + (dry - xy[1]) ** 2
                                 if d2 <= best_d2:
-                                    best = (drx, dry, diam)
+                                    best = (drx, dry, diam, dlayer)
                                     best_d2 = d2
                     if best is not None and od > best[2]:
                         vias.append(Via(x=best[0], y=best[1],
                                         outerDiamMM=od, drillDiamMM=best[2],
-                                        netName=""))
+                                        netName="", layer=best[3]))
                         _synth_added += 1
                 if _synth_added:
                     logger.info("ODB++ via synthesis (coincidence fallback): +%d vias", _synth_added)
