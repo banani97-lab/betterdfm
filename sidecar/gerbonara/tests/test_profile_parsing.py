@@ -54,3 +54,24 @@ def test_profile_boundary_only_no_hole_flag():
         assert len(boundary) >= 4
     finally:
         path.unlink()
+
+
+def test_profile_arc_tessellated_not_chord():
+    """OC arc edges must tessellate, not collapse to a chord.
+
+    Fixture profile is a square with a semicircle bulging out the right side,
+    centered at (1, 0.5) with radius 0.5 inch (12.7 mm). Without tessellation
+    the polygon collapses to a 1×1 inch square (max x = 25.4mm); with proper
+    tessellation it bulges to max x ≈ 38.1 mm.
+    """
+    boundary, _ = _parse_profile(FIXTURES / "profile_with_arc.txt", "INCH")
+    xs = [p.x for p in boundary]
+    assert max(xs) > 36, (
+        f"Arc not tessellated — max x = {max(xs):.2f}mm; "
+        f"expected ≈38.1mm if the arc bulges out, "
+        f"≈25.4mm if it collapsed to a chord"
+    )
+    # And the polygon must have intermediate arc samples, not just 4 corners
+    assert len(boundary) > 6, (
+        f"Expected arc tessellation samples, got {len(boundary)} points"
+    )

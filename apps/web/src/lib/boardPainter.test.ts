@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest'
 import { buildPaintList } from './boardPainter'
 import type { Bounds } from './boardPainter'
 import type { BoardData, Violation } from './api'
-import type { FillRect, DrawLine, DrawViolationMarker } from './paint'
+import type { FillRect, DrawLine, DrawViolationMarker, DrawPolygon } from './paint'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -175,5 +175,26 @@ describe('buildPaintList', () => {
     const result = buildPaintList(board, makeBounds(), [], hidden, undefined, false)
     const composites = result.filter(i => i.type === 'setComposite')
     expect(composites).toHaveLength(0)
+  })
+
+  it('passes outlineHoles to FR4 fill polygon as cutouts', () => {
+    const board = makeBoard({
+      outlineHoles: [
+        [{ x: 10, y: 10 }, { x: 20, y: 10 }, { x: 20, y: 20 }, { x: 10, y: 20 }],
+      ],
+    })
+    const result = buildPaintList(board, makeBounds(), [], new Set(), undefined, false)
+    const fr4 = result.find(i => i.type === 'drawPolygon') as DrawPolygon | undefined
+    expect(fr4).toBeDefined()
+    expect(fr4!.holes).toHaveLength(1)
+    expect(fr4!.holes![0]).toHaveLength(4)
+  })
+
+  it('omits holes field when outlineHoles is empty', () => {
+    const board = makeBoard()
+    const result = buildPaintList(board, makeBounds(), [], new Set(), undefined, false)
+    const fr4 = result.find(i => i.type === 'drawPolygon') as DrawPolygon | undefined
+    expect(fr4).toBeDefined()
+    expect(fr4!.holes).toBeUndefined()
   })
 })

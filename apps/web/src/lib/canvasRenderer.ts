@@ -53,7 +53,16 @@ export function executeInstructions(
         ctx.moveTo(inst.points[0].x, inst.points[0].y)
         for (let i = 1; i < inst.points.length; i++) ctx.lineTo(inst.points[i].x, inst.points[i].y)
         if (inst.close) ctx.closePath()
-        if (inst.fillStyle)   { ctx.fillStyle   = inst.fillStyle;   ctx.fill() }
+        for (const hole of inst.holes ?? []) {
+          if (hole.length < 2) continue
+          ctx.moveTo(hole[0].x, hole[0].y)
+          for (let i = 1; i < hole.length; i++) ctx.lineTo(hole[i].x, hole[i].y)
+          ctx.closePath()
+        }
+        if (inst.fillStyle) {
+          ctx.fillStyle = inst.fillStyle
+          ctx.fill(inst.holes && inst.holes.length > 0 ? 'evenodd' : 'nonzero')
+        }
         if (inst.strokeStyle) { ctx.strokeStyle = inst.strokeStyle; ctx.lineWidth = inst.lineWidth ?? 1; ctx.stroke() }
         break
       }

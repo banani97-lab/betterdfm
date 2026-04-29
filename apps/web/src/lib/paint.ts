@@ -39,6 +39,8 @@ export interface DrawEllipse {
 export interface DrawPolygon {
   type: 'drawPolygon'
   points: Array<{ x: number; y: number }>
+  // Inner cutout rings — rendered as holes via the evenodd fill rule.
+  holes?: Array<Array<{ x: number; y: number }>>
   fillStyle?: FillStyle
   strokeStyle?: StrokeStyle
   lineWidth?: number
