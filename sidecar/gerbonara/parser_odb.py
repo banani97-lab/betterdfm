@@ -869,15 +869,22 @@ def _build_features(
         if rec == "L":
             if ltype not in ("COPPER", "POWER_GROUND", "SILK", "ROUT"):
                 continue
+            # ODB++ L record: `L XS YS XE YE SYM POL DCODE`. The symbol index
+            # is the field immediately BEFORE the P/N polarity flag — *not*
+            # the trailing DCODE, which is a legacy gerber-style aperture
+            # number that often differs from SYM (Cadence/Valor extracts set
+            # DCODE=0 universally). Reading parts[pol_idx + 1] picked up the
+            # DCODE and routed every L record on those archives to symbol $0
+            # (frequently `r0` → zero-width → silently filtered out).
             pol_idx = next((i for i in (5, 6, 7) if i < len(parts) and parts[i] in ("P", "N")), None)
-            if pol_idx is None or parts[pol_idx] != "P" or pol_idx + 1 >= len(parts):
+            if pol_idx is None or parts[pol_idx] != "P" or pol_idx - 1 < 5:
                 continue
             try:
                 x1 = _coord_to_mm(float(parts[1]), units)
                 y1 = _coord_to_mm(float(parts[2]), units)
                 x2 = _coord_to_mm(float(parts[3]), units)
                 y2 = _coord_to_mm(float(parts[4]), units)
-                sym = symbols.get(int(parts[pol_idx + 1]), {"w": 0.1})
+                sym = symbols.get(int(parts[pol_idx - 1]), {"w": 0.1})
                 trace_w = sym["w"]
                 # Skip sub-minimum trace widths on copper layers. Below 0.05mm
                 # (50µm) is not a manufacturable trace — it's a coordinate
