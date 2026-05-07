@@ -60,6 +60,21 @@ def test_non_copper_layer_skips_l_records():
     assert len(traces) == 0, "SOLDER_MASK layer should not produce traces from L records"
 
 
+def test_l_record_uses_sym_field_not_dcode():
+    """ODB++ `L XS YS XE YE SYM POL DCODE` — width must come from SYM (parts[5]),
+    not the trailing DCODE (parts[7]). Cadence/Valor extracts set DCODE=0
+    universally, so reading DCODE routed every trace to symbol $0 = `r0`
+    (zero width) and the sub-50µm filter then dropped 99% of the geometry."""
+    traces, pads, vias, polygons = _run_parse(
+        "features_l_record_sym_dcode.txt", ltype="COPPER", units="MM",
+    )
+    # Three L records have non-zero SYM (1, 2, 3) and DCODE=0. The fourth has
+    # SYM=0 (`r0`) and is correctly filtered as zero-width. Pre-fix all four
+    # were filtered (DCODE=0 → $0 → r0 → drop).
+    widths = sorted(round(t.widthMM, 4) for t in traces)
+    assert widths == [0.1, 0.5, 2.0], f"expected widths [0.1, 0.5, 2.0]; got {widths}"
+
+
 # ── Via emission via .padstack_id cross-reference ─────────────────────────────
 
 def test_via_from_padstack_id_cross_reference():
