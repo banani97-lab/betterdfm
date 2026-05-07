@@ -31,6 +31,14 @@ FIXTURES = Path(__file__).parent / "fixtures"
     # unknown symbol → fallback
     ("sc_join0201_hd",     "INCH", "CIRCLE", 0.1,    0.001),
     ("",                   "INCH", "CIRCLE", 0.1,    0.001),  # empty string → fallback
+    # Valor mil-encoded decimals on `U MM` files (mil-fallback heuristic)
+    ("oval94.488x31.496",  "MM",   "OVAL",   2.4,    0.005),  # 94.488 mil → 2.4 mm
+    ("rect21.654x55.118",  "MM",   "RECT",   0.55,   0.005),  # 0805 chip pad
+    ("rect102.362x86.614", "MM",   "RECT",   2.6,    0.005),
+    # Negative controls — sub-50µm threshold must NOT fire on these MM cases
+    ("r152.4",             "MM",   "CIRCLE", 0.1524, 0.001),  # 6 mil silkscreen
+    ("r400",               "MM",   "CIRCLE", 0.4,    0.001),
+    ("r7700",              "MM",   "CIRCLE", 7.7,    0.001),  # mounting pad
 ])
 def test_parse_sym_shape_and_width(sym, units, expected_shape, expected_w, tol):
     result = _parse_sym(sym, units)
@@ -57,6 +65,49 @@ def test_parse_sym_rect_dimensions():
     result = _parse_sym("rect2720x1230", "INCH")
     assert result["shape"] == "RECT"
     assert result["w"] > result["h"]  # 2720 > 1230
+
+
+def test_mil_fallback_rescales_decimal_oval_on_mm_file():
+    """Valor extracts encode decimal pad symbols in mil even under `U MM`."""
+    result = _parse_sym("oval94.488x31.496", "MM")
+    assert result["shape"] == "OVAL"
+    assert result["w"] == pytest.approx(2.4, abs=0.005)
+    assert result["h"] == pytest.approx(0.8, abs=0.005)
+
+
+def test_mil_fallback_rescales_decimal_rect_on_mm_file():
+    result = _parse_sym("rect21.654x55.118", "MM")
+    assert result["shape"] == "RECT"
+    assert result["w"] == pytest.approx(0.55, abs=0.005)
+    assert result["h"] == pytest.approx(1.4, abs=0.005)
+
+
+def test_mil_fallback_emits_warning():
+    warnings: list[str] = []
+    _parse_sym("oval94.488x31.496", "MM", warnings=warnings, layer_name="smt")
+    assert any("mil" in w.lower() for w in warnings), warnings
+
+
+def test_mil_fallback_silent_on_plausible_mm_silkscreen():
+    """6-mil silkscreen `r152.4` decodes cleanly to 0.1524mm — must not retry."""
+    warnings: list[str] = []
+    result = _parse_sym("r152.4", "MM", warnings=warnings, layer_name="sst")
+    assert result["w"] == pytest.approx(0.1524, abs=0.001)
+    assert not any("mil" in w.lower() for w in warnings), warnings
+
+
+def test_mil_fallback_does_not_apply_to_inch_files():
+    """INCH path is naturally mil-encoded — heuristic must be MM-only."""
+    warnings: list[str] = []
+    result = _parse_sym("r10", "INCH", warnings=warnings)
+    assert result["w"] == pytest.approx(0.254, abs=0.001)
+    assert not warnings
+
+
+def test_mil_fallback_preserves_zero_dimensions():
+    """Custom-syms-style zero-dim shapes must not be inflated by the heuristic."""
+    result = _parse_sym("thermal", "MM")  # hardcoded 1.0mm path, untouched
+    assert result["w"] == pytest.approx(1.0)
 
 
 def test_parse_symbol_table_inch(tmp_path):
