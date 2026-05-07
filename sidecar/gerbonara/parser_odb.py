@@ -18,6 +18,66 @@ logger = logging.getLogger(__name__)
 
 # ── Symbol parsing ─────────────────────────────────────────────────────────────
 
+# Smallest plausible PCB feature size, by shape kind. Decoded dimensions
+# below the relevant threshold on a `U MM` file are a decoding mistake, not
+# real geometry — Valor-extracted ODB++ archives encode decimal pad symbols
+# (e.g. `oval94.488x31.496`) in mil even though the file declares millimetres.
+#
+# CIRCLE thresholds stay tight because round symbols are commonly silkscreen
+# line caps (4-mil = 0.1 mm widths exist in the wild). Pad shapes (RECT,
+# OVAL, DONUT) get a wider band: even an 0201 pad's short side is ≥ 0.2 mm,
+# so anything under 0.1 mm in a pad-shaped symbol is unphysical.
+_IMPLAUSIBLE_MM_THRESHOLDS = {
+    "CIRCLE": 0.05,
+    "RECT": 0.1,
+    "OVAL": 0.1,
+    "DONUT": 0.1,
+}
+
+
+def _maybe_rescale_mil(
+    shape: dict,
+    units: str,
+    sym: str,
+    layer_name: str,
+    warnings: list[str] | None,
+) -> dict:
+    """Rescale a symbol whose μm-decoded dimensions came out implausibly small.
+
+    Cadence/Valor ODB++ extracts sometimes encode decimal-named pad symbols
+    in mil even on files declared `U MM`. The standard 1/1000-of-unit rule
+    then shrinks those symbols by 25.4×, leaving sub-physical "pads" that no
+    real fab could produce. When that happens, retry the conversion as mil
+    (×0.0254 instead of ×0.001), which is a clean ×25.4 rescale of the
+    already-computed mm dimensions.
+    """
+    if units.upper() != "MM":
+        return shape
+    threshold = _IMPLAUSIBLE_MM_THRESHOLDS.get(shape.get("shape", ""))
+    if threshold is None:
+        return shape
+    dims = (shape.get("w", 0.0), shape.get("h", 0.0), shape.get("inner", 0.0))
+    positive = [d for d in dims if d > 0]
+    if not positive or min(positive) >= threshold:
+        return shape
+    factor = 25.4
+    rescaled = dict(shape)
+    rescaled["w"] = shape.get("w", 0.0) * factor
+    rescaled["h"] = shape.get("h", 0.0) * factor
+    if "inner" in shape:
+        rescaled["inner"] = shape["inner"] * factor
+    logger.debug(
+        "Symbol %r rescaled from %.6f mm to %.3f mm via mil heuristic",
+        sym, min(positive), min(positive) * factor,
+    )
+    if warnings is not None:
+        warnings.append(
+            f"Layer {layer_name!r}: symbol {sym!r} decoded below {threshold} mm "
+            f"under U MM — retried as mil"
+        )
+    return rescaled
+
+
 def _parse_sym(
     sym: str,
     units: str = "INCH",
@@ -49,7 +109,9 @@ def _parse_sym(
             outer = _sym_to_mm(raw_outer, units)
             inner = _sym_to_mm(raw_inner, units)
             inner = min(inner, outer * 0.85)
-            return {"shape": "DONUT", "w": outer, "h": outer, "inner": inner}
+            return _maybe_rescale_mil(
+                {"shape": "DONUT", "w": outer, "h": outer, "inner": inner},
+                units, sym, layer_name, warnings)
         if s.startswith("chamf_rect"):
             rest = s[10:]
             dims = rest.split("x")
@@ -60,7 +122,9 @@ def _parse_sym(
                 raw_h = float(h_raw)
                 w = _sym_to_mm(raw_w, units)
                 h = _sym_to_mm(raw_h, units)
-                return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+                return _maybe_rescale_mil(
+                    {"shape": "RECT", "w": w, "h": h, "inner": 0.0},
+                    units, sym, layer_name, warnings)
             except (ValueError, IndexError):
                 pass
         if s.startswith("rect"):
@@ -71,22 +135,30 @@ def _parse_sym(
             raw_h = float(h_raw)
             w = _sym_to_mm(raw_w, units)
             h = _sym_to_mm(raw_h, units)
-            return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+            return _maybe_rescale_mil(
+                {"shape": "RECT", "w": w, "h": h, "inner": 0.0},
+                units, sym, layer_name, warnings)
         if s.startswith("oval"):
             parts = s[4:].split("x")
             raw_w = float(parts[0])
             raw_h = float(parts[1]) if len(parts) > 1 else raw_w
             w = _sym_to_mm(raw_w, units)
             h = _sym_to_mm(raw_h, units)
-            return {"shape": "OVAL", "w": w, "h": h, "inner": 0.0}
+            return _maybe_rescale_mil(
+                {"shape": "OVAL", "w": w, "h": h, "inner": 0.0},
+                units, sym, layer_name, warnings)
         if s.startswith("s") and len(s) > 1 and (s[1].isdigit() or s[1] == "."):
             raw_d = float(s[1:].split("x")[0])
             d = _sym_to_mm(raw_d, units)
-            return {"shape": "RECT", "w": d, "h": d, "inner": 0.0}
+            return _maybe_rescale_mil(
+                {"shape": "RECT", "w": d, "h": d, "inner": 0.0},
+                units, sym, layer_name, warnings)
         if s.startswith("r") and len(s) > 1 and (s[1].isdigit() or s[1] == "."):
             raw_d = float(s[1:].split("x")[0])
             d = _sym_to_mm(raw_d, units)
-            return {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0}
+            return _maybe_rescale_mil(
+                {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0},
+                units, sym, layer_name, warnings)
         if s.startswith("moire"):
             return {"shape": "CIRCLE", "w": 1.0, "h": 1.0, "inner": 0.0}
         if s.startswith("thermal"):
@@ -95,7 +167,9 @@ def _parse_sym(
                 raw_d = float(rest.split("x")[0]) if rest else 0
                 if raw_d > 0:
                     d = _sym_to_mm(raw_d, units)
-                    return {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0}
+                    return _maybe_rescale_mil(
+                        {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0},
+                        units, sym, layer_name, warnings)
             except ValueError:
                 pass
             return {"shape": "CIRCLE", "w": 1.0, "h": 1.0, "inner": 0.0}
@@ -110,7 +184,9 @@ def _parse_sym(
                     w = _sym_to_mm(raw_w, units)
                     h = _sym_to_mm(raw_h, units)
                     if w > 0 and h > 0:
-                        return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+                        return _maybe_rescale_mil(
+                            {"shape": "RECT", "w": w, "h": h, "inner": 0.0},
+                            units, sym, layer_name, warnings)
                 except (ValueError, IndexError):
                     pass
             else:
@@ -118,7 +194,9 @@ def _parse_sym(
                     raw_d = float(last)
                     d = _sym_to_mm(raw_d, units)
                     if d > 0:
-                        return {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0}
+                        return _maybe_rescale_mil(
+                            {"shape": "CIRCLE", "w": d, "h": d, "inner": 0.0},
+                            units, sym, layer_name, warnings)
                 except ValueError:
                     pass
     except (ValueError, IndexError):
