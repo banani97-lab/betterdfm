@@ -179,6 +179,7 @@ func (h *AdminOrgHandler) GetOrganizationStats(c echo.Context) error {
 		JobsByStatus:      make(map[string]int64),
 		ViolationsBySev:   make(map[string]int64),
 		GradeDistribution: make(map[string]int64),
+		TopRules:          []RuleCount{},
 	}
 
 	h.db.Model(&db.AnalysisJob{}).Where("org_id = ?", orgID).Count(&stats.TotalJobs)
@@ -240,6 +241,7 @@ func (h *AdminOrgHandler) GetPlatformStats(c echo.Context) error {
 		JobsByStatus:      make(map[string]int64),
 		ViolationsBySev:   make(map[string]int64),
 		GradeDistribution: make(map[string]int64),
+		TopRules:          []RuleCount{},
 	}
 
 	h.db.Model(&db.Organization{}).Count(&stats.TotalOrgs)
