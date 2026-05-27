@@ -454,7 +454,7 @@ function UploadPageInner() {
           <div className="text-center space-y-4">
             <div className="animate-spin h-10 w-10 border-4 border-blue-600 border-t-transparent rounded-full mx-auto" />
             <p className="font-medium text-foreground">
-              {isBatch ? `Uploading ${files.length} files to S3...` : 'Uploading to S3...'}
+              {isBatch ? `Processing ${files.length} files...` : 'Processing File...'}
             </p>
             {isBatch ? (
               <div className="space-y-2">
