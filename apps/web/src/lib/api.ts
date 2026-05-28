@@ -574,7 +574,7 @@ export async function getSharedBoardData(token: string, jobId: string): Promise<
 
 export async function sharedUpload(
   token: string,
-  data: { filename: string; fileType: string; uploaderName?: string; uploaderEmail?: string }
+  data: { filename: string; fileType: string; uploaderName: string; uploaderEmail: string }
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return shareFetch(token, '/upload', { method: 'POST', body: JSON.stringify(data) })
 }
