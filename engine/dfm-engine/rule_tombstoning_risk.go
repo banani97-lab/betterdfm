@@ -1,6 +1,9 @@
 package dfmengine
 
-import "sort"
+import (
+	"math"
+	"sort"
+)
 
 // smallPassiveClasses are package classes susceptible to tombstoning.
 var smallPassiveClasses = map[string]bool{
@@ -96,14 +99,17 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 
 			flagged[refDes] = true
 			msg, sug := msgTombstoningRisk(refDes, vPad.PackageClass, ratio)
+			// Other pad center = sum-of-centers minus this pad's center.
+			otherX := padInfos[0].pad.X + padInfos[1].pad.X - vPad.X
+			otherY := padInfos[0].pad.Y + padInfos[1].pad.Y - vPad.Y
 			violations = append(violations, Violation{
 				RuleID:     r.ID(),
 				Severity:   "ERROR",
 				Layer:      vPad.Layer,
 				X:          vPad.X,
 				Y:          vPad.Y,
-				X2:         padInfos[0].pad.X + padInfos[1].pad.X - vPad.X,
-				Y2:         padInfos[0].pad.Y + padInfos[1].pad.Y - vPad.Y,
+				X2:         otherX,
+				Y2:         otherY,
 				Message:    msg,
 				Suggestion: sug,
 				MeasuredMM: ratio,
@@ -111,6 +117,14 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 				Unit:       "ratio",
 				RefDes:     refDes,
 			})
+			// Fix hint: grow the smaller pad along the pair axis toward
+			// the larger pad. Magnitude is the linear delta needed to
+			// reach the larger pad's area (sqrt-domain delta on side
+			// length, applied to the geometric mean of W and H).
+			smallSide := math.Sqrt(vPad.WidthMM * vPad.HeightMM)
+			delta := smallSide*math.Sqrt(ratio) - smallSide
+			setResizeHint(&violations[len(violations)-1],
+				otherX-vPad.X, otherY-vPad.Y, delta, "pad")
 		}
 	}
 

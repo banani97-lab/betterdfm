@@ -335,6 +335,11 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						X2:         p.X,
 						Y2:         p.Y,
 					})
+					// Fix hint: push the pad away from the trace's closest
+					// point. Trace-to-trace pairs (above) don't get a hint;
+					// routing decisions don't map to "shift N mm".
+					setShiftHint(&violations[len(violations)-1],
+						p.X-cpX, p.Y-cpY, minC-clearance, "pad")
 					layerViolations++
 				}
 			}

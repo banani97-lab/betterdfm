@@ -179,18 +179,29 @@ func (r *SilkscreenOnPadRule) Run(board BoardData, profile ProfileRules) []Viola
 					msg, sug := msgSilkscreenOnPad(pe.refDes)
 					scx := (silkBox.minX + silkBox.maxX) / 2
 					scy := (silkBox.minY + silkBox.maxY) / 2
+					padCx := (pe.box.minX + pe.box.maxX) / 2
+					padCy := (pe.box.minY + pe.box.maxY) / 2
 					violations = append(violations, Violation{
 						RuleID:     r.ID(),
 						Severity:   "ERROR",
 						Layer:      silkLayer,
 						X:          scx,
 						Y:          scy,
-						X2:         (pe.box.minX + pe.box.maxX) / 2,
-						Y2:         (pe.box.minY + pe.box.maxY) / 2,
+						X2:         padCx,
+						Y2:         padCy,
 						Message:    msg,
 						Suggestion: sug,
 						RefDes:     pe.refDes,
 					})
+					// Fix hint: push the silk feature off the pad. Direction
+					// is silk-center → away-from-pad-center. Magnitude is
+					// roughly the pad's half-diagonal plus a 0.1mm cushion
+					// to clear the pad's outer edge.
+					padHalfDiag := math.Hypot(
+						pe.box.maxX-pe.box.minX,
+						pe.box.maxY-pe.box.minY) / 2
+					setShiftHint(&violations[len(violations)-1],
+						scx-padCx, scy-padCy, padHalfDiag+0.1, "silk")
 					break outer
 				}
 			}

@@ -96,6 +96,12 @@ func (TraceImbalanceRule) Run(board BoardData, profile ProfileRules) []Violation
 				NetName:    pads[0].NetName,
 				Count:      1,
 			})
+			// Fix hint: shrink the wide trace's width along the pair axis.
+			// Direction points from this pad to the partner so the renderer
+			// can draw a resize arrow along the trace axis.
+			delta := wide - narrow*maxRatio
+			setResizeHint(&violations[len(violations)-1],
+				pads[1].X-pads[0].X, pads[1].Y-pads[0].Y, delta, "trace")
 		}
 	}
 

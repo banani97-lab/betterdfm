@@ -95,6 +95,10 @@ func (r *DrillToDrillRule) Run(board BoardData, profile ProfileRules) []Violatio
 					LimitMM:    minD,
 					Unit:       "mm",
 				})
+				// Fix hint: push hole a away from hole b along the separation
+				// vector. Magnitude = the missing gap.
+				setShiftHint(&violations[len(violations)-1],
+					a.x-b.x, a.y-b.y, minD-gap, "drill")
 				if len(violations) >= maxDrillToDrillViolations {
 					break
 				}
