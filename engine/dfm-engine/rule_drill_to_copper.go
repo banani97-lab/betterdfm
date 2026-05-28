@@ -121,14 +121,17 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 			}
 			if gap < minD-geomEps {
 				msg, sug := msgDrillToCopperBelow(gap, minD)
+				// True closest point on the trace center-line — direction
+				// from drill to that point is the fix vector.
+				npX, npY := closestPointOnSeg(h.x, h.y, t.StartX, t.StartY, t.EndX, t.EndY)
 				violations = append(violations, Violation{
 					RuleID:     r.ID(),
 					Severity:   "ERROR",
 					Layer:      t.Layer,
 					X:          h.x,
 					Y:          h.y,
-					X2:         (t.StartX + t.EndX) / 2,
-					Y2:         (t.StartY + t.EndY) / 2,
+					X2:         npX,
+					Y2:         npY,
 					Message:    msg,
 					Suggestion: sug,
 					MeasuredMM: gap,
@@ -136,6 +139,8 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 					Unit:       "mm",
 					NetName:    t.NetName,
 				})
+				setShiftHint(&violations[len(violations)-1],
+					h.x-npX, h.y-npY, minD-gap, "drill")
 			}
 		}
 
@@ -184,6 +189,9 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 					NetName:    p.NetName,
 					RefDes:     p.RefDes,
 				})
+				// Push drill away from the pad center.
+				setShiftHint(&violations[len(violations)-1],
+					h.x-p.X, h.y-p.Y, minD-gap, "drill")
 			}
 		}
 	}

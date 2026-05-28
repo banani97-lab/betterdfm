@@ -1,5 +1,7 @@
 package dfmengine
 
+import "math"
+
 // EdgeClearanceRule checks that component pads, drill holes, and fiducials
 // maintain minimum distance from the board edge.
 type EdgeClearanceRule struct{}
@@ -96,6 +98,14 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 				NetName:    pad.NetName,
 				RefDes:     pad.RefDes,
 			})
+			// Fix hint: shift the pad inward, away from the closest outline
+			// point. Magnitude = shortfall (limit - measured).
+			target := "pad"
+			if pad.RefDes != "" {
+				target = "component"
+			}
+			setShiftHint(&violations[len(violations)-1],
+				pad.X-cpX, pad.Y-cpY, limit-copperEdgeDist, target)
 		}
 	}
 
@@ -108,7 +118,8 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 			continue
 		}
 		halfDiam := drill.DiamMM / 2
-		edgeDist := oidx.minDist(drill.X, drill.Y) - halfDiam
+		_, dcpX, dcpY := oidx.minDistWithPoint(drill.X, drill.Y)
+		edgeDist := math.Hypot(drill.X-dcpX, drill.Y-dcpY) - halfDiam
 		if edgeDist < limit-geomEps {
 			msg := msgEdgeClearanceDrillBelow(edgeDist, limit, drill.DiamMM)
 			layer := drill.Layer
@@ -127,6 +138,8 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 				LimitMM:    limit,
 				Unit:       "mm",
 			})
+			setShiftHint(&violations[len(violations)-1],
+				drill.X-dcpX, drill.Y-dcpY, limit-edgeDist, "drill")
 		}
 	}
 
