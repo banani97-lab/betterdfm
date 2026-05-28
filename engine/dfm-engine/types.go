@@ -135,6 +135,18 @@ type Violation struct {
 	RefDes     string  `json:"refDes"`     // reference designator, "" if not a component pad
 	X2         float64 `json:"x2"`         // second object X (clearance/dam rules), 0 otherwise
 	Y2         float64 `json:"y2"`         // second object Y (clearance/dam rules), 0 otherwise
+
+	// Structured fix hint. FixAction == "" means no hint; renderer falls
+	// back to the legacy dot+ring with the canned Suggestion text. When
+	// present, the hint encodes a directional fix (action + unit vector +
+	// magnitude + target). For positional "add" hints (e.g. fiducial
+	// placement) the absolute target is encoded in X2/Y2 and the unit
+	// vector is derived from (X,Y) -> (X2,Y2).
+	FixAction      string  `json:"fixAction,omitempty"`      // "shift" | "resize" | "add" | ""
+	FixDX          float64 `json:"fixDX,omitempty"`          // unit vector x (board space, Y-up), 0 if non-spatial
+	FixDY          float64 `json:"fixDY,omitempty"`          // unit vector y, 0 if non-spatial
+	FixMagnitudeMM float64 `json:"fixMagnitudeMM,omitempty"` // non-negative; mm of shift/widen
+	FixTarget      string  `json:"fixTarget,omitempty"`      // "pad" | "drill" | "trace" | "silk" | "component" | ""
 }
 
 // Rule interface
