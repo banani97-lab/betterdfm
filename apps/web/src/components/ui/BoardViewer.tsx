@@ -565,6 +565,82 @@ function drawGrid(ctx: CanvasRenderingContext2D, b: Bounds, zoom: number) {
   ctx.restore()
 }
 
+/** Per-action arrow renderer for fix hints. Anchored at (cx, cy) in
+ * canvas space. `dx, dy` is the unit vector in board space (Y-up); we
+ * flip dy here so the arrow points in the right direction on a Y-down
+ * canvas. For "add" actions, the absolute target (cx2, cy2) overrides
+ * the (dx,dy) endpoint so the arrow lands on the suggested location. */
+function drawFixArrow(
+  ctx: CanvasRenderingContext2D,
+  cx: number, cy: number,
+  dx: number, dy: number,
+  magnitudeMM: number,
+  scalePxPerMM: number,
+  action: 'shift' | 'resize' | 'add',
+  color: string,
+  emphasized: boolean,
+  absoluteTarget?: { cx: number; cy: number },
+) {
+  const cdx = dx
+  const cdy = -dy // board Y-up to canvas Y-down
+
+  let endX: number, endY: number, lengthPx: number
+  if (action === 'add' && absoluteTarget) {
+    endX = absoluteTarget.cx
+    endY = absoluteTarget.cy
+    lengthPx = Math.hypot(endX - cx, endY - cy)
+  } else {
+    lengthPx = Math.min(48, Math.max(16, magnitudeMM * scalePxPerMM))
+    endX = cx + cdx * lengthPx
+    endY = cy + cdy * lengthPx
+  }
+  if (!Number.isFinite(endX) || !Number.isFinite(endY) || lengthPx < 1) return
+
+  const headLen = 6
+  const headAng = (25 * Math.PI) / 180
+  const ang = Math.atan2(endY - cy, endX - cx)
+
+  const drawHead = (atX: number, atY: number, backAng: number) => {
+    ctx.beginPath()
+    ctx.moveTo(atX, atY)
+    ctx.lineTo(atX - headLen * Math.cos(backAng - headAng), atY - headLen * Math.sin(backAng - headAng))
+    ctx.moveTo(atX, atY)
+    ctx.lineTo(atX - headLen * Math.cos(backAng + headAng), atY - headLen * Math.sin(backAng + headAng))
+    ctx.stroke()
+  }
+
+  ctx.save()
+  ctx.strokeStyle = color
+  ctx.lineWidth = emphasized ? 2.4 : 1.5
+  ctx.globalAlpha = emphasized ? 1.0 : 0.55
+  if (emphasized) {
+    ctx.shadowColor = color
+    ctx.shadowBlur = 8
+  }
+
+  if (action === 'add') {
+    ctx.setLineDash([4, 3])
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(endX, endY); ctx.stroke()
+    ctx.setLineDash([])
+    // ⊕ glyph at target: ring + cross
+    const r = 5
+    ctx.beginPath(); ctx.arc(endX, endY, r, 0, Math.PI * 2); ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(endX - r, endY); ctx.lineTo(endX + r, endY)
+    ctx.moveTo(endX, endY - r); ctx.lineTo(endX, endY + r)
+    ctx.stroke()
+  } else {
+    // shaft
+    ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(endX, endY); ctx.stroke()
+    drawHead(endX, endY, ang)
+    if (action === 'resize') {
+      // double-head: arrowhead at the origin end too
+      drawHead(cx, cy, ang + Math.PI)
+    }
+  }
+  ctx.restore()
+}
+
 /** Step 11: EDA-style violation markers — triangle/diamond/circle. */
 function drawViolations(
   ctx: CanvasRenderingContext2D,
@@ -603,8 +679,10 @@ function drawViolations(
           const r = 12
           ctx.strokeRect(cx - r, cy - r, r * 2, r * 2)
         }
-        // Dashed line to secondary object (clearance/dam rules).
-        if (v.x2 !== 0 || v.y2 !== 0) {
+        // Dashed line to secondary object (clearance/dam rules). For "add"
+        // hints the (x2,y2) target is also the fix-arrow endpoint, so the
+        // dashed line would visually duplicate the arrow — skip it then.
+        if ((v.x2 !== 0 || v.y2 !== 0) && v.fixAction !== 'add') {
           const cx2 = tx(v.x2), cy2 = ty(v.y2)
           if (ok(cx2) && ok(cy2)) {
             ctx.globalAlpha = 0.5
@@ -626,6 +704,43 @@ function drawViolations(
         ctx.strokeStyle = color; ctx.lineWidth = 1
         ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2); ctx.stroke()
         ctx.restore()
+      }
+
+      // Fix-hint arrow (per-rule). When present, drawn alongside the
+      // existing markers. Unselected: subtle ambient hint. Selected:
+      // emphasized with a magnitude label near the tip.
+      if (v.fixAction && v.fixDX !== undefined && v.fixDY !== undefined) {
+        const absTarget = v.fixAction === 'add' && (v.x2 !== 0 || v.y2 !== 0)
+          ? { cx: tx(v.x2), cy: ty(v.y2) }
+          : undefined
+        drawFixArrow(
+          ctx, cx, cy,
+          v.fixDX, v.fixDY,
+          v.fixMagnitudeMM ?? 0,
+          s,
+          v.fixAction,
+          color,
+          isSelected,
+          absTarget,
+        )
+        if (isSelected) {
+          // Magnitude label near the tip.
+          let label = ''
+          if (v.fixAction === 'shift') label = `move ${(v.fixMagnitudeMM ?? 0).toFixed(2)} mm`
+          else if (v.fixAction === 'resize') label = `widen ${(v.fixMagnitudeMM ?? 0).toFixed(2)} mm`
+          else if (v.fixAction === 'add') label = `add ${v.fixTarget || 'feature'}`
+          if (label) {
+            ctx.save()
+            ctx.fillStyle = color
+            ctx.globalAlpha = 0.95
+            ctx.font = '11px ui-sans-serif, system-ui, sans-serif'
+            const labelOffset = 14
+            const lx = cx + v.fixDX * labelOffset + 8
+            const ly = cy - v.fixDY * labelOffset - 4
+            ctx.fillText(label, lx, ly)
+            ctx.restore()
+          }
+        }
       }
     }
   } else {

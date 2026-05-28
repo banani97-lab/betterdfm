@@ -39,6 +39,37 @@ const severityIcon = {
   INFO: <Info className="h-4 w-4 text-blue-500" />,
 }
 
+// formatFixHint returns a short parenthesised phrase derived from the
+// structured FixHint fields, e.g. " (move 0.18 mm NE)". Appended to the
+// existing canned suggestion text in the list. Returns '' when no hint
+// is present (caller should skip rendering).
+function formatFixHint(v: Violation): string {
+  if (!v.fixAction) return ''
+  const mag = v.fixMagnitudeMM ?? 0
+  if (v.fixAction === 'shift') {
+    const dir = compassFromVector(v.fixDX ?? 0, v.fixDY ?? 0)
+    return dir ? ` (move ${mag.toFixed(2)} mm ${dir})` : ` (move ${mag.toFixed(2)} mm)`
+  }
+  if (v.fixAction === 'resize') {
+    return ` (widen by ~${mag.toFixed(2)} mm)`
+  }
+  if (v.fixAction === 'add') {
+    return ` (add ${v.fixTarget || 'feature'} near ${(v as Violation).x2.toFixed(0)}, ${(v as Violation).y2.toFixed(0)})`
+  }
+  return ''
+}
+
+// 8-point compass from a board-space unit vector (Y-up). Empty when the
+// vector is near-zero.
+function compassFromVector(dx: number, dy: number): string {
+  if (Math.hypot(dx, dy) < 1e-6) return ''
+  const angDeg = (Math.atan2(dy, dx) * 180) / Math.PI // -180..180, 0=E, 90=N
+  // Map to 8 sectors of 45° each, centered on N/NE/E/SE/S/SW/W/NW.
+  const labels = ['E', 'NE', 'N', 'NW', 'W', 'SW', 'S', 'SE']
+  const idx = ((Math.round(angDeg / 45) + 8) % 8 + 8) % 8
+  return labels[idx]
+}
+
 const severityBadgeVariant: Record<string, 'destructive' | 'warning' | 'info'> = {
   ERROR: 'destructive',
   WARNING: 'warning',
@@ -212,7 +243,12 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
                   </div>
                   <p className={cn('text-sm text-foreground leading-snug', v.ignored && 'line-through')}>{v.message}</p>
                   {v.suggestion && !v.ignored && (
-                    <p className="text-xs text-muted-foreground mt-1 leading-snug">{v.suggestion}</p>
+                    <p className="text-xs text-muted-foreground mt-1 leading-snug">
+                      {v.suggestion}
+                      {v.fixAction && (
+                        <span className="ml-1 text-foreground/70">{formatFixHint(v)}</span>
+                      )}
+                    </p>
                   )}
                   {v.measuredMM !== 0 && !v.ignored && (
                     <div className="mt-1 text-xs font-mono text-muted-foreground space-y-0.5">

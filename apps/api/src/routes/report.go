@@ -265,6 +265,54 @@ func drawPageHeader(f *fpdf.Fpdf, pW float64, tr func(string) string,
 	f.CellFormat(pW*0.25, 5.5, tr("Profile: "+trunc(profileName, 24)), "", 1, "L", true, 0, "")
 }
 
+// compassFromVector maps a unit vector (board space, Y-up) to one of 8
+// compass labels. Returns "" when the vector is near-zero.
+func compassFromVector(dx, dy float64) string {
+	if math.Hypot(dx, dy) < 1e-6 {
+		return ""
+	}
+	angDeg := math.Atan2(dy, dx) * 180 / math.Pi // -180..180, 0=E
+	labels := []string{"E", "NE", "N", "NW", "W", "SW", "S", "SE"}
+	idx := (int(math.Round(angDeg/45.0)) + 16) % 8
+	return labels[idx]
+}
+
+// composeFixLine returns the per-rule "Fix:" line text. When a structured
+// FixHint is present it prepends a generated phrase (direction, magnitude,
+// or target position) to the rule's canned Suggestion. Empty hint falls
+// back to the canned text alone.
+func composeFixLine(v db.Violation) string {
+	if v.FixAction == "" {
+		return v.Suggestion
+	}
+	var phrase string
+	target := v.FixTarget
+	if target == "" {
+		target = "feature"
+	}
+	switch v.FixAction {
+	case "shift":
+		dir := compassFromVector(v.FixDX, v.FixDY)
+		if dir != "" {
+			phrase = fmt.Sprintf("Shift %s ~%.2f mm %s.", target, v.FixMagnitudeMM, dir)
+		} else {
+			phrase = fmt.Sprintf("Shift %s ~%.2f mm.", target, v.FixMagnitudeMM)
+		}
+	case "resize":
+		phrase = fmt.Sprintf("Widen %s by ~%.2f mm.", target, v.FixMagnitudeMM)
+	case "add":
+		phrase = fmt.Sprintf("Add %s near (%.0f, %.0f) mm.", target, v.X2, v.Y2)
+	}
+	if v.Suggestion == "" {
+		return phrase
+	}
+	combined := phrase + " " + v.Suggestion
+	if len(combined) > 200 {
+		combined = combined[:197] + "..."
+	}
+	return combined
+}
+
 // violationDeviation returns how far a violation is from its limit, normalised
 // to [0, ∞). Used to rank worst instances within a rule group.
 func violationDeviation(v db.Violation) float64 {
@@ -620,10 +668,11 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 			f.SetFont("Arial", "", 8)
 			f.CellFormat(0, 8, sev+"  ", "", 1, "R", false, 0, "")
 
-			// Suggestion line
+			// Suggestion line — generated from the structured FixHint
+			// when present, otherwise the rule's canned text.
 			suggestion := ""
-			if len(g.violations) > 0 && g.violations[0].Suggestion != "" {
-				suggestion = g.violations[0].Suggestion
+			if len(g.violations) > 0 {
+				suggestion = composeFixLine(g.violations[0])
 			}
 			if suggestion != "" {
 				f.SetFillColor(252, 249, 240)
