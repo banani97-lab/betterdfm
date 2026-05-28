@@ -58,6 +58,25 @@ func severityRGBi(sev string) (int, int, int) {
 	return int(r * 255), int(g * 255), int(b * 255)
 }
 
+// verdictForGrade returns the one-line verdict shown next to the headline grade.
+// Mirrors the engine's scoreGrade verdicts so the PDF text matches the dashboard
+// when we use the persisted grade letter instead of recomputing.
+func verdictForGrade(grade string) string {
+	switch grade {
+	case "A":
+		return "Production Ready - no significant issues"
+	case "B":
+		return "Minor Issues - review recommended before submission"
+	case "C":
+		return "Moderate Issues - rework required"
+	case "D":
+		return "Significant Issues - major redesign required"
+	case "F":
+		return "Not Manufacturable - critical failures present"
+	}
+	return ""
+}
+
 // scoreBarColor returns an RGB color for a score (green→yellow→orange→red).
 func scoreBarColor(score int) (int, int, int) {
 	switch {
@@ -212,8 +231,13 @@ func ruleDisplayName(id string) string {
 		"drill-to-drill":    "Drill-to-Drill Spacing",
 		"drill-to-copper":   "Drill-to-Copper Spacing",
 		"copper-sliver":     "Copper Sliver",
-		"silkscreen-on-pad": "Silkscreen on Pad",
-		"fiducial-count":    "Fiducial Count",
+		"silkscreen-on-pad":    "Silkscreen on Pad",
+		"fiducial-count":       "Fiducial Count",
+		"pad-size-for-package": "Pad Size for Package",
+		"package-capability":   "Package Capability",
+		"tombstoning-risk":     "Tombstoning Risk",
+		"trace-imbalance":      "Trace Imbalance",
+		"component-height":     "Component Height",
 	}
 	if n, ok := names[id]; ok {
 		return n
@@ -284,7 +308,21 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		_ = json.Unmarshal(job.BoardData, &board)
 	}
 
+	// Recompute to get per-rule breakdown + area/density for the report layout.
+	// Headline score/grade come from the persisted job values so the PDF stays
+	// in lockstep with the dashboard even when the engine's weights or caps
+	// have drifted since the job was scored.
 	sr := computeReportScore(violations, board)
+	displayScore := job.MfgScore
+	displayGrade := job.MfgGrade
+	if displayGrade == "" {
+		displayGrade = sr.Grade
+		displayScore = sr.Score
+	}
+	displayVerdict := verdictForGrade(displayGrade)
+	if displayVerdict == "" {
+		displayVerdict = sr.Verdict
+	}
 
 	errCount, warnCount, infoCount := 0, 0, 0
 	for _, v := range violations {
@@ -349,7 +387,7 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	// ── Score + Design Summary (two columns) ─────────────────────────────────
 	const colL, colR = 88.0, 88.0
 	sectionY := f.GetY()
-	sr1, sg1, sb1 := scoreBarColor(sr.Score)
+	sr1, sg1, sb1 := scoreBarColor(displayScore)
 
 	// Left: score bar + grade
 	f.SetXY(15, sectionY)
@@ -361,7 +399,7 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 
 	const barW, barH = 84.0, 10.0
 	barX, barY := 15.0, f.GetY()
-	fillW := barW * float64(sr.Score) / 100.0
+	fillW := barW * float64(displayScore) / 100.0
 	f.SetFillColor(sr1, sg1, sb1)
 	f.Rect(barX, barY, fillW, barH, "F")
 	f.SetFillColor(225, 225, 225)
@@ -370,16 +408,16 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.SetXY(15, barY+barH+2)
 	f.SetFont("Arial", "B", 24)
 	f.SetTextColor(sr1, sg1, sb1)
-	f.CellFormat(18, 11, sr.Grade, "", 0, "L", false, 0, "")
+	f.CellFormat(18, 11, displayGrade, "", 0, "L", false, 0, "")
 	f.SetFont("Arial", "B", 10)
 	f.SetTextColor(40, 40, 40)
-	f.CellFormat(colL-18, 11, fmt.Sprintf("%d/100", sr.Score), "", 1, "L", false, 0, "")
+	f.CellFormat(colL-18, 11, fmt.Sprintf("%d/100", displayScore), "", 1, "L", false, 0, "")
 	// Verdict wraps on its own line across the full left column so it
 	// can't overflow into the right-column DESIGN SUMMARY.
 	f.SetX(15)
 	f.SetFont("Arial", "", 8)
 	f.SetTextColor(90, 90, 90)
-	f.MultiCell(colL, 4, tr(sr.Verdict), "", "L", false)
+	f.MultiCell(colL, 4, tr(displayVerdict), "", "L", false)
 	leftColBottomY := f.GetY()
 
 	// Right: design summary
@@ -487,12 +525,12 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	gradeLabels := map[string]string{
 		"A": "no significant", "B": "minor", "C": "moderate", "D": "significant", "F": "critical",
 	}
-	gradeLabel := gradeLabels[sr.Grade]
+	gradeLabel := gradeLabels[displayGrade]
 	if gradeLabel == "" {
 		gradeLabel = "some"
 	}
 	var verdictText string
-	if sr.Score >= 90 {
+	if displayScore >= 90 {
 		verdictText = "This design meets all manufacturability requirements and is ready for fabrication submission."
 	} else if errCount > 0 {
 		topRule := ""
@@ -675,6 +713,14 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	f.CellFormat(pW/2, 6, "Value", "1", 1, "C", true, 0, "")
 
 	type ruleRow struct{ name, val string }
+	smallestPkg := rules.SmallestPackageClass
+	if smallestPkg == "" {
+		smallestPkg = "(no minimum)"
+	}
+	silkscreenOnPad := "Enabled"
+	if rules.EnableSilkscreenOnPadCheck != nil && !*rules.EnableSilkscreenOnPadCheck {
+		silkscreenOnPad = "Disabled"
+	}
 	profileRows := []ruleRow{
 		{"Min Trace Width", fmt.Sprintf("%.3f mm", rules.MinTraceWidthMM)},
 		{"Min Clearance", fmt.Sprintf("%.3f mm", rules.MinClearanceMM)},
@@ -687,6 +733,11 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		{"Min Drill-to-Drill", fmt.Sprintf("%.3f mm", rules.MinDrillToDrillMM)},
 		{"Min Drill-to-Copper", fmt.Sprintf("%.3f mm", rules.MinDrillToCopperMM)},
 		{"Min Copper Sliver", fmt.Sprintf("%.3f mm", rules.MinCopperSliverMM)},
+		{"Smallest Package Class", smallestPkg},
+		{"Max Trace Imbalance Ratio", fmt.Sprintf("%.1f : 1", rules.MaxTraceImbalanceRatio)},
+		{"Max Component Height (Top)", fmt.Sprintf("%.1f mm", rules.MaxComponentHeightTopMM)},
+		{"Max Component Height (Bottom)", fmt.Sprintf("%.1f mm", rules.MaxComponentHeightBottomMM)},
+		{"Silkscreen-on-Pad Check", silkscreenOnPad},
 	}
 	for i, row := range profileRows {
 		if i%2 == 0 {
