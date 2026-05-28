@@ -90,6 +90,12 @@ export interface Violation {
   x2:         number
   y2:         number
   ignored:    boolean
+  // Structured fix hint, optional. Empty/absent fixAction means no hint.
+  fixAction?:      'shift' | 'resize' | 'add' | ''
+  fixDX?:          number
+  fixDY?:          number
+  fixMagnitudeMM?: number
+  fixTarget?:      'pad' | 'drill' | 'trace' | 'silk' | 'component' | 'fiducial' | ''
 }
 
 export interface BoardLayer { name: string; type: string; startLayer?: string; endLayer?: string }

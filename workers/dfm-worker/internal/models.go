@@ -76,4 +76,12 @@ type Violation struct {
 	X2         float64 `json:"x2"`
 	Y2         float64 `json:"y2"`
 	Ignored    bool    `gorm:"default:false" json:"ignored"`
+
+	// Structured fix hint. Empty FixAction = no hint (renderer falls back
+	// to the canned Suggestion). See engine/dfm-engine/types.go.
+	FixAction      string  `json:"fixAction,omitempty"`
+	FixDX          float64 `json:"fixDX,omitempty"`
+	FixDY          float64 `json:"fixDY,omitempty"`
+	FixMagnitudeMM float64 `json:"fixMagnitudeMM,omitempty"`
+	FixTarget      string  `json:"fixTarget,omitempty"`
 }
