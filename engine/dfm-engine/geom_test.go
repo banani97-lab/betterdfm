@@ -236,3 +236,82 @@ func TestClosestPointOnSeg(t *testing.T) {
 		}
 	}
 }
+
+func TestSetShiftHint_NormalizesVector(t *testing.T) {
+	v := Violation{}
+	setShiftHint(&v, 3, 4, 0.18, "drill")
+	if v.FixAction != "shift" {
+		t.Fatalf("FixAction = %q, want shift", v.FixAction)
+	}
+	if math.Abs(v.FixDX-0.6) > 1e-9 || math.Abs(v.FixDY-0.8) > 1e-9 {
+		t.Errorf("vector not normalized: got (%.4f,%.4f), want (0.6,0.8)", v.FixDX, v.FixDY)
+	}
+	if v.FixMagnitudeMM != 0.18 {
+		t.Errorf("FixMagnitudeMM = %v, want 0.18", v.FixMagnitudeMM)
+	}
+	if v.FixTarget != "drill" {
+		t.Errorf("FixTarget = %q, want drill", v.FixTarget)
+	}
+}
+
+func TestSetShiftHint_GuardsZeroVector(t *testing.T) {
+	v := Violation{}
+	setShiftHint(&v, 0, 0, 0.5, "pad")
+	if v.FixAction != "" {
+		t.Errorf("zero vector should leave hint empty, got action %q", v.FixAction)
+	}
+}
+
+func TestSetShiftHint_GuardsNonPositiveMagnitude(t *testing.T) {
+	v := Violation{}
+	setShiftHint(&v, 1, 0, 0, "pad")
+	if v.FixAction != "" {
+		t.Errorf("zero magnitude should leave hint empty, got action %q", v.FixAction)
+	}
+	setShiftHint(&v, 1, 0, -0.1, "pad")
+	if v.FixAction != "" {
+		t.Errorf("negative magnitude should leave hint empty, got action %q", v.FixAction)
+	}
+}
+
+func TestSetResizeHint_Basic(t *testing.T) {
+	v := Violation{}
+	setResizeHint(&v, 0, 5, 0.04, "trace")
+	if v.FixAction != "resize" {
+		t.Fatalf("FixAction = %q, want resize", v.FixAction)
+	}
+	if math.Abs(v.FixDX-0) > 1e-9 || math.Abs(v.FixDY-1) > 1e-9 {
+		t.Errorf("vector not normalized: got (%.4f,%.4f), want (0,1)", v.FixDX, v.FixDY)
+	}
+	if v.FixTarget != "trace" {
+		t.Errorf("FixTarget = %q, want trace", v.FixTarget)
+	}
+}
+
+func TestSetAddHint_EncodesAbsoluteTarget(t *testing.T) {
+	v := Violation{}
+	setAddHint(&v, 10, 20, 13, 24, "component")
+	if v.FixAction != "add" {
+		t.Fatalf("FixAction = %q, want add", v.FixAction)
+	}
+	// (X,Y) should be the anchor, (X2,Y2) the absolute target.
+	if v.X != 10 || v.Y != 20 || v.X2 != 13 || v.Y2 != 24 {
+		t.Errorf("anchor/target: got X=%v Y=%v X2=%v Y2=%v", v.X, v.Y, v.X2, v.Y2)
+	}
+	// Unit vector and magnitude derived from the anchor-to-target vector.
+	wantMag := 5.0 // sqrt(3^2 + 4^2)
+	if math.Abs(v.FixMagnitudeMM-wantMag) > 1e-9 {
+		t.Errorf("FixMagnitudeMM = %v, want %v", v.FixMagnitudeMM, wantMag)
+	}
+	if math.Abs(v.FixDX-0.6) > 1e-9 || math.Abs(v.FixDY-0.8) > 1e-9 {
+		t.Errorf("unit vector: got (%.4f,%.4f), want (0.6,0.8)", v.FixDX, v.FixDY)
+	}
+}
+
+func TestSetAddHint_GuardsCoincidentPoints(t *testing.T) {
+	v := Violation{}
+	setAddHint(&v, 5, 5, 5, 5, "component")
+	if v.FixAction != "" {
+		t.Errorf("coincident anchor/target should leave hint empty, got %q", v.FixAction)
+	}
+}

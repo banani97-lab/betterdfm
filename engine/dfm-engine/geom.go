@@ -194,3 +194,63 @@ func closestPointOnSeg(px, py, ax, ay, bx, by float64) (float64, float64) {
 	t := math.Max(0, math.Min(1, ((px-ax)*dx+(py-ay)*dy)/(dx*dx+dy*dy)))
 	return ax + t*dx, ay + t*dy
 }
+
+// setShiftHint marks a violation with a "shift in direction (dx,dy) by
+// magnitudeMM" hint. Vector is normalized to unit length. Zero-length
+// vectors or non-positive magnitudes leave the hint fields empty (the
+// renderer falls back to the legacy dot+ring with canned Suggestion text).
+func setShiftHint(v *Violation, dx, dy, magnitudeMM float64, target string) {
+	if magnitudeMM <= 0 {
+		return
+	}
+	n := math.Hypot(dx, dy)
+	if n < geomEps {
+		return
+	}
+	v.FixAction = "shift"
+	v.FixDX = dx / n
+	v.FixDY = dy / n
+	v.FixMagnitudeMM = magnitudeMM
+	v.FixTarget = target
+}
+
+// setResizeHint marks a violation with a "grow the target by magnitudeMM
+// along the (alongDX, alongDY) axis" hint. Used by rules whose fix is
+// dimensional rather than positional (tombstoning pad enlargement,
+// trace-imbalance trace widening). Renders as a double-headed arrow.
+func setResizeHint(v *Violation, alongDX, alongDY, magnitudeMM float64, target string) {
+	if magnitudeMM <= 0 {
+		return
+	}
+	n := math.Hypot(alongDX, alongDY)
+	if n < geomEps {
+		return
+	}
+	v.FixAction = "resize"
+	v.FixDX = alongDX / n
+	v.FixDY = alongDY / n
+	v.FixMagnitudeMM = magnitudeMM
+	v.FixTarget = target
+}
+
+// setAddHint marks a violation with an "add a target feature near (toX,
+// toY)" hint, anchored at (fromX, fromY). The absolute target is encoded
+// in the existing X2/Y2 fields; the unit vector and magnitude are derived
+// so the renderer has one code path. Used by fiducial-count.
+func setAddHint(v *Violation, fromX, fromY, toX, toY float64, target string) {
+	dx := toX - fromX
+	dy := toY - fromY
+	n := math.Hypot(dx, dy)
+	if n < geomEps {
+		return
+	}
+	v.X = fromX
+	v.Y = fromY
+	v.X2 = toX
+	v.Y2 = toY
+	v.FixAction = "add"
+	v.FixDX = dx / n
+	v.FixDY = dy / n
+	v.FixMagnitudeMM = n
+	v.FixTarget = target
+}
