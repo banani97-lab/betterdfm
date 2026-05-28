@@ -118,4 +118,42 @@ describe('BoardViewer', () => {
       )
     ).not.toThrow()
   })
+
+  it('selected violation with fixAction draws a magnitude label', () => {
+    mockCtx.fillText.mockClear()
+    render(
+      <BoardViewer
+        boardData={syntheticBoardData()}
+        {...defaultProps}
+        violations={[
+          makeViolation({
+            id: 'vfix',
+            fixAction: 'shift',
+            fixDX: -1, fixDY: 0,
+            fixMagnitudeMM: 0.18,
+            fixTarget: 'drill',
+          }),
+        ]}
+        selectedViolationId="vfix"
+      />
+    )
+    const calls = mockCtx.fillText.mock.calls.map((c: unknown[]) => String(c[0]))
+    const hasMoveLabel = calls.some(s => s.startsWith('move '))
+    expect(hasMoveLabel).toBe(true)
+  })
+
+  it('violation without fixAction does not draw a magnitude label', () => {
+    mockCtx.fillText.mockClear()
+    render(
+      <BoardViewer
+        boardData={syntheticBoardData()}
+        {...defaultProps}
+        violations={[makeViolation({ id: 'vnf' })]}
+        selectedViolationId="vnf"
+      />
+    )
+    const calls = mockCtx.fillText.mock.calls.map((c: unknown[]) => String(c[0]))
+    const hasMoveLabel = calls.some(s => s.startsWith('move ') || s.startsWith('widen ') || s.startsWith('add '))
+    expect(hasMoveLabel).toBe(false)
+  })
 })
