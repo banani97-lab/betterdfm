@@ -1842,7 +1842,11 @@ def _parse_components(
             pkg_ref = int(parts[1])
             x_mm = _coord_to_mm(float(parts[2]), units)
             y_mm = _coord_to_mm(float(parts[3]), units)
-            # parts[4] = rotation, parts[5] = mirror flag ("N" or "M")
+            # parts[4] = rotation (degrees), parts[5] = mirror flag ("N" or "M")
+            try:
+                rotation_deg = float(parts[4]) % 360.0
+            except (ValueError, IndexError):
+                rotation_deg = 0.0
             mirror = parts[5].upper() if len(parts) > 5 else ""
             refdes = parts[6]
             part_name = parts[7] if len(parts) > 7 else ""
@@ -1949,6 +1953,7 @@ def _parse_components(
                 "x": x_mm, "y": y_mm, "refDes": refdes, "partName": part_name,
                 "side": side, "heightMM": height_mm, "mountType": mount_type,
                 "bboxWMM": bbox_w_mm, "bboxHMM": bbox_h_mm,
+                "rotationDeg": rotation_deg,
             })
         except (ValueError, IndexError):
             pass
@@ -1973,11 +1978,13 @@ class _RefdesIndex:
 
     def __init__(self, components: list, cell_size: float = 10.0) -> None:
         self._cell_size = cell_size
-        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str, float, float]]] = {}
+        # Tuple: (cx, cy, refdes, part_name, side, bbox_w, bbox_h, rot_rad)
+        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str, float, float, float]]] = {}
         for entry in components:
             # Accept dicts (current shape) plus legacy 4-/5-tuples for safety.
             bbox_w = 0.0
             bbox_h = 0.0
+            rotation_deg = 0.0
             if isinstance(entry, dict):
                 cx = entry["x"]; cy = entry["y"]
                 refdes = entry.get("refDes", "")
@@ -1985,24 +1992,32 @@ class _RefdesIndex:
                 side = entry.get("side", "")
                 bbox_w = float(entry.get("bboxWMM", 0.0) or 0.0)
                 bbox_h = float(entry.get("bboxHMM", 0.0) or 0.0)
+                rotation_deg = float(entry.get("rotationDeg", 0.0) or 0.0)
             elif len(entry) == 5:
                 cx, cy, refdes, part_name, side = entry
             else:
                 cx, cy, refdes, part_name = entry
                 side = ""
-            # Register the component in every cell its bbox covers (plus a
-            # small overhang for pad lands). Passive-sized components fall
-            # entirely inside one cell so this is a one-cell insert for them,
-            # but a 30mm connector spans 3+ cells and would otherwise be
-            # missed by the 3x3 lookup window when a pad sits at the far end.
+            rot_rad = math.radians(rotation_deg)
+            # Register the component in every cell its rotated bbox covers
+            # (plus a small overhang for pad lands). Passives fall entirely
+            # inside one cell so this is a one-cell insert; a 30mm connector
+            # spans 3+ cells and would otherwise be missed by the 3x3 lookup
+            # window when a pad sits at the far end.
             margin = 1.0
-            half_w = bbox_w / 2.0 + margin if bbox_w > 0 else 0.0
-            half_h = bbox_h / 2.0 + margin if bbox_h > 0 else 0.0
-            gx_lo = int(math.floor((cx - half_w) / cell_size))
-            gx_hi = int(math.floor((cx + half_w) / cell_size))
-            gy_lo = int(math.floor((cy - half_h) / cell_size))
-            gy_hi = int(math.floor((cy + half_h) / cell_size))
-            entry_tuple = (cx, cy, refdes, part_name, side, bbox_w, bbox_h)
+            if bbox_w > 0 and bbox_h > 0:
+                c = abs(math.cos(rot_rad))
+                s = abs(math.sin(rot_rad))
+                rot_half_w = (bbox_w * c + bbox_h * s) / 2.0 + margin
+                rot_half_h = (bbox_w * s + bbox_h * c) / 2.0 + margin
+            else:
+                rot_half_w = 0.0
+                rot_half_h = 0.0
+            gx_lo = int(math.floor((cx - rot_half_w) / cell_size))
+            gx_hi = int(math.floor((cx + rot_half_w) / cell_size))
+            gy_lo = int(math.floor((cy - rot_half_h) / cell_size))
+            gy_hi = int(math.floor((cy + rot_half_h) / cell_size))
+            entry_tuple = (cx, cy, refdes, part_name, side, bbox_w, bbox_h, rot_rad)
             for gx in range(gx_lo, gx_hi + 1):
                 for gy in range(gy_lo, gy_hi + 1):
                     self._grid.setdefault((gx, gy), []).append(entry_tuple)
@@ -2031,21 +2046,35 @@ class _RefdesIndex:
                 bucket = self._grid.get((gx + dx, gy + dy))
                 if bucket is None:
                     continue
-                for cx, cy, refdes, part_name, comp_side, bbox_w, bbox_h in bucket:
+                for cx, cy, refdes, part_name, comp_side, bbox_w, bbox_h, rot_rad in bucket:
                     if side in ("top", "bot") and comp_side and comp_side != side:
                         continue
                     d2 = (x - cx) ** 2 + (y - cy) ** 2
                     pkg = _classify_package(part_name)
-                    # When the EDA PKG bbox is known, derive the tolerance
-                    # from the component's actual half-extent (rotation-
-                    # agnostic) so long parts like connectors capture every
-                    # pad. Otherwise fall back to the per-package-class
-                    # table, then to the flat default.
+                    # When the EDA PKG bbox is known, do a rotated-rectangle
+                    # containment check against the component's actual
+                    # bounding box. Using a circular tolerance from the bbox
+                    # over-reaches in the short axis and steals neighboring
+                    # components' pads (a 5x25mm connector ends up with a
+                    # 12.5mm radius that swallows nearby passives).
                     if bbox_w > 0 and bbox_h > 0:
-                        tol = max(bbox_w, bbox_h) / 2.0 + 1.0
+                        ox = x - cx
+                        oy = y - cy
+                        # Rotate offset into the package-local frame.
+                        c = math.cos(-rot_rad)
+                        s = math.sin(-rot_rad)
+                        lx = ox * c - oy * s
+                        ly = ox * s + oy * c
+                        margin = 1.0
+                        if abs(lx) > bbox_w / 2.0 + margin:
+                            continue
+                        if abs(ly) > bbox_h / 2.0 + margin:
+                            continue
                     else:
                         tol = _PACKAGE_TOLERANCE.get(pkg, _DEFAULT_TOLERANCE)
-                    if d2 <= tol * tol and d2 < best_dist:
+                        if d2 > tol * tol:
+                            continue
+                    if d2 < best_dist:
                         best_dist = d2
                         best_name = refdes
                         best_pkg = pkg
