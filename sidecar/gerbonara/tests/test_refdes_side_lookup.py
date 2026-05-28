@@ -86,6 +86,23 @@ def test_refdes_index_uses_bbox_for_long_components():
     assert name == "J5"
 
 
+def test_refdes_index_bbox_check_is_rotation_aware():
+    # Same J5 as above, but rotated 90deg. The package-local bbox is still
+    # 5x20 (narrow x long), but on the board the long axis is horizontal.
+    # End pads now sit at (+/-9.5, 0), not (0, +/-9.5).
+    components = [
+        {"x": 0.0, "y": 0.0, "refDes": "J5", "partName": "HDR_2x14",
+         "side": "top", "bboxWMM": 5.0, "bboxHMM": 20.0, "rotationDeg": 90.0},
+    ]
+    idx = _RefdesIndex(components)
+    assert idx.lookup(9.5, 0.0, side="top")[0] == "J5"
+    assert idx.lookup(-9.5, 0.0, side="top")[0] == "J5"
+    # And a point that would have been inside the unrotated bbox but is now
+    # outside (along the package's short axis, which is now vertical) must
+    # not match.
+    assert idx.lookup(0.0, 9.5, side="top")[0] == ""
+
+
 def test_refdes_index_bbox_does_not_steal_neighbor_pads():
     # A long connector and a nearby 0402 cap. The cap's own pads should
     # still resolve to C1, not get swept up by the connector's larger
