@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/mail"
 	"path/filepath"
 	"strings"
 	"time"
@@ -17,6 +18,20 @@ import (
 	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 )
+
+// isValidEmail does a light syntactic check (mail.ParseAddress) — enough to
+// reject empty strings and obvious typos on shared-link uploads. We don't try
+// to verify deliverability.
+func isValidEmail(s string) bool {
+	if s == "" {
+		return false
+	}
+	addr, err := mail.ParseAddress(s)
+	if err != nil {
+		return false
+	}
+	return addr.Address != "" && strings.Contains(addr.Address, "@")
+}
 
 type ShareHandler struct {
 	db    *gorm.DB
@@ -443,6 +458,14 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 	}
 	if req.FileType != "ODB_PLUS_PLUS" {
 		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be ODB_PLUS_PLUS")
+	}
+	req.UploaderName = strings.TrimSpace(req.UploaderName)
+	req.UploaderEmail = strings.TrimSpace(req.UploaderEmail)
+	if req.UploaderName == "" {
+		return echo.NewHTTPError(http.StatusBadRequest, "uploader name is required")
+	}
+	if !isValidEmail(req.UploaderEmail) {
+		return echo.NewHTTPError(http.StatusBadRequest, "a valid uploader email is required")
 	}
 
 	submissionID := uuid.New().String()

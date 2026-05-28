@@ -63,6 +63,11 @@ export default function SharedPage() {
   const [dragOver, setDragOver] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
 
+  const trimmedName = uploadName.trim()
+  const trimmedEmail = uploadEmail.trim()
+  const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
+  const contactReady = trimmedName.length > 0 && emailLooksValid
+
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
       const next = new Set(prev)
@@ -167,6 +172,11 @@ export default function SharedPage() {
 
   const handleFileUpload = useCallback(async (file: File) => {
     if (!shareInfo?.allowUpload) return
+    const name = uploadName.trim()
+    const email = uploadEmail.trim()
+    if (!name) { setError('Please enter your name before uploading.'); return }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setError('Please enter a valid email before uploading.'); return }
+    setError(null)
     setUploading(true)
     setUploadProgress(0)
     setUploadSuccess(false)
@@ -174,8 +184,8 @@ export default function SharedPage() {
       const result = await sharedUpload(token, {
         filename: file.name,
         fileType: uploadFileType,
-        uploaderName: uploadName,
-        uploaderEmail: uploadEmail,
+        uploaderName: name,
+        uploaderEmail: email,
       })
       if (result.presignedUrl) {
         await uploadToS3(result.presignedUrl, file, setUploadProgress)
@@ -292,20 +302,28 @@ export default function SharedPage() {
                   {/* Contact info */}
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your name</label>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                        Your name <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="text"
                         placeholder="Jane Smith"
+                        required
+                        aria-required="true"
                         value={uploadName}
                         onChange={(e) => setUploadName(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                       />
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">Your email</label>
+                      <label className="block text-xs font-medium text-muted-foreground mb-1.5">
+                        Your email <span className="text-red-500">*</span>
+                      </label>
                       <input
                         type="email"
                         placeholder="jane@company.com"
+                        required
+                        aria-required="true"
                         value={uploadEmail}
                         onChange={(e) => setUploadEmail(e.target.value)}
                         className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
@@ -316,19 +334,23 @@ export default function SharedPage() {
                   {/* Drop zone */}
                   <label
                     className={cn(
-                      "flex flex-col items-center justify-center gap-2 py-8 rounded-lg border-2 border-dashed cursor-pointer transition-all",
-                      dragOver
-                        ? "border-primary bg-primary/5"
-                        : "border-border hover:border-primary/40 hover:bg-muted/30"
+                      "flex flex-col items-center justify-center gap-2 py-8 rounded-lg border-2 border-dashed transition-all",
+                      !contactReady
+                        ? "border-border bg-muted/20 cursor-not-allowed opacity-60"
+                        : dragOver
+                          ? "border-primary bg-primary/5 cursor-pointer"
+                          : "border-border hover:border-primary/40 hover:bg-muted/30 cursor-pointer"
                     )}
-                    onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+                    onDragOver={(e) => { if (!contactReady) return; e.preventDefault(); setDragOver(true) }}
                     onDragLeave={() => setDragOver(false)}
                     onDrop={(e) => {
+                      if (!contactReady) { e.preventDefault(); return }
                       e.preventDefault()
                       setDragOver(false)
                       const file = e.dataTransfer.files?.[0]
                       if (file) handleFileUpload(file)
                     }}
+                    aria-disabled={!contactReady}
                   >
                     <div className={cn(
                       "h-10 w-10 rounded-full flex items-center justify-center transition-colors",
@@ -338,14 +360,16 @@ export default function SharedPage() {
                     </div>
                     <div className="text-center">
                       <span className="text-sm font-medium">
-                        {dragOver ? 'Drop file here' : 'Drag and drop your file here'}
+                        {!contactReady
+                          ? 'Enter your name and email to upload'
+                          : dragOver ? 'Drop file here' : 'Drag and drop your file here'}
                       </span>
                       <p className="text-xs text-muted-foreground mt-0.5">or click to browse (.zip, .tar, .tgz)</p>
                     </div>
                     <input
                       type="file"
                       accept=".zip,.tgz,.tar,.tar.gz"
-                      disabled={uploading}
+                      disabled={uploading || !contactReady}
                       onChange={(e) => {
                         const file = e.target.files?.[0]
                         if (file) handleFileUpload(file)
@@ -470,14 +494,18 @@ export default function SharedPage() {
           <span className="text-sm text-muted-foreground">Upload revision:</span>
           <input
             type="text"
-            placeholder="Name"
+            placeholder="Name *"
+            required
+            aria-required="true"
             value={uploadName}
             onChange={(e) => setUploadName(e.target.value)}
             className="px-2 py-1 text-sm border rounded bg-background w-28"
           />
           <input
             type="email"
-            placeholder="Email"
+            placeholder="Email *"
+            required
+            aria-required="true"
             value={uploadEmail}
             onChange={(e) => setUploadEmail(e.target.value)}
             className="px-2 py-1 text-sm border rounded bg-background w-36"
@@ -485,13 +513,17 @@ export default function SharedPage() {
           <input
             type="file"
             accept=".zip,.tgz,.tar.gz"
-            disabled={uploading}
+            disabled={uploading || !contactReady}
+            title={contactReady ? undefined : 'Enter your name and email to upload'}
             onChange={(e) => {
               const file = e.target.files?.[0]
               if (file) handleFileUpload(file)
             }}
-            className="text-sm"
+            className={cn('text-sm', !contactReady && 'opacity-60 cursor-not-allowed')}
           />
+          {!contactReady && (
+            <span className="text-xs text-muted-foreground">Name and email required</span>
+          )}
           {uploading && (
             <div className="flex-1 max-w-32">
               <div className="w-full bg-muted rounded-full h-2">
