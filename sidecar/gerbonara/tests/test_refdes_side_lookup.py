@@ -64,6 +64,43 @@ def test_refdes_index_unknown_component_side_is_wildcard():
     assert idx.lookup(10.0, 10.0, side="bot")[0] == "X1"
 
 
+def test_refdes_index_uses_bbox_for_long_components():
+    # Regression: a long connector (e.g. J5) used to lose its end pads to
+    # the flat 3mm fallback tolerance, so the BoardViewer's component
+    # bounding box only wrapped the centroid pads. When the EDA PKG bbox
+    # is known, the index should size the lookup radius to the component's
+    # actual half-extent instead.
+    components = [
+        {"x": 0.0, "y": 0.0, "refDes": "J5", "partName": "HDR_2x14",
+         "side": "top", "bboxWMM": 5.0, "bboxHMM": 20.0},
+    ]
+    idx = _RefdesIndex(components)
+
+    # Pad at the far end of the connector, well outside the 3mm default
+    # tolerance but inside the component bbox.
+    name, _ = idx.lookup(0.0, 9.5, side="top")
+    assert name == "J5"
+
+    # And the opposite end.
+    name, _ = idx.lookup(0.0, -9.5, side="top")
+    assert name == "J5"
+
+
+def test_refdes_index_bbox_does_not_steal_neighbor_pads():
+    # A long connector and a nearby 0402 cap. The cap's own pads should
+    # still resolve to C1, not get swept up by the connector's larger
+    # tolerance — nearest-by-distance arbitration wins.
+    components = [
+        {"x": 0.0, "y": 0.0, "refDes": "J5", "partName": "HDR_2x14",
+         "side": "top", "bboxWMM": 5.0, "bboxHMM": 20.0},
+        {"x": 8.0, "y": 0.0, "refDes": "C1", "partName": "C_0402",
+         "side": "top", "bboxWMM": 1.0, "bboxHMM": 0.5},
+    ]
+    idx = _RefdesIndex(components)
+    name, _ = idx.lookup(8.1, 0.0, side="top")
+    assert name == "C1"
+
+
 def test_parse_components_reads_mirror_flag(tmp_path):
     cmp_file = tmp_path / "components"
     cmp_file.write_text(

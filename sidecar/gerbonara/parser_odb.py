@@ -1935,9 +1935,20 @@ def _parse_components(
                     if pkg_from_bbox:
                         part_name = f"{part_name}_{pkg_from_bbox}" if part_name else pkg_from_bbox
 
+            # Pull the package bbox out of the EDA PKG record so the refdes
+            # spatial index can size its lookup tolerance per-component.
+            # Without this, long parts like connectors fall back to the flat
+            # _DEFAULT_TOLERANCE, missing the pads at the far ends.
+            bbox_w_mm = 0.0
+            bbox_h_mm = 0.0
+            if pkg_ref in eda_pkgs:
+                bbox_w_mm = float(eda_pkgs[pkg_ref].get("bbox_w_mm", 0.0) or 0.0)
+                bbox_h_mm = float(eda_pkgs[pkg_ref].get("bbox_h_mm", 0.0) or 0.0)
+
             components.append({
                 "x": x_mm, "y": y_mm, "refDes": refdes, "partName": part_name,
                 "side": side, "heightMM": height_mm, "mountType": mount_type,
+                "bboxWMM": bbox_w_mm, "bboxHMM": bbox_h_mm,
             })
         except (ValueError, IndexError):
             pass
@@ -1962,21 +1973,39 @@ class _RefdesIndex:
 
     def __init__(self, components: list, cell_size: float = 10.0) -> None:
         self._cell_size = cell_size
-        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str]]] = {}
+        self._grid: dict[tuple[int, int], list[tuple[float, float, str, str, str, float, float]]] = {}
         for entry in components:
             # Accept dicts (current shape) plus legacy 4-/5-tuples for safety.
+            bbox_w = 0.0
+            bbox_h = 0.0
             if isinstance(entry, dict):
                 cx = entry["x"]; cy = entry["y"]
                 refdes = entry.get("refDes", "")
                 part_name = entry.get("partName", "")
                 side = entry.get("side", "")
+                bbox_w = float(entry.get("bboxWMM", 0.0) or 0.0)
+                bbox_h = float(entry.get("bboxHMM", 0.0) or 0.0)
             elif len(entry) == 5:
                 cx, cy, refdes, part_name, side = entry
             else:
                 cx, cy, refdes, part_name = entry
                 side = ""
-            key = (int(math.floor(cx / cell_size)), int(math.floor(cy / cell_size)))
-            self._grid.setdefault(key, []).append((cx, cy, refdes, part_name, side))
+            # Register the component in every cell its bbox covers (plus a
+            # small overhang for pad lands). Passive-sized components fall
+            # entirely inside one cell so this is a one-cell insert for them,
+            # but a 30mm connector spans 3+ cells and would otherwise be
+            # missed by the 3x3 lookup window when a pad sits at the far end.
+            margin = 1.0
+            half_w = bbox_w / 2.0 + margin if bbox_w > 0 else 0.0
+            half_h = bbox_h / 2.0 + margin if bbox_h > 0 else 0.0
+            gx_lo = int(math.floor((cx - half_w) / cell_size))
+            gx_hi = int(math.floor((cx + half_w) / cell_size))
+            gy_lo = int(math.floor((cy - half_h) / cell_size))
+            gy_hi = int(math.floor((cy + half_h) / cell_size))
+            entry_tuple = (cx, cy, refdes, part_name, side, bbox_w, bbox_h)
+            for gx in range(gx_lo, gx_hi + 1):
+                for gy in range(gy_lo, gy_hi + 1):
+                    self._grid.setdefault((gx, gy), []).append(entry_tuple)
 
     def lookup(self, x: float, y: float, side: str | None = None) -> tuple[str, str]:
         """Return (refdes, packageClass) for the nearest component whose
@@ -2002,12 +2031,20 @@ class _RefdesIndex:
                 bucket = self._grid.get((gx + dx, gy + dy))
                 if bucket is None:
                     continue
-                for cx, cy, refdes, part_name, comp_side in bucket:
+                for cx, cy, refdes, part_name, comp_side, bbox_w, bbox_h in bucket:
                     if side in ("top", "bot") and comp_side and comp_side != side:
                         continue
                     d2 = (x - cx) ** 2 + (y - cy) ** 2
                     pkg = _classify_package(part_name)
-                    tol = _PACKAGE_TOLERANCE.get(pkg, _DEFAULT_TOLERANCE)
+                    # When the EDA PKG bbox is known, derive the tolerance
+                    # from the component's actual half-extent (rotation-
+                    # agnostic) so long parts like connectors capture every
+                    # pad. Otherwise fall back to the per-package-class
+                    # table, then to the flat default.
+                    if bbox_w > 0 and bbox_h > 0:
+                        tol = max(bbox_w, bbox_h) / 2.0 + 1.0
+                    else:
+                        tol = _PACKAGE_TOLERANCE.get(pkg, _DEFAULT_TOLERANCE)
                     if d2 <= tol * tol and d2 < best_dist:
                         best_dist = d2
                         best_name = refdes
