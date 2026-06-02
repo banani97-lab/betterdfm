@@ -131,6 +131,11 @@ export interface ProfileRules {
   minComponentSpacingMM?: number
   flagThroughHoleOnBottom?: boolean
   minMountingHoleKeepoutMM?: number
+  enableFiducialPlacementCheck?: boolean
+  enableFiducialCountCheck?: boolean
+  enablePadSizeForPackageCheck?: boolean
+  enableTombstoningRiskCheck?: boolean
+  enableViaInPadCheck?: boolean
 }
 
 export interface CapabilityProfile {

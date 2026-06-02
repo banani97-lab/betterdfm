@@ -25,11 +25,20 @@ const (
 //   - Collinear global fiducials (3 or more, but nearly in a line) -> WARNING.
 //   - Fine-pitch / BGA components with no fiducial near their land pattern ->
 //     INFO advising local fiducials for optical alignment.
+//
+// Gated by profile.EnableFiducialPlacementCheck: nil or true enables the check,
+// false disables it.
 type FiducialPlacementRule struct{}
 
 func (r *FiducialPlacementRule) ID() string { return "fiducial-placement" }
 
-func (r *FiducialPlacementRule) Run(board BoardData, _ ProfileRules) []Violation {
+func (r *FiducialPlacementRule) Run(board BoardData, profile ProfileRules) []Violation {
+	// Gated by profile.EnableFiducialPlacementCheck: nil or true enables the
+	// check, false disables it.
+	if profile.EnableFiducialPlacementCheck != nil && !*profile.EnableFiducialPlacementCheck {
+		return nil
+	}
+
 	var fids []Point
 	for _, p := range board.Pads {
 		if p.IsFiducial {

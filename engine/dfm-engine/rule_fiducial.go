@@ -10,7 +10,13 @@ type FiducialRule struct{}
 
 func (r *FiducialRule) ID() string { return "fiducial-count" }
 
-func (r *FiducialRule) Run(board BoardData, _ ProfileRules) []Violation {
+func (r *FiducialRule) Run(board BoardData, profile ProfileRules) []Violation {
+	// Gated by profile.EnableFiducialCountCheck: nil or true enables the check,
+	// false disables it.
+	if profile.EnableFiducialCountCheck != nil && !*profile.EnableFiducialCountCheck {
+		return nil
+	}
+
 	count := 0
 	for _, p := range board.Pads {
 		if p.IsFiducial {

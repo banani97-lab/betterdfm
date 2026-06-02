@@ -40,6 +40,21 @@ func TestFiducialPlacement_CollinearWarning(t *testing.T) {
 	}
 }
 
+func TestFiducialPlacement_DisabledByProfile(t *testing.T) {
+	// A collinear set that would otherwise WARNING must be silent when the
+	// check is gated off via the profile toggle.
+	board := BoardData{
+		Layers:  spacingLayers(),
+		Pads:    []Pad{fiducialPad(0, 0), fiducialPad(10, 0), fiducialPad(20, 0)},
+		Outline: rectOutline(60, 40),
+	}
+	off := false
+	vs := (&FiducialPlacementRule{}).Run(board, ProfileRules{EnableFiducialPlacementCheck: &off})
+	if len(vs) != 0 {
+		t.Fatalf("disabled fiducial-placement check must produce no violations, got %+v", vs)
+	}
+}
+
 func TestFiducialPlacement_TwoFiducialsNoCollinearCheck(t *testing.T) {
 	// Count insufficiency is FiducialRule's concern; this rule should stay quiet.
 	board := BoardData{

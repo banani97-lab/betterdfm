@@ -224,16 +224,16 @@ const RULES = [
   { id: 'mounting-hole-keepout', group: 'fab', sev: 'WARNING', desc: 'Copper keepout around non-plated mounting holes ≥ minMountingHoleKeepoutMM (IPC-2221B)' },
   { id: 'silkscreen-on-pad', group: 'fab', sev: 'INFO', desc: 'Silkscreen does not overlap pads' },
   // Assembly (10)
-  { id: 'fiducial-count', group: 'assembly', sev: 'WARNING', desc: 'Board has ≥ 3 fiducials for pick-and-place (skipped if none found)' },
-  { id: 'pad-size-for-package', group: 'assembly', sev: 'ERROR', desc: 'Pad geometry within IPC-7351 envelope for the package class' },
+  { id: 'fiducial-count', group: 'assembly', sev: 'WARNING', desc: 'Board has ≥ 3 fiducials for pick-and-place (skipped if none found; enableFiducialCountCheck)' },
+  { id: 'pad-size-for-package', group: 'assembly', sev: 'ERROR', desc: 'Pad geometry within IPC-7351 envelope for the package class (enablePadSizeForPackageCheck)' },
   { id: 'package-capability', group: 'assembly', sev: 'ERROR', desc: 'No package smaller than the CM’s smallestPackageClass' },
-  { id: 'tombstoning-risk', group: 'assembly', sev: 'ERROR', desc: 'Pad area ratio on small 2-pad passives ≤ 1.3 (reflow imbalance)' },
+  { id: 'tombstoning-risk', group: 'assembly', sev: 'ERROR', desc: 'Pad area ratio on small 2-pad passives ≤ 1.3 (reflow imbalance; enableTombstoningRiskCheck)' },
   { id: 'trace-imbalance', group: 'assembly', sev: 'ERROR', desc: 'Thermal trace/pour balance into 2-pad components ≤ maxTraceImbalanceRatio' },
   { id: 'component-height', group: 'assembly', sev: 'ERROR', desc: 'SMT component height within per-side limits (maxComponentHeightTop/BottomMM)' },
   { id: 'component-spacing', group: 'assembly', sev: 'WARNING', desc: 'Same-side courtyard edge-to-edge gap ≥ minComponentSpacingMM (IPC-7351B); ERROR on overlap' },
-  { id: 'via-in-pad', group: 'assembly', sev: 'WARNING', desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093)' },
+  { id: 'via-in-pad', group: 'assembly', sev: 'WARNING', desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093; enableViaInPadCheck)' },
   { id: 'through-hole-on-bottom', group: 'assembly', sev: 'WARNING', desc: 'Through-hole / press-fit parts on the bottom side (flagThroughHoleOnBottom)' },
-  { id: 'fiducial-placement', group: 'assembly', sev: 'WARNING', desc: 'Global fiducials non-collinear; local fiducials for fine-pitch/BGA (IPC-7351)' },
+  { id: 'fiducial-placement', group: 'assembly', sev: 'WARNING', desc: 'Global fiducials non-collinear; local fiducials for fine-pitch/BGA (IPC-7351, enableFiducialPlacementCheck)' },
 ] as const
 
 export default function TechnicalPage() {

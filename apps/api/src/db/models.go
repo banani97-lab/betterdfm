@@ -59,6 +59,13 @@ type ProfileRules struct {
 	MinComponentSpacingMM      float64 `json:"minComponentSpacingMM"`
 	FlagThroughHoleOnBottom    *bool   `json:"flagThroughHoleOnBottom"`
 	MinMountingHoleKeepoutMM   float64 `json:"minMountingHoleKeepoutMM"`
+	// nil or true enables the rule; false disables it. On/off toggles for the
+	// discrete checks that have no numeric threshold.
+	EnableFiducialPlacementCheck *bool `json:"enableFiducialPlacementCheck"`
+	EnableFiducialCountCheck     *bool `json:"enableFiducialCountCheck"`
+	EnablePadSizeForPackageCheck *bool `json:"enablePadSizeForPackageCheck"`
+	EnableTombstoningRiskCheck   *bool `json:"enableTombstoningRiskCheck"`
+	EnableViaInPadCheck          *bool `json:"enableViaInPadCheck"`
 }
 
 // Project groups related submissions

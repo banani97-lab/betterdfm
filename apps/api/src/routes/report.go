@@ -717,9 +717,11 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 	if smallestPkg == "" {
 		smallestPkg = "(no minimum)"
 	}
-	silkscreenOnPad := "Enabled"
-	if rules.EnableSilkscreenOnPadCheck != nil && !*rules.EnableSilkscreenOnPadCheck {
-		silkscreenOnPad = "Disabled"
+	enabledLabel := func(b *bool) string {
+		if b != nil && !*b {
+			return "Disabled"
+		}
+		return "Enabled"
 	}
 	profileRows := []ruleRow{
 		{"Min Trace Width", fmt.Sprintf("%.3f mm", rules.MinTraceWidthMM)},
@@ -737,7 +739,12 @@ func (h *ReportHandler) GetJobReport(c echo.Context) error {
 		{"Max Trace Imbalance Ratio", fmt.Sprintf("%.1f : 1", rules.MaxTraceImbalanceRatio)},
 		{"Max Component Height (Top)", fmt.Sprintf("%.1f mm", rules.MaxComponentHeightTopMM)},
 		{"Max Component Height (Bottom)", fmt.Sprintf("%.1f mm", rules.MaxComponentHeightBottomMM)},
-		{"Silkscreen-on-Pad Check", silkscreenOnPad},
+		{"Silkscreen-on-Pad Check", enabledLabel(rules.EnableSilkscreenOnPadCheck)},
+		{"Fiducial-Placement Check", enabledLabel(rules.EnableFiducialPlacementCheck)},
+		{"Fiducial-Count Check", enabledLabel(rules.EnableFiducialCountCheck)},
+		{"Pad-Size-for-Package Check", enabledLabel(rules.EnablePadSizeForPackageCheck)},
+		{"Tombstoning-Risk Check", enabledLabel(rules.EnableTombstoningRiskCheck)},
+		{"Via-in-Pad Check", enabledLabel(rules.EnableViaInPadCheck)},
 	}
 	for i, row := range profileRows {
 		if i%2 == 0 {

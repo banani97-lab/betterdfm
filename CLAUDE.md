@@ -133,16 +133,16 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 
 | Rule | Severity | What it checks |
 |------|----------|---------------|
-| fiducial-count | WARNING | Board has >= 3 fiducials for pick-and-place (skipped if parser found none) |
-| pad-size-for-package | ERROR / INFO | Pad geometry within IPC-7351 envelope for the detected passive package class |
+| fiducial-count | WARNING | Board has >= 3 fiducials for pick-and-place (skipped if parser found none); gated by `profile.EnableFiducialCountCheck` (`*bool`, default on) |
+| pad-size-for-package | ERROR / INFO | Pad geometry within IPC-7351 envelope for the detected passive package class; gated by `profile.EnablePadSizeForPackageCheck` (`*bool`, default on) |
 | package-capability | ERROR | No component uses a package class smaller than `profile.SmallestPackageClass` |
-| tombstoning-risk | ERROR | Pad area ratio on small 2-pad passives (01005-0603) <= 1.3 |
+| tombstoning-risk | ERROR | Pad area ratio on small 2-pad passives (01005-0603) <= 1.3; gated by `profile.EnableTombstoningRiskCheck` (`*bool`, default on) |
 | trace-imbalance | ERROR | Trace/pour width ratio into a 2-pad component <= `profile.MaxTraceImbalanceRatio` |
 | component-height | ERROR / INFO | SMT component height within per-side limits (`MaxComponentHeightTop/BottomMM`) |
 | component-spacing | WARNING / ERROR | Same-side component courtyard (pad-bbox) edge-to-edge gap >= `profile.MinComponentSpacingMM` (off when 0); ERROR on overlap. IPC-7351B |
-| via-in-pad | WARNING / INFO | Via landing in an SMT land (parser `IsViaCatchPad`); WARNING on fine-pitch/BGA, INFO otherwise. IPC-4761/7093 |
+| via-in-pad | WARNING / INFO | Via landing in an SMT land (parser `IsViaCatchPad`); WARNING on fine-pitch/BGA, INFO otherwise. Gated by `profile.EnableViaInPadCheck` (`*bool`, default on). IPC-4761/7093 |
 | through-hole-on-bottom | WARNING | Through-hole / press-fit parts on the bottom side; gated by `profile.FlagThroughHoleOnBottom` (`*bool`, default on) |
-| fiducial-placement | WARNING / INFO | Global fiducials not collinear; fine-pitch/BGA parts have a local fiducial. Runs only if fiducials present. IPC-7351 |
+| fiducial-placement | WARNING / INFO | Global fiducials not collinear; fine-pitch/BGA parts have a local fiducial. Runs only if fiducials present; gated by `profile.EnableFiducialPlacementCheck` (`*bool`, default on). IPC-7351 |
 
 **Scoring** (`score.go`):
 - Per-violation penalty: `ruleWeight * severityWeight * marginMult` (margin scales by how far measured deviates from limit).

@@ -39,6 +39,11 @@ const DEFAULT_RULES: ProfileRules = {
   minComponentSpacingMM: 0.5,
   flagThroughHoleOnBottom: true,
   minMountingHoleKeepoutMM: 0.5,
+  enableFiducialPlacementCheck: true,
+  enableFiducialCountCheck: true,
+  enablePadSizeForPackageCheck: true,
+  enableTombstoningRiskCheck: true,
+  enableViaInPadCheck: true,
 }
 
 const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc: string }> = [
@@ -74,6 +79,24 @@ const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string;
     desc: 'Minimum courtyard edge-to-edge gap between adjacent same-side components. Below this, the pick-and-place nozzle cannot reach the part and rework becomes difficult. IPC-7351B nominal density implies about 0.5 mm.' },
   { key: 'minMountingHoleKeepoutMM', label: 'Min Mounting-Hole Keepout', unit: 'mm', step: '0.05',
     desc: 'Minimum copper keepout from the edge of a non-plated mounting hole. Protects copper from the screw head and washer footprint per IPC-2221B generic clearance.' },
+]
+
+// Discrete checks with no numeric threshold — each is a simple on/off switch.
+const TOGGLE_FIELDS: Array<{ key: keyof ProfileRules; label: string; desc: string }> = [
+  { key: 'enableSilkscreenOnPadCheck', label: 'Silkscreen-on-Pad Check',
+    desc: 'Flag silkscreen features overlapping copper pads, which can lift or contaminate the solder joint.' },
+  { key: 'flagThroughHoleOnBottom', label: 'Through-Hole on Bottom Side',
+    desc: 'Flag THT / press-fit parts on the bottom side, which cannot be wave or reflow soldered normally.' },
+  { key: 'enableFiducialPlacementCheck', label: 'Fiducial-Placement Check',
+    desc: 'Flag collinear global fiducials and fine-pitch / BGA parts missing a nearby local fiducial (IPC-7351).' },
+  { key: 'enableFiducialCountCheck', label: 'Fiducial-Count Check',
+    desc: 'Require at least 3 fiducials for pick-and-place alignment when the board has any.' },
+  { key: 'enablePadSizeForPackageCheck', label: 'Pad-Size-for-Package Check',
+    desc: 'Flag passive pad geometry outside the IPC-7351 envelope for the detected package class.' },
+  { key: 'enableTombstoningRiskCheck', label: 'Tombstoning-Risk Check',
+    desc: 'Flag small 2-pad passives with unbalanced pad areas that can tombstone during reflow.' },
+  { key: 'enableViaInPadCheck', label: 'Via-in-Pad Check',
+    desc: 'Flag vias landing in SMT lands, which can wick solder away from the joint (IPC-4761 / 7093).' },
 ]
 
 export default function AdminProfilePage() {
@@ -287,34 +310,25 @@ export default function AdminProfilePage() {
                 </select>
               </div>
 
-              <div className="mt-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rules.enableSilkscreenOnPadCheck ?? true}
-                    onChange={(e) => setRules((r) => ({ ...r, enableSilkscreenOnPadCheck: e.target.checked }))}
-                    className="w-4 h-4"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-foreground">Enable Silkscreen-on-Pad Check</span>
-                    <p className="text-xs text-muted-foreground">Check for silkscreen features overlapping copper pads</p>
+              <div className="mt-4 pt-4 border-t border-border">
+                <h3 className="text-sm font-semibold text-foreground mb-1">On/Off Checks</h3>
+                <p className="text-xs text-muted-foreground mb-3">Discrete checks with no numeric threshold. Turn off any that don&apos;t apply to your process.</p>
+                {TOGGLE_FIELDS.map((t) => (
+                  <div key={t.key} className="mt-3">
+                    <label className="flex items-center gap-3 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={(rules[t.key] as boolean | undefined) ?? true}
+                        onChange={(e) => setRules((r) => ({ ...r, [t.key]: e.target.checked }))}
+                        className="w-4 h-4"
+                      />
+                      <div>
+                        <span className="text-sm font-medium text-foreground">{t.label}</span>
+                        <p className="text-xs text-muted-foreground">{t.desc}</p>
+                      </div>
+                    </label>
                   </div>
-                </label>
-              </div>
-
-              <div className="mt-4">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={rules.flagThroughHoleOnBottom ?? true}
-                    onChange={(e) => setRules((r) => ({ ...r, flagThroughHoleOnBottom: e.target.checked }))}
-                    className="w-4 h-4"
-                  />
-                  <div>
-                    <span className="text-sm font-medium text-foreground">Flag Through-Hole on Bottom Side</span>
-                    <p className="text-xs text-muted-foreground">Flag THT / press-fit parts on the bottom side, which can&apos;t be wave or reflow soldered normally</p>
-                  </div>
-                </label>
+                ))}
               </div>
 
               {message && (

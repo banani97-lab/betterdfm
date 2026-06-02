@@ -16,7 +16,13 @@ type TombstoningRiskRule struct{}
 
 func (r *TombstoningRiskRule) ID() string { return "tombstoning-risk" }
 
-func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
+func (r *TombstoningRiskRule) Run(board BoardData, profile ProfileRules) []Violation {
+	// Gated by profile.EnableTombstoningRiskCheck: nil or true enables the
+	// check, false disables it.
+	if profile.EnableTombstoningRiskCheck != nil && !*profile.EnableTombstoningRiskCheck {
+		return nil
+	}
+
 	const maxViolations = 500
 	const maxRatio = 1.3
 
