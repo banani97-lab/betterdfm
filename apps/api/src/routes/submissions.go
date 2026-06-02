@@ -53,7 +53,8 @@ func (h *SubmissionsHandler) ListSubmissions(c echo.Context) error {
 	}
 	var jobs []jobRow
 	if len(ids) > 0 {
-		h.db.Raw("SELECT id, submission_id, mfg_score, mfg_grade FROM analysis_jobs WHERE submission_id IN ?", ids).Scan(&jobs)
+		h.db.Raw(`SELECT DISTINCT ON (submission_id) id, submission_id, mfg_score, mfg_grade
+			FROM analysis_jobs WHERE submission_id IN ? ORDER BY submission_id, created_at DESC`, ids).Scan(&jobs)
 	}
 	type jobInfo struct {
 		id       string

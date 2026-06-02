@@ -458,6 +458,10 @@ export async function archiveProject(id: string): Promise<Project> {
   return apiFetch(`/projects/${id}`, { method: 'DELETE' })
 }
 
+export async function restoreProject(id: string): Promise<Project> {
+  return apiFetch(`/projects/${id}/restore`, { method: 'POST' })
+}
+
 export async function getProjectSubmissions(projectId: string): Promise<Submission[]> {
   return apiFetch<Submission[]>(`/projects/${projectId}/submissions`)
 }

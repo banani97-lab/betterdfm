@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"net/http"
+	"time"
 
 	"github.com/betterdfm/api/src/db"
 	"github.com/betterdfm/api/src/lib"
@@ -104,21 +105,45 @@ func (h *CompareHandler) Compare(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusBadRequest, "job B is not complete")
 	}
 
-	// Fetch non-ignored violations for both jobs.
+	// Load the submissions behind each job for lineage check + filenames.
+	var subA, subB db.Submission
+	if err := h.db.First(&subA, "id = ? AND org_id = ?", jobA.SubmissionID, user.OrgID).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "submission for job A not found")
+	}
+	if err := h.db.First(&subB, "id = ? AND org_id = ?", jobB.SubmissionID, user.OrgID).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "submission for job B not found")
+	}
+
+	// Comparison only makes sense across revisions of the same board, which we
+	// approximate by requiring both submissions to share a (non-null) project.
+	// Without this guard, two unrelated boards produce a meaningless diff.
+	if subA.ProjectID == nil || subB.ProjectID == nil || *subA.ProjectID != *subB.ProjectID {
+		return echo.NewHTTPError(http.StatusBadRequest, "jobs must belong to the same project to be compared")
+	}
+
+	// Orient old -> new so the baseline (A) is always the earlier revision,
+	// regardless of selection order. This keeps scoreDelta sign meaningful
+	// (positive = improvement) and the Before/After labels correct.
+	if jobOrderKey(jobA).After(jobOrderKey(jobB)) {
+		jobA, jobB = jobB, jobA
+		subA, subB = subB, subA
+	}
+
+	// Fetch non-ignored violations for both jobs (in oriented order).
 	var violationsA, violationsB []db.Violation
-	if err := h.db.Where("job_id = ? AND ignored = false", jobAID).Find(&violationsA).Error; err != nil {
+	if err := h.db.Where("job_id = ? AND ignored = false", jobA.ID).Find(&violationsA).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
-	if err := h.db.Where("job_id = ? AND ignored = false", jobBID).Find(&violationsB).Error; err != nil {
+	if err := h.db.Where("job_id = ? AND ignored = false", jobB.ID).Find(&violationsB).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
 	// Run violation matching algorithm.
 	fixed, newViolations, unchanged := matchViolations(violationsA, violationsB)
 
-	// Fetch submission filenames for context.
-	filenameA := fetchFilename(h.db, jobA.SubmissionID)
-	filenameB := fetchFilename(h.db, jobB.SubmissionID)
+	// Submission filenames for context.
+	filenameA := subA.Filename
+	filenameB := subB.Filename
 
 	// Build completed-at strings.
 	var completedAtA, completedAtB *string
@@ -217,11 +242,12 @@ func matchViolations(violationsA, violationsB []db.Violation) (fixed []db.Violat
 	return fixed, newV, unchanged
 }
 
-// fetchFilename looks up the submission filename for a given submission ID.
-func fetchFilename(database *gorm.DB, submissionID string) string {
-	var sub db.Submission
-	if err := database.Select("filename").First(&sub, "id = ?", submissionID).Error; err != nil {
-		return ""
+// jobOrderKey returns the timestamp used to order revisions oldest -> newest.
+// Prefers completion time; falls back to creation time when a job never
+// recorded a CompletedAt.
+func jobOrderKey(j db.AnalysisJob) time.Time {
+	if j.CompletedAt != nil {
+		return *j.CompletedAt
 	}
-	return sub.Filename
+	return j.CreatedAt
 }

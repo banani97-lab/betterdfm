@@ -92,10 +92,10 @@ type Batch struct {
 // Submission is an uploaded ODB++ file
 type Submission struct {
 	ID        string    `gorm:"primaryKey" json:"id"`
-	OrgID     string    `json:"orgId"`
+	OrgID     string    `gorm:"index" json:"orgId"`
 	UserID    string    `json:"userId"`
-	ProjectID *string   `json:"projectId"`
-	BatchID   *string   `json:"batchId"`
+	ProjectID *string   `gorm:"index" json:"projectId"`
+	BatchID   *string   `gorm:"index" json:"batchId"`
 	Filename  string    `json:"filename"`
 	FileType  string    `json:"fileType"` // ODB_PLUS_PLUS
 	FileKey   string    `json:"fileKey"`  // S3 key
@@ -106,8 +106,8 @@ type Submission struct {
 // AnalysisJob is one analysis run
 type AnalysisJob struct {
 	ID            string         `gorm:"primaryKey" json:"id"`
-	OrgID         string         `json:"orgId"`
-	SubmissionID  string         `json:"submissionId"`
+	OrgID         string         `gorm:"index" json:"orgId"`
+	SubmissionID  string         `gorm:"index" json:"submissionId"`
 	ProfileID     string         `json:"profileId"`
 	Status        string         `json:"status"` // PENDING | PROCESSING | DONE | FAILED
 	CreatedAt     time.Time      `gorm:"autoCreateTime" json:"createdAt"`
@@ -170,8 +170,8 @@ type UsageEvent struct {
 // Violation is a single DFM issue found.
 type Violation struct {
 	ID         string  `gorm:"primaryKey" json:"id"`
-	OrgID      string  `json:"orgId"`
-	JobID      string  `json:"jobId"`
+	OrgID      string  `gorm:"index" json:"orgId"`
+	JobID      string  `gorm:"index" json:"jobId"`
 	RuleID     string  `json:"ruleId"`
 	Severity   string  `json:"severity"` // ERROR | WARNING | INFO
 	Layer      string  `json:"layer"`

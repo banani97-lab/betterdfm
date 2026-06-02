@@ -91,10 +91,12 @@ export default function ProjectDetailPage() {
     }
   }
 
-  // Score sparkline data
+  // Score sparkline data. The API returns submissions newest-first, but the
+  // sparkline reads left-to-right as oldest-to-newest, so reverse to chronological.
   const scoreData = submissions
     .filter((s) => s.status === 'DONE' && s.mfgScore > 0)
     .map((s) => s.mfgScore)
+    .reverse()
 
   if (loading) {
     return (
