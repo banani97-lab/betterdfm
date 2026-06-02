@@ -42,19 +42,19 @@ type Trace struct {
 }
 
 type Pad struct {
-	Layer    string  `json:"layer"`
-	X        float64 `json:"x"`
-	Y        float64 `json:"y"`
-	WidthMM  float64 `json:"widthMM"`
-	HeightMM float64 `json:"heightMM"`
-	Shape    string  `json:"shape"`             // RECT | CIRCLE | OVAL | POLYGON | DONUT
-	NetName      string  `json:"netName"`
-	RefDes       string  `json:"refDes"`
-	PackageClass string  `json:"packageClass,omitempty"` // e.g. "0201", "0402", "0603"
-	Contour      []Point `json:"contour,omitempty"`      // polygon contour points when Shape == "POLYGON"
-	HoleMM       float64 `json:"holeMM,omitempty"`       // inner diameter when Shape == "DONUT" (via catch-pad ring)
-	IsFiducial   bool    `json:"isFiducial,omitempty"`
-	IsViaCatchPad bool   `json:"isViaCatchPad,omitempty"` // set by parser when pad sits on a drill hit
+	Layer         string  `json:"layer"`
+	X             float64 `json:"x"`
+	Y             float64 `json:"y"`
+	WidthMM       float64 `json:"widthMM"`
+	HeightMM      float64 `json:"heightMM"`
+	Shape         string  `json:"shape"` // RECT | CIRCLE | OVAL | POLYGON | DONUT
+	NetName       string  `json:"netName"`
+	RefDes        string  `json:"refDes"`
+	PackageClass  string  `json:"packageClass,omitempty"` // e.g. "0201", "0402", "0603"
+	Contour       []Point `json:"contour,omitempty"`      // polygon contour points when Shape == "POLYGON"
+	HoleMM        float64 `json:"holeMM,omitempty"`       // inner diameter when Shape == "DONUT" (via catch-pad ring)
+	IsFiducial    bool    `json:"isFiducial,omitempty"`
+	IsViaCatchPad bool    `json:"isViaCatchPad,omitempty"` // set by parser when pad sits on a drill hit
 }
 
 type Via struct {
@@ -89,7 +89,7 @@ type Component struct {
 	RefDes       string  `json:"refDes"`
 	X            float64 `json:"x"`
 	Y            float64 `json:"y"`
-	Side         string  `json:"side,omitempty"`         // "top" | "bot" | ""
+	Side         string  `json:"side,omitempty"` // "top" | "bot" | ""
 	PartName     string  `json:"partName,omitempty"`
 	PackageClass string  `json:"packageClass,omitempty"` // IPC class like "0402" if classifiable
 	HeightMM     float64 `json:"heightMM,omitempty"`     // 0 when not declared
@@ -98,24 +98,36 @@ type Component struct {
 
 // ProfileRules defines the CM's manufacturing capabilities
 type ProfileRules struct {
-	MinTraceWidthMM    float64 `json:"minTraceWidthMM"`
-	MinClearanceMM     float64 `json:"minClearanceMM"`
-	MinDrillDiamMM     float64 `json:"minDrillDiamMM"`
-	MaxDrillDiamMM     float64 `json:"maxDrillDiamMM"`
-	MinAnnularRingMM   float64 `json:"minAnnularRingMM"`
-	MaxAspectRatio     float64 `json:"maxAspectRatio"`
-	MinSolderMaskDamMM float64 `json:"minSolderMaskDamMM"`
-	MinEdgeClearanceMM float64 `json:"minEdgeClearanceMM"`
-	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
-	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
-	MinCopperSliverMM    float64 `json:"minCopperSliverMM"`
-	SmallestPackageClass string  `json:"smallestPackageClass,omitempty"` // e.g. "0402" — smallest passive the CM can place
-	MaxTraceImbalanceRatio    float64 `json:"maxTraceImbalanceRatio"`
-	EnableSilkscreenOnPadCheck *bool  `json:"enableSilkscreenOnPadCheck"`
+	MinTraceWidthMM            float64 `json:"minTraceWidthMM"`
+	MinClearanceMM             float64 `json:"minClearanceMM"`
+	MinDrillDiamMM             float64 `json:"minDrillDiamMM"`
+	MaxDrillDiamMM             float64 `json:"maxDrillDiamMM"`
+	MinAnnularRingMM           float64 `json:"minAnnularRingMM"`
+	MaxAspectRatio             float64 `json:"maxAspectRatio"`
+	MinSolderMaskDamMM         float64 `json:"minSolderMaskDamMM"`
+	MinEdgeClearanceMM         float64 `json:"minEdgeClearanceMM"`
+	MinDrillToDrillMM          float64 `json:"minDrillToDrillMM"`
+	MinDrillToCopperMM         float64 `json:"minDrillToCopperMM"`
+	MinCopperSliverMM          float64 `json:"minCopperSliverMM"`
+	SmallestPackageClass       string  `json:"smallestPackageClass,omitempty"` // e.g. "0402" — smallest passive the CM can place
+	MaxTraceImbalanceRatio     float64 `json:"maxTraceImbalanceRatio"`
+	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 	// SMT component height caps per side. Set either side to 0 to disable
 	// that half of the check. Applies to components with mountType=="smt".
 	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
 	MaxComponentHeightBottomMM float64 `json:"maxComponentHeightBottomMM"`
+	// Assembly placement checks.
+	// MinComponentSpacingMM is the minimum courtyard edge-to-edge gap between
+	// same-side components for pick-and-place nozzle access and rework
+	// (IPC-7351B nominal-density courtyard excess). 0 disables.
+	MinComponentSpacingMM float64 `json:"minComponentSpacingMM"`
+	// FlagThroughHoleOnBottom flags through-hole / press-fit parts placed on
+	// the bottom side, which can't be wave/reflow soldered normally. nil or
+	// true enables the check; false disables it.
+	FlagThroughHoleOnBottom *bool `json:"flagThroughHoleOnBottom"`
+	// MinMountingHoleKeepoutMM is the minimum copper keepout around the edge of
+	// non-plated mounting holes (IPC-2221B generic clearance). 0 disables.
+	MinMountingHoleKeepoutMM float64 `json:"minMountingHoleKeepoutMM"`
 }
 
 // Violation is a single DFM issue found.
@@ -161,10 +173,18 @@ func newBoardBBox(outline []Point, buffer float64) boardBBox {
 		valid: true,
 	}
 	for _, p := range outline[1:] {
-		if p.X < b.minX { b.minX = p.X }
-		if p.X > b.maxX { b.maxX = p.X }
-		if p.Y < b.minY { b.minY = p.Y }
-		if p.Y > b.maxY { b.maxY = p.Y }
+		if p.X < b.minX {
+			b.minX = p.X
+		}
+		if p.X > b.maxX {
+			b.maxX = p.X
+		}
+		if p.Y < b.minY {
+			b.minY = p.Y
+		}
+		if p.Y > b.maxY {
+			b.maxY = p.Y
+		}
 	}
 	b.minX -= buffer
 	b.maxX += buffer
@@ -243,4 +263,3 @@ func outerCopperLayerSet(layers []Layer) map[string]bool {
 	}
 	return set
 }
-

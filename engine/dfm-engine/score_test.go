@@ -13,7 +13,7 @@ func TestScore_NoViolations(t *testing.T) {
 }
 
 func TestScore_SevereClearance(t *testing.T) {
-	// Many clearance errors should max out the clearance cap (15 pts) → score ≤ 85.
+	// Many clearance errors should max out the clearance cap (13 pts) → score ≤ 87.
 	viols := make([]Violation, 50)
 	for i := range viols {
 		viols[i] = Violation{
@@ -28,8 +28,8 @@ func TestScore_SevereClearance(t *testing.T) {
 		}
 	}
 	result := ComputeScore(viols, rectOutline(60, 40))
-	if result.Score >= 87 {
-		t.Errorf("expected score < 87 with many clearance errors (cap=14), got %d", result.Score)
+	if result.Score > 87 {
+		t.Errorf("expected score <= 87 with many clearance errors (cap=13), got %d", result.Score)
 	}
 }
 

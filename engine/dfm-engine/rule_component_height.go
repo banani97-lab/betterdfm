@@ -98,11 +98,11 @@ func (ComponentHeightRule) Run(board BoardData, profile ProfileRules) []Violatio
 
 	if missingHeight > 0 {
 		violations = append(violations, Violation{
-			RuleID:   "component-height",
-			Severity: "INFO",
-			Message:  msgComponentsMissingHeight(missingHeight),
+			RuleID:     "component-height",
+			Severity:   "INFO",
+			Message:    msgComponentsMissingHeight(missingHeight),
 			Suggestion: "ODB++ exports sometimes omit .comp_height for certain packages. Unlisted components are skipped.",
-			Unit:     "mm",
+			Unit:       "mm",
 		})
 	}
 	return violations

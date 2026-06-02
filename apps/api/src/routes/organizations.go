@@ -15,29 +15,29 @@ import (
 
 // OrgStats is the response for GET /admin/organizations/:id/stats
 type OrgStats struct {
-	TotalJobs        int64              `json:"totalJobs"`
-	JobsByStatus     map[string]int64   `json:"jobsByStatus"`
-	TotalSubmissions int64              `json:"totalSubmissions"`
-	TotalUsers       int64              `json:"totalUsers"`
-	TotalViolations  int64              `json:"totalViolations"`
-	ViolationsBySev  map[string]int64   `json:"violationsBySeverity"`
-	TopRules         []RuleCount        `json:"topRules"`
-	AvgScore         float64            `json:"avgScore"`
-	GradeDistribution map[string]int64  `json:"gradeDistribution"`
+	TotalJobs         int64            `json:"totalJobs"`
+	JobsByStatus      map[string]int64 `json:"jobsByStatus"`
+	TotalSubmissions  int64            `json:"totalSubmissions"`
+	TotalUsers        int64            `json:"totalUsers"`
+	TotalViolations   int64            `json:"totalViolations"`
+	ViolationsBySev   map[string]int64 `json:"violationsBySeverity"`
+	TopRules          []RuleCount      `json:"topRules"`
+	AvgScore          float64          `json:"avgScore"`
+	GradeDistribution map[string]int64 `json:"gradeDistribution"`
 }
 
 // PlatformStats is the response for GET /admin/stats
 type PlatformStats struct {
-	TotalOrgs        int64              `json:"totalOrgs"`
-	TotalJobs        int64              `json:"totalJobs"`
-	JobsByStatus     map[string]int64   `json:"jobsByStatus"`
-	TotalSubmissions int64              `json:"totalSubmissions"`
-	TotalUsers       int64              `json:"totalUsers"`
-	TotalViolations  int64              `json:"totalViolations"`
-	ViolationsBySev  map[string]int64   `json:"violationsBySeverity"`
-	TopRules         []RuleCount        `json:"topRules"`
-	AvgScore         float64            `json:"avgScore"`
-	GradeDistribution map[string]int64  `json:"gradeDistribution"`
+	TotalOrgs         int64            `json:"totalOrgs"`
+	TotalJobs         int64            `json:"totalJobs"`
+	JobsByStatus      map[string]int64 `json:"jobsByStatus"`
+	TotalSubmissions  int64            `json:"totalSubmissions"`
+	TotalUsers        int64            `json:"totalUsers"`
+	TotalViolations   int64            `json:"totalViolations"`
+	ViolationsBySev   map[string]int64 `json:"violationsBySeverity"`
+	TopRules          []RuleCount      `json:"topRules"`
+	AvgScore          float64          `json:"avgScore"`
+	GradeDistribution map[string]int64 `json:"gradeDistribution"`
 }
 
 type RuleCount struct {

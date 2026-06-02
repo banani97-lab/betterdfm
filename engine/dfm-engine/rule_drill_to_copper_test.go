@@ -11,7 +11,7 @@ func TestDrillToCopper_TooClose(t *testing.T) {
 		Traces: []Trace{
 			{Layer: "top_copper", WidthMM: 0.1, StartX: 0, StartY: 10.3, EndX: 30, EndY: 10.3},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{MinDrillToCopperMM: 0.25}
@@ -37,7 +37,7 @@ func TestDrillToCopper_OK(t *testing.T) {
 		Traces: []Trace{
 			{Layer: "top_copper", WidthMM: 0.1, StartX: 0, StartY: 10.5, EndX: 30, EndY: 10.5},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{MinDrillToCopperMM: 0.25}
@@ -54,7 +54,7 @@ func TestDrillToCopper_NoProfile(t *testing.T) {
 		Traces: []Trace{
 			{Layer: "top_copper", WidthMM: 0.1, StartX: 0, StartY: 10.2, EndX: 30, EndY: 10.2},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{} // MinDrillToCopperMM = 0 → disabled
@@ -72,7 +72,7 @@ func TestDrillToCopper_AnnularRingSkipped(t *testing.T) {
 		Pads: []Pad{
 			{Layer: "top_copper", X: 10, Y: 10, WidthMM: 0.6, HeightMM: 0.6, Shape: "CIRCLE"},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{MinDrillToCopperMM: 0.25}
@@ -91,7 +91,7 @@ func TestDrillToCopper_PadTooClose(t *testing.T) {
 		Pads: []Pad{
 			{Layer: "top_copper", X: 10.3, Y: 10, WidthMM: 0.1, HeightMM: 0.1, Shape: "CIRCLE"},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{MinDrillToCopperMM: 0.25}
@@ -153,7 +153,7 @@ func TestDrillToCopper_SilkSkipped(t *testing.T) {
 		Traces: []Trace{
 			{Layer: "top_silk", WidthMM: 0.1, StartX: 0, StartY: 10.2, EndX: 30, EndY: 10.2},
 		},
-		Drills: []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
+		Drills:  []Drill{{X: 10, Y: 10, DiamMM: 0.3, Plated: true}},
 		Outline: rectOutline(40, 30),
 	}
 	profile := ProfileRules{MinDrillToCopperMM: 0.25}

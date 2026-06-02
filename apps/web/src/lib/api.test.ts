@@ -59,7 +59,7 @@ describe('apiFetch', () => {
   it('Violation type has x2 and y2 fields (compile-time check)', () => {
     // This is a compile-time check; if the type lacks x2/y2, TypeScript will error.
     const v: Violation = {
-      id: '1', jobId: 'j1', ruleId: 'clearance', severity: 'ERROR',
+      id: '1', orgId: 'org1', jobId: 'j1', ruleId: 'clearance', severity: 'ERROR',
       layer: 'top_copper', x: 1, y: 2, message: 'msg', suggestion: 'sug',
       count: 1, measuredMM: 0.05, limitMM: 0.1, unit: 'mm',
       netName: '', refDes: '', x2: 3, y2: 4, ignored: false,

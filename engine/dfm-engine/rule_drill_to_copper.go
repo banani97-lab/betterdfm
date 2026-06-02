@@ -46,11 +46,15 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 	bbox := newBoardBBox(board.Outline, 2.0)
 	holes := make([]hole, 0, len(board.Drills)+len(board.Vias))
 	for _, d := range board.Drills {
-		if !bbox.contains(d.X, d.Y) { continue }
+		if !bbox.contains(d.X, d.Y) {
+			continue
+		}
 		holes = append(holes, hole{d.X, d.Y, d.DiamMM / 2, ""})
 	}
 	for _, v := range board.Vias {
-		if !bbox.contains(v.X, v.Y) { continue }
+		if !bbox.contains(v.X, v.Y) {
+			continue
+		}
 		holes = append(holes, hole{v.X, v.Y, v.DrillDiamMM / 2, v.NetName})
 	}
 	if len(holes) == 0 {
@@ -161,7 +165,7 @@ func (r *DrillToCopperRule) Run(board BoardData, profile ProfileRules) []Violati
 				continue
 			}
 			// P2.1: padEdgeDist for shape-aware drill-to-pad gap.
-			
+
 			gap := padEdgeDist(h.x, h.y, p) - h.radius
 			if gap < 0 {
 				continue // overlapping (annular ring pad or DRC issue)

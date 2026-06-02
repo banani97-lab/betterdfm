@@ -215,4 +215,3 @@ func polyShortDim(poly Polygon) float64 {
 	}
 	return short
 }
-

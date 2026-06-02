@@ -2,13 +2,13 @@ package lib
 
 // TierLimits defines the resource and feature limits for a subscription tier.
 type TierLimits struct {
-	AnalysesPerMonth    int  // -1 = unlimited
-	MaxUsers            int  // -1 = unlimited
+	AnalysesPerMonth    int // -1 = unlimited
+	MaxUsers            int // -1 = unlimited
 	MaxProfiles         int
-	MaxProjects         int  // -1 = unlimited
-	MaxBatchFiles       int  // 0 = disabled
+	MaxProjects         int // -1 = unlimited
+	MaxBatchFiles       int // 0 = disabled
 	CompareEnabled      bool
-	MaxActiveShareLinks int  // -1 = unlimited, 0 = disabled
+	MaxActiveShareLinks int // -1 = unlimited, 0 = disabled
 	AdminDashboard      bool
 	OverageRateCents    int
 }
