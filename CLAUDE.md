@@ -105,6 +105,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 ### Python (Sidecar)
 
 - **ODB++ parser**: `parser_odb.py` (custom archive extraction and feature parsing).
+- **Package-type classification**: the parser reads `eda/data` `PKG` records (pin grid + pad shapes) and sets `Component.packageType` (`discrete`/`leaded`/`bga`/`through_hole`) via mount type → IPC name token → geometric BGA detection → leaded residual. Consumed by the per-class `component-spacing` rule.
 - **All coordinates output in millimeters** — unit conversion happens in parsers.
 - **Fallback mock data** if S3 is unavailable (dev mode).
 
@@ -139,7 +140,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | tombstoning-risk | ERROR | Pad area ratio on small 2-pad passives (01005-0603) <= 1.3; gated by `profile.EnableTombstoningRiskCheck` (`*bool`, default on) |
 | trace-imbalance | ERROR | Trace/pour width ratio into a 2-pad component <= `profile.MaxTraceImbalanceRatio` |
 | component-height | ERROR / INFO | SMT component height within per-side limits (`MaxComponentHeightTop/BottomMM`) |
-| component-spacing | WARNING / ERROR | Same-side component courtyard (pad-bbox) edge-to-edge gap >= `profile.MinComponentSpacingMM` (off when 0); ERROR on overlap. IPC-7351B |
+| component-spacing | WARNING / ERROR | Same-side component courtyard (pad-bbox) edge-to-edge gap. Flat `profile.MinComponentSpacingMM` (off when 0), or per-package-class keepouts when `profile.ComponentSpacing` is set; pair limit = `max(radius[a], radius[b])` keyed off each part's `Component.PackageType` (`discrete`/`leaded`/`bga`/`through_hole`, classified by the parser). Through-hole parts are included only in per-class mode. ERROR on overlap. IPC-7351B |
 | via-in-pad | WARNING / INFO | Via landing in an SMT land (parser `IsViaCatchPad`); WARNING on fine-pitch/BGA, INFO otherwise. Gated by `profile.EnableViaInPadCheck` (`*bool`, default on). IPC-4761/7093 |
 | through-hole-on-bottom | WARNING | Through-hole / press-fit parts on the bottom side; gated by `profile.FlagThroughHoleOnBottom` (`*bool`, default on) |
 | fiducial-placement | WARNING / INFO | Global fiducials not collinear; fine-pitch/BGA parts have a local fiducial. Runs only if fiducials present; gated by `profile.EnableFiducialPlacementCheck` (`*bool`, default on). IPC-7351 |

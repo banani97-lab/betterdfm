@@ -230,7 +230,7 @@ const RULES = [
   { id: 'tombstoning-risk', group: 'assembly', sev: 'ERROR', desc: 'Pad area ratio on small 2-pad passives ≤ 1.3 (reflow imbalance; enableTombstoningRiskCheck)' },
   { id: 'trace-imbalance', group: 'assembly', sev: 'ERROR', desc: 'Thermal trace/pour balance into 2-pad components ≤ maxTraceImbalanceRatio' },
   { id: 'component-height', group: 'assembly', sev: 'ERROR', desc: 'SMT component height within per-side limits (maxComponentHeightTop/BottomMM)' },
-  { id: 'component-spacing', group: 'assembly', sev: 'WARNING', desc: 'Same-side courtyard edge-to-edge gap ≥ minComponentSpacingMM (IPC-7351B); ERROR on overlap' },
+  { id: 'component-spacing', group: 'assembly', sev: 'WARNING', desc: 'Same-side courtyard edge-to-edge gap (IPC-7351B): flat minComponentSpacingMM, or per-package-class keepouts via componentSpacing (discrete/leaded/BGA/through-hole, pair limit = larger of the two); ERROR on overlap' },
   { id: 'via-in-pad', group: 'assembly', sev: 'WARNING', desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093; enableViaInPadCheck)' },
   { id: 'through-hole-on-bottom', group: 'assembly', sev: 'WARNING', desc: 'Through-hole / press-fit parts on the bottom side (flagThroughHoleOnBottom)' },
   { id: 'fiducial-placement', group: 'assembly', sev: 'WARNING', desc: 'Global fiducials non-collinear; local fiducials for fine-pitch/BGA (IPC-7351, enableFiducialPlacementCheck)' },
