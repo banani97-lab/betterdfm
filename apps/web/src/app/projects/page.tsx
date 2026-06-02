@@ -119,12 +119,12 @@ export default function ProjectsPage() {
             projectLimitReached ? (
               <p className="text-xs text-muted-foreground">Project limit reached ({usage!.projects.used}/{usage!.projects.limit}). Upgrade to create more.</p>
             ) : (
-              <Button onClick={() => setShowCreate(true)}>
+              <Button variant="outline" onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-2" /> New Project
               </Button>
             )
           )}
-          <AppTaskbar />
+          <AppTaskbar expandOnHover={false} />
         </div>
       </header>
 

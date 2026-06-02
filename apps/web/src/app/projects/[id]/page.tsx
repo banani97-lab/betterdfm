@@ -149,7 +149,7 @@ export default function ProjectDetailPage() {
               </Link>
             </>
           )}
-          <AppTaskbar />
+          <AppTaskbar expandOnHover={false} />
         </div>
       </header>
 

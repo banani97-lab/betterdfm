@@ -311,7 +311,7 @@ export default function ResultsPage() {
           <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={downloadPDF}>
             <Download className="h-4 w-4 mr-1" />PDF
           </Button>
-          <AppTaskbar />
+          <AppTaskbar expandOnHover={false} />
         </div>
         {/* Summary badges */}
         <div className="order-3 md:order-2 w-full md:w-auto flex items-center gap-2">
