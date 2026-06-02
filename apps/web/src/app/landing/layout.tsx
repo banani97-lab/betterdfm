@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   },
   title: 'RapidDFM — Screen PCB Designs Automatically Before They Hit Your Engineers',
   description:
-    'Automated DFM screening for PCB contract manufacturers. Upload ODB++ files, run 16 manufacturability checks in under 30 seconds, and share results with customers. Reduce manual CAM review time by up to 80%.',
+    'Automated DFM screening for PCB contract manufacturers. Upload ODB++ files, run 22 manufacturability checks in under 30 seconds, and share results with customers. Reduce manual CAM review time by up to 80%.',
   keywords: [
     'DFM', 'DFM analysis', 'PCB DFM', 'design for manufacturability',
     'ODB++ analysis', 'PCB manufacturing',
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   ],
   openGraph: {
     title: 'RapidDFM — Automated DFM Screening for PCB Shops',
-    description: 'Stop reviewing bad designs. Start screening them automatically. 16 DFM checks in under 30 seconds.',
+    description: 'Stop reviewing bad designs. Start screening them automatically. 22 DFM checks in under 30 seconds.',
     url: 'https://www.rapiddfm.com',
     siteName: 'RapidDFM',
     type: 'website',
