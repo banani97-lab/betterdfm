@@ -27,7 +27,13 @@ type ViaInPadRule struct{}
 
 func (r *ViaInPadRule) ID() string { return "via-in-pad" }
 
-func (r *ViaInPadRule) Run(board BoardData, _ ProfileRules) []Violation {
+func (r *ViaInPadRule) Run(board BoardData, profile ProfileRules) []Violation {
+	// Gated by profile.EnableViaInPadCheck: nil or true enables the check,
+	// false disables it.
+	if profile.EnableViaInPadCheck != nil && !*profile.EnableViaInPadCheck {
+		return nil
+	}
+
 	const maxViolations = 500
 
 	outer := outerCopperLayerSet(board.Layers)

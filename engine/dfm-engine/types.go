@@ -128,6 +128,16 @@ type ProfileRules struct {
 	// MinMountingHoleKeepoutMM is the minimum copper keepout around the edge of
 	// non-plated mounting holes (IPC-2221B generic clearance). 0 disables.
 	MinMountingHoleKeepoutMM float64 `json:"minMountingHoleKeepoutMM"`
+	// EnableFiducialPlacementCheck gates the fiducial-placement rule (collinear
+	// global fiducials + missing local fiducials for fine-pitch/BGA parts). nil
+	// or true enables the check; false disables it.
+	EnableFiducialPlacementCheck *bool `json:"enableFiducialPlacementCheck"`
+	// On/off toggles for the remaining discrete checks that have no numeric
+	// threshold. nil or true enables the check; false disables it.
+	EnableFiducialCountCheck     *bool `json:"enableFiducialCountCheck"`
+	EnablePadSizeForPackageCheck *bool `json:"enablePadSizeForPackageCheck"`
+	EnableTombstoningRiskCheck   *bool `json:"enableTombstoningRiskCheck"`
+	EnableViaInPadCheck          *bool `json:"enableViaInPadCheck"`
 }
 
 // Violation is a single DFM issue found.

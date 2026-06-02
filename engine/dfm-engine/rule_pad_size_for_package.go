@@ -38,7 +38,13 @@ type PadSizeForPackageRule struct{}
 
 func (r *PadSizeForPackageRule) ID() string { return "pad-size-for-package" }
 
-func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation {
+func (r *PadSizeForPackageRule) Run(board BoardData, profile ProfileRules) []Violation {
+	// Gated by profile.EnablePadSizeForPackageCheck: nil or true enables the
+	// check, false disables it.
+	if profile.EnablePadSizeForPackageCheck != nil && !*profile.EnablePadSizeForPackageCheck {
+		return nil
+	}
+
 	const maxViolations = 500
 	var violations []Violation
 
