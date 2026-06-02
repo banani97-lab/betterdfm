@@ -248,6 +248,8 @@ func (h *ProjectsHandler) UpdateProject(c echo.Context) error {
 }
 
 // ArchiveProject DELETE /projects/:id
+// Soft-archive: the project is hidden from the default list but its submissions
+// are preserved and it can be restored via RestoreProject.
 func (h *ProjectsHandler) ArchiveProject(c echo.Context) error {
 	user := lib.GetUser(c)
 	id := c.Param("id")
@@ -263,7 +265,29 @@ func (h *ProjectsHandler) ArchiveProject(c echo.Context) error {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
-	lib.Track("Project Deleted", user.OrgID, map[string]any{"orgId": user.OrgID})
+	lib.Track("Project Archived", user.OrgID, map[string]any{"orgId": user.OrgID})
+
+	return c.JSON(http.StatusOK, project)
+}
+
+// RestoreProject POST /projects/:id/restore
+// Un-archives a previously archived project.
+func (h *ProjectsHandler) RestoreProject(c echo.Context) error {
+	user := lib.GetUser(c)
+	id := c.Param("id")
+
+	var project db.Project
+	if err := h.db.Where("id = ? AND org_id = ?", id, user.OrgID).First(&project).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "project not found")
+	}
+
+	project.Archived = false
+	project.UpdatedAt = time.Now()
+	if err := h.db.Save(&project).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+
+	lib.Track("Project Restored", user.OrgID, map[string]any{"orgId": user.OrgID})
 
 	return c.JSON(http.StatusOK, project)
 }
@@ -297,7 +321,8 @@ func (h *ProjectsHandler) ListProjectSubmissions(c echo.Context) error {
 	}
 	var jobs []jobRow
 	if len(ids) > 0 {
-		h.db.Raw("SELECT id, submission_id, mfg_score, mfg_grade FROM analysis_jobs WHERE submission_id IN ?", ids).Scan(&jobs)
+		h.db.Raw(`SELECT DISTINCT ON (submission_id) id, submission_id, mfg_score, mfg_grade
+			FROM analysis_jobs WHERE submission_id IN ? ORDER BY submission_id, created_at DESC`, ids).Scan(&jobs)
 	}
 	type jobInfo struct {
 		id       string

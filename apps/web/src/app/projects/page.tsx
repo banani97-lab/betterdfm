@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { FolderOpen, Plus, Search, X } from 'lucide-react'
-import { getProjects, createProject, type Project } from '@/lib/api'
+import { Archive, ArchiveRestore, FolderOpen, Plus, Search, X } from 'lucide-react'
+import { getProjects, createProject, archiveProject, restoreProject, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -34,6 +34,7 @@ export default function ProjectsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -42,9 +43,9 @@ export default function ProjectsPage() {
   const { usage } = useUsage()
   const projectLimitReached = usage ? (usage.projects.limit !== -1 && usage.projects.used >= usage.projects.limit) : false
 
-  const fetchProjects = useCallback(async (q?: string) => {
+  const fetchProjects = useCallback(async (q?: string, archived = false) => {
     try {
-      const data = await getProjects(q, false)
+      const data = await getProjects(q, archived)
       setProjects(data ?? [])
       setError(null)
     } catch (e: unknown) {
@@ -56,13 +57,28 @@ export default function ProjectsPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
-    fetchProjects()
+    fetchProjects(undefined, false)
   }, [router, fetchProjects])
 
   useEffect(() => {
-    const t = setTimeout(() => { fetchProjects(search || undefined) }, 300)
+    const t = setTimeout(() => { fetchProjects(search || undefined, showArchived) }, 300)
     return () => clearTimeout(t)
-  }, [search, fetchProjects])
+  }, [search, showArchived, fetchProjects])
+
+  const handleArchiveToggle = async (e: MouseEvent, id: string, archived: boolean) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      if (archived) {
+        await restoreProject(id)
+      } else {
+        await archiveProject(id)
+      }
+      fetchProjects(search || undefined, showArchived)
+    } catch (err: unknown) {
+      if (err instanceof Error) setError(err.message)
+    }
+  }
 
   const handleCreate = async () => {
     if (!newName.trim()) return
@@ -116,16 +132,34 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {/* Search */}
-        <div className="relative mb-6 max-w-md">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <input
-            type="text"
-            placeholder="Search projects..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-input bg-background rounded-md pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+        {/* Search + Active/Archived toggle */}
+        <div className="mb-6 flex flex-wrap items-center gap-3">
+          <div className="relative max-w-md flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full border border-input bg-background rounded-md pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+          </div>
+          <div className="inline-flex rounded-md border border-input overflow-hidden text-sm">
+            <button
+              type="button"
+              onClick={() => setShowArchived(false)}
+              className={`px-3 py-2 ${!showArchived ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'}`}
+            >
+              Active
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowArchived(true)}
+              className={`px-3 py-2 border-l border-input ${showArchived ? 'bg-primary text-primary-foreground' : 'bg-background text-muted-foreground hover:text-foreground'}`}
+            >
+              Archived
+            </button>
+          </div>
         </div>
 
         {error && (
@@ -141,14 +175,14 @@ export default function ProjectsPage() {
         ) : projects.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/45">
             <FolderOpen className="h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-medium text-foreground">No projects yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Create a project to organize your submissions</p>
-            {canWrite() && !projectLimitReached && (
+            <h3 className="text-lg font-medium text-foreground">{showArchived ? 'No archived projects' : 'No projects yet'}</h3>
+            {!showArchived && <p className="text-sm text-muted-foreground mb-4">Create a project to organize your submissions</p>}
+            {!showArchived && canWrite() && !projectLimitReached && (
               <Button onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-2" /> Create your first project
               </Button>
             )}
-            {canWrite() && projectLimitReached && (
+            {!showArchived && canWrite() && projectLimitReached && (
               <p className="text-xs text-muted-foreground">Project limit reached ({usage!.projects.used}/{usage!.projects.limit}). Upgrade to create more.</p>
             )}
           </div>
@@ -183,6 +217,17 @@ export default function ProjectsPage() {
                       <span className="text-xs text-muted-foreground">
                         {formatDate(p.lastActivityAt)}
                       </span>
+                    )}
+                    {canWrite() && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleArchiveToggle(e, p.id, showArchived)}
+                        className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                        title={showArchived ? 'Restore project' : 'Archive project'}
+                      >
+                        {showArchived ? <ArchiveRestore className="h-3.5 w-3.5" /> : <Archive className="h-3.5 w-3.5" />}
+                        {showArchived ? 'Restore' : 'Archive'}
+                      </button>
                     )}
                   </div>
                 </div>

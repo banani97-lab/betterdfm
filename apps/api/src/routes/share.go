@@ -285,7 +285,8 @@ func (h *ShareHandler) GetSharedSubmissions(c echo.Context) error {
 	}
 	var jobs []jobRow
 	if len(ids) > 0 {
-		h.db.Raw("SELECT id, submission_id, mfg_score, mfg_grade, status FROM analysis_jobs WHERE submission_id IN ?", ids).Scan(&jobs)
+		h.db.Raw(`SELECT DISTINCT ON (submission_id) id, submission_id, mfg_score, mfg_grade, status
+			FROM analysis_jobs WHERE submission_id IN ? ORDER BY submission_id, created_at DESC`, ids).Scan(&jobs)
 	}
 
 	type jobInfo struct {
@@ -343,9 +344,14 @@ func (h *ShareHandler) verifyJobAccess(link *db.ShareLink, jobID string) (*db.An
 			return nil, gorm.ErrRecordNotFound
 		}
 	} else if link.ProjectID != nil {
-		// Project share: verify the job's submission belongs to the org
+		// Project share: the job's submission must belong to the shared project,
+		// not merely the same org. Without the project_id match, one project
+		// share link would expose every job in the org.
 		var sub db.Submission
 		if err := h.db.First(&sub, "id = ? AND org_id = ?", job.SubmissionID, link.OrgID).Error; err != nil {
+			return nil, gorm.ErrRecordNotFound
+		}
+		if sub.ProjectID == nil || *sub.ProjectID != *link.ProjectID {
 			return nil, gorm.ErrRecordNotFound
 		}
 	}

@@ -156,6 +156,7 @@ func main() {
 	write.POST("/projects", projectsHandler.CreateProject)
 	write.PUT("/projects/:id", projectsHandler.UpdateProject)
 	write.DELETE("/projects/:id", projectsHandler.ArchiveProject)
+	write.POST("/projects/:id/restore", projectsHandler.RestoreProject)
 	write.POST("/projects/:id/submissions", projectsHandler.MoveSubmissionToProject)
 	write.POST("/profiles", profilesHandler.CreateProfile)
 	write.PUT("/profiles/:id", profilesHandler.UpdateProfile)

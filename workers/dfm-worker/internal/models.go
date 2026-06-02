@@ -20,8 +20,8 @@ type Batch struct {
 // DB models mirroring the API's models
 type AnalysisJob struct {
 	ID            string `gorm:"primaryKey"`
-	OrgID         string
-	SubmissionID  string
+	OrgID         string `gorm:"index"`
+	SubmissionID  string `gorm:"index"`
 	ProfileID     string
 	Status        string
 	CreatedAt     time.Time `gorm:"autoCreateTime"`
@@ -38,10 +38,10 @@ type AnalysisJob struct {
 
 type Submission struct {
 	ID        string `gorm:"primaryKey"`
-	OrgID     string
+	OrgID     string `gorm:"index"`
 	UserID    string
-	ProjectID *string
-	BatchID   *string
+	ProjectID *string `gorm:"index"`
+	BatchID   *string `gorm:"index"`
 	Filename  string
 	FileType  string
 	FileKey   string
@@ -58,8 +58,8 @@ type CapabilityProfile struct {
 
 type Violation struct {
 	ID         string  `gorm:"primaryKey" json:"id"`
-	OrgID      string  `json:"orgId"`
-	JobID      string  `json:"jobId"`
+	OrgID      string  `gorm:"index" json:"orgId"`
+	JobID      string  `gorm:"index" json:"jobId"`
 	RuleID     string  `json:"ruleId"`
 	Severity   string  `json:"severity"`
 	Layer      string  `json:"layer"`
