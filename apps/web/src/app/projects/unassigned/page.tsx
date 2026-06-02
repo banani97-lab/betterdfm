@@ -7,6 +7,7 @@ import { Inbox } from 'lucide-react'
 import { getSubmissions, getProjects, moveSubmissionToProject, type Submission, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,6 +67,7 @@ export default function UnassignedSubmissionsPage() {
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex items-center justify-between gap-3 sticky top-0 z-30">
         <RapidDFMLogo className="shrink-0" />
+        <AppTaskbar />
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">

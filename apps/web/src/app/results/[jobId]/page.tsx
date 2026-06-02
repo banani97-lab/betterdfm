@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { ViolationList, type SeverityFilter } from '@/components/ui/ViolationList'
 import { BoardViewer } from '@/components/ui/BoardViewer'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
 
@@ -310,6 +311,7 @@ export default function ResultsPage() {
           <Button variant="outline" className="h-10 px-3 md:h-11 md:px-8" onClick={downloadPDF}>
             <Download className="h-4 w-4 mr-1" />PDF
           </Button>
+          <AppTaskbar />
         </div>
         {/* Summary badges */}
         <div className="order-3 md:order-2 w-full md:w-auto flex items-center gap-2">

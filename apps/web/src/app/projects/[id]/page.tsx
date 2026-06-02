@@ -15,6 +15,7 @@ import {
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -148,6 +149,7 @@ export default function ProjectDetailPage() {
               </Link>
             </>
           )}
+          <AppTaskbar />
         </div>
       </header>
 

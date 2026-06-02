@@ -16,6 +16,7 @@ import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -328,7 +329,10 @@ export default function AdminProfilePage() {
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
         <RapidDFMLogo />
-        <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
+          <AppTaskbar className="w-auto" />
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">

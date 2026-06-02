@@ -8,6 +8,7 @@ import { isLoggedIn } from '@/lib/auth'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { cn } from '@/lib/utils'
 
 function gradeColor(grade: string): string {
@@ -100,7 +101,10 @@ export default function BatchDetailPage() {
     <div className="min-h-screen bg-background">
       <header className="bg-card border-b px-6 py-5 flex items-center justify-between gap-4">
         <RapidDFMLogo />
-        <h1 className="text-xl font-semibold text-foreground">Batch Results</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-xl font-semibold text-foreground">Batch Results</h1>
+          <AppTaskbar className="w-auto" />
+        </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
