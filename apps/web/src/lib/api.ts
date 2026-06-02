@@ -202,8 +202,9 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
 // ── Submissions ───────────────────────────────────────────────────────────────
 
-export async function getSubmissions(): Promise<Submission[]> {
-  return apiFetch<Submission[]>('/submissions')
+export async function getSubmissions(opts?: { unassigned?: boolean }): Promise<Submission[]> {
+  const qs = opts?.unassigned ? '?unassigned=true' : ''
+  return apiFetch<Submission[]>(`/submissions${qs}`)
 }
 
 export async function createSubmission(
@@ -460,6 +461,17 @@ export async function archiveProject(id: string): Promise<Project> {
 
 export async function restoreProject(id: string): Promise<Project> {
   return apiFetch(`/projects/${id}/restore`, { method: 'POST' })
+}
+
+export async function moveSubmissionToProject(projectId: string, submissionId: string): Promise<Submission> {
+  return apiFetch(`/projects/${projectId}/submissions`, {
+    method: 'POST',
+    body: JSON.stringify({ submissionId }),
+  })
+}
+
+export async function unassignSubmission(submissionId: string): Promise<Submission> {
+  return apiFetch(`/submissions/${submissionId}/project`, { method: 'DELETE' })
 }
 
 export async function getProjectSubmissions(projectId: string): Promise<Submission[]> {

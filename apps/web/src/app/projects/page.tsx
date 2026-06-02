@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState, type MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Archive, ArchiveRestore, FolderOpen, Plus, Search, X } from 'lucide-react'
-import { getProjects, createProject, archiveProject, restoreProject, type Project } from '@/lib/api'
+import { Archive, ArchiveRestore, FolderOpen, Inbox, Plus, Search, X } from 'lucide-react'
+import { getProjects, createProject, archiveProject, restoreProject, getSubmissions, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -35,6 +35,7 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
+  const [unassignedCount, setUnassignedCount] = useState(0)
   const [showCreate, setShowCreate] = useState(false)
   const [newName, setNewName] = useState('')
   const [newDesc, setNewDesc] = useState('')
@@ -47,6 +48,12 @@ export default function ProjectsPage() {
     try {
       const data = await getProjects(q, archived)
       setProjects(data ?? [])
+      if (!archived) {
+        const unassigned = await getSubmissions({ unassigned: true })
+        setUnassignedCount(unassigned?.length ?? 0)
+      } else {
+        setUnassignedCount(0)
+      }
       setError(null)
     } catch (e: unknown) {
       if (e instanceof Error) setError(e.message)
@@ -166,6 +173,20 @@ export default function ProjectsPage() {
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
             {error}
           </div>
+        )}
+
+        {!showArchived && !loading && unassignedCount > 0 && (
+          <Link href="/projects/unassigned">
+            <div className="mb-4 rounded-2xl border border-dashed border-border/70 bg-card/40 p-5 hover:bg-card/60 transition-colors cursor-pointer flex items-center gap-3">
+              <Inbox className="h-5 w-5 text-muted-foreground shrink-0" />
+              <div>
+                <h3 className="text-base font-semibold text-foreground">Unassigned</h3>
+                <p className="text-xs text-muted-foreground">
+                  {unassignedCount} submission{unassignedCount === 1 ? '' : 's'} not in any project
+                </p>
+              </div>
+            </div>
+          </Link>
         )}
 
         {loading ? (

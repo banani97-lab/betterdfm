@@ -251,19 +251,9 @@ func (h *BatchesHandler) AnalyzeBatch(c echo.Context) error {
 		profileID = *batch.ProfileID
 	}
 	if profileID == "" {
-		var profile db.CapabilityProfile
-		if err := h.db.Where("org_id = ? AND is_default = ?", user.OrgID, true).First(&profile).Error; err != nil {
-			defaultRules := `{"minTraceWidthMM":0.15,"minClearanceMM":0.15,"minDrillDiamMM":0.3,"maxDrillDiamMM":6.3,"minAnnularRingMM":0.15,"maxAspectRatio":10,"minSolderMaskDamMM":0.1,"minEdgeClearanceMM":0.3,"minDrillToDrillMM":0.25,"minDrillToCopperMM":0.25,"minCopperSliverMM":0.1,"maxTraceImbalanceRatio":2.0,"enableSilkscreenOnPadCheck":true,"maxComponentHeightTopMM":10,"maxComponentHeightBottomMM":5,"minComponentSpacingMM":0.5,"flagThroughHoleOnBottom":true,"minMountingHoleKeepoutMM":0.5}`
-			profile = db.CapabilityProfile{
-				ID:        uuid.New().String(),
-				OrgID:     user.OrgID,
-				Name:      "Default",
-				IsDefault: true,
-				Rules:     []byte(defaultRules),
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-			}
-			h.db.Create(&profile)
+		profile, err := getOrCreateDefaultProfile(h.db, user.OrgID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve default profile")
 		}
 		profileID = profile.ID
 	}
@@ -359,8 +349,7 @@ func (h *BatchesHandler) RetryBatch(c echo.Context) error {
 		profileID = *batch.ProfileID
 	}
 	if profileID == "" {
-		var profile db.CapabilityProfile
-		if err := h.db.Where("org_id = ? AND is_default = ?", user.OrgID, true).First(&profile).Error; err == nil {
+		if profile, err := getOrCreateDefaultProfile(h.db, user.OrgID); err == nil {
 			profileID = profile.ID
 		}
 	}
