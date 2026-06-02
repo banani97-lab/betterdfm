@@ -3,11 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Edit2, Plus, Share2, Upload } from 'lucide-react'
+import { Check, Edit2, FolderMinus, Plus, Share2, Upload } from 'lucide-react'
 import {
   getProject,
   getProjectSubmissions,
   updateProject,
+  unassignSubmission,
   type Project,
   type Submission,
 } from '@/lib/api'
@@ -75,6 +76,15 @@ export default function ProjectDetailPage() {
       setLoading(false)
     }
   }, [id])
+
+  const handleUnassign = useCallback(async (submissionId: string) => {
+    try {
+      await unassignSubmission(submissionId)
+      setSubmissions((prev) => prev.filter((s) => s.id !== submissionId))
+    } catch (e: unknown) {
+      if (e instanceof Error) setError(e.message)
+    }
+  }, [])
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
@@ -396,6 +406,16 @@ export default function ProjectDetailPage() {
                     )}
                     {s.status !== 'DONE' && (
                       <Badge variant="info" className="text-sm px-3 py-1.5">{s.status}</Badge>
+                    )}
+                    {canWrite() && (
+                      <Button
+                        variant="ghost"
+                        className="h-11 px-3 text-sm text-muted-foreground hover:text-foreground"
+                        onClick={() => handleUnassign(s.id)}
+                        title="Remove from project"
+                      >
+                        <FolderMinus className="h-4 w-4 mr-1.5" /> Remove
+                      </Button>
                     )}
                   </div>
                 </li>

@@ -33,10 +33,15 @@ type submissionResponse struct {
 }
 
 // ListSubmissions GET /submissions
+// Supports ?unassigned=true to return only submissions not in any project.
 func (h *SubmissionsHandler) ListSubmissions(c echo.Context) error {
 	user := lib.GetUser(c)
+	query := h.db.Where("org_id = ?", user.OrgID)
+	if c.QueryParam("unassigned") == "true" {
+		query = query.Where("project_id IS NULL")
+	}
 	var submissions []db.Submission
-	if err := h.db.Where("org_id = ?", user.OrgID).Order("created_at desc").Find(&submissions).Error; err != nil {
+	if err := query.Order("created_at desc").Find(&submissions).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
 	}
 
@@ -180,20 +185,9 @@ func (h *SubmissionsHandler) StartAnalysis(c echo.Context) error {
 
 	// Use default profile if none specified
 	if req.ProfileID == "" {
-		var profile db.CapabilityProfile
-		if err := h.db.Where("org_id = ? AND is_default = ?", user.OrgID, true).First(&profile).Error; err != nil {
-			// Create a default profile if none exists
-			defaultRules := `{"minTraceWidthMM":0.15,"minClearanceMM":0.15,"minDrillDiamMM":0.3,"maxDrillDiamMM":6.3,"minAnnularRingMM":0.15,"maxAspectRatio":10,"minSolderMaskDamMM":0.1,"minEdgeClearanceMM":0.3,"minDrillToDrillMM":0.25,"minDrillToCopperMM":0.25,"minCopperSliverMM":0.1,"maxTraceImbalanceRatio":2.0,"enableSilkscreenOnPadCheck":true,"maxComponentHeightTopMM":10,"maxComponentHeightBottomMM":5,"minComponentSpacingMM":0.5,"flagThroughHoleOnBottom":true,"minMountingHoleKeepoutMM":0.5}`
-			profile = db.CapabilityProfile{
-				ID:        uuid.New().String(),
-				OrgID:     user.OrgID,
-				Name:      "Default",
-				IsDefault: true,
-				Rules:     []byte(defaultRules),
-				CreatedAt: time.Now(),
-				UpdatedAt: time.Now(),
-			}
-			h.db.Create(&profile)
+		profile, err := getOrCreateDefaultProfile(h.db, user.OrgID)
+		if err != nil {
+			return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve default profile")
 		}
 		req.ProfileID = profile.ID
 	}

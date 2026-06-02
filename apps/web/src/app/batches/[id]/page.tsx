@@ -65,10 +65,13 @@ export default function BatchDetailPage() {
     if (!isLoggedIn()) { router.replace('/login'); return }
 
     let cancelled = false
+    const start = Date.now()
+    const POLL_TIMEOUT_MS = 5 * 60 * 1000 // stop polling a stuck batch after 5 min
     const poll = async () => {
       const result = await fetchBatch()
       if (cancelled) return
       if (result && (result.batch.status === 'PENDING' || result.batch.status === 'PROCESSING')) {
+        if (Date.now() - start > POLL_TIMEOUT_MS) return
         setTimeout(() => {
           if (!cancelled) poll()
         }, 3000)

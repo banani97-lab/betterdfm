@@ -381,3 +381,21 @@ func (h *ProjectsHandler) MoveSubmissionToProject(c echo.Context) error {
 	}
 	return c.JSON(http.StatusOK, submission)
 }
+
+// UnassignSubmission DELETE /submissions/:id/project
+// Removes a submission from its project, leaving it unassigned.
+func (h *ProjectsHandler) UnassignSubmission(c echo.Context) error {
+	user := lib.GetUser(c)
+	submissionID := c.Param("id")
+
+	var submission db.Submission
+	if err := h.db.Where("id = ? AND org_id = ?", submissionID, user.OrgID).First(&submission).Error; err != nil {
+		return echo.NewHTTPError(http.StatusNotFound, "submission not found")
+	}
+
+	submission.ProjectID = nil
+	if err := h.db.Model(&submission).Update("project_id", nil).Error; err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
+	}
+	return c.JSON(http.StatusOK, submission)
+}

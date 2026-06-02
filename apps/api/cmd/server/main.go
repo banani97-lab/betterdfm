@@ -5,12 +5,14 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/betterdfm/api/src/db"
 	"github.com/betterdfm/api/src/lib"
 	"github.com/betterdfm/api/src/routes"
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
+	"golang.org/x/time/rate"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
@@ -96,9 +98,20 @@ func main() {
 		return c.JSON(http.StatusOK, map[string]string{"status": "ok"})
 	})
 
+	// Rate limiter for unauthenticated public endpoints, keyed on client IP.
+	// These are the only routes reachable without a JWT or share token, so they
+	// are the abuse surface for the public API.
+	publicRateLimiter := middleware.RateLimiterWithConfig(middleware.RateLimiterConfig{
+		Store: middleware.NewRateLimiterMemoryStoreWithConfig(middleware.RateLimiterMemoryStoreConfig{
+			Rate:      rate.Limit(5),
+			Burst:     20,
+			ExpiresIn: 3 * time.Minute,
+		}),
+	})
+
 	// Contact form (unauthenticated)
 	contactHandler := routes.NewContactHandler(database)
-	e.POST("/contact", contactHandler.SubmitContact)
+	e.POST("/contact", contactHandler.SubmitContact, publicRateLimiter)
 
 	// JWT middleware for app users (validates audience against app client ID)
 	jwtMW := lib.NewJWTMiddleware(jwtIssuer, cognitoClientID)
@@ -158,6 +171,7 @@ func main() {
 	write.DELETE("/projects/:id", projectsHandler.ArchiveProject)
 	write.POST("/projects/:id/restore", projectsHandler.RestoreProject)
 	write.POST("/projects/:id/submissions", projectsHandler.MoveSubmissionToProject)
+	write.DELETE("/submissions/:id/project", projectsHandler.UnassignSubmission)
 	write.POST("/profiles", profilesHandler.CreateProfile)
 	write.PUT("/profiles/:id", profilesHandler.UpdateProfile)
 	write.DELETE("/profiles/:id", profilesHandler.DeleteProfile)
@@ -167,7 +181,7 @@ func main() {
 	write.GET("/share-links/:id/uploads", shareHandler.ListShareUploads)
 
 	// Public shared routes (token-based auth, no JWT)
-	shared := e.Group("/shared/:token", shareHandler.TokenMiddleware())
+	shared := e.Group("/shared/:token", publicRateLimiter, shareHandler.TokenMiddleware())
 	shared.GET("", shareHandler.GetShareInfo)
 	shared.GET("/submissions", shareHandler.GetSharedSubmissions)
 	shared.GET("/jobs/:jobId", shareHandler.GetSharedJob)

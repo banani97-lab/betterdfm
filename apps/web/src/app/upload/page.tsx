@@ -8,14 +8,13 @@ import {
   createSubmission,
   uploadToS3,
   startAnalysis,
-  getJob,
   getProfiles,
   createBatch,
   analyzeBatch,
-  getBatch,
   type CapabilityProfile,
   type AnalysisJob,
 } from '@/lib/api'
+import { pollJobUntilDone, pollBatchUntilDone } from '@/lib/poll'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
@@ -193,12 +192,7 @@ function UploadPageInner() {
       track('Analysis Requested', { submissionId, profileId })
       setJob(newJob)
 
-      let jobData = newJob
-      while (jobData.status === 'PENDING' || jobData.status === 'PROCESSING') {
-        await new Promise((r) => setTimeout(r, 3000))
-        jobData = await getJob(newJob.id)
-        setJob(jobData)
-      }
+      const jobData = await pollJobUntilDone(newJob.id, { onUpdate: setJob })
       if (jobData.status === 'DONE') {
         setStep('done')
       } else {
@@ -257,12 +251,8 @@ function UploadPageInner() {
       setStep('analyzing')
       await analyzeBatch(batchResp.batchId, profileId || undefined)
 
-      // 4. Poll batch status
-      let batchData = await getBatch(batchResp.batchId)
-      while (batchData.batch.status === 'PENDING' || batchData.batch.status === 'PROCESSING') {
-        await new Promise((r) => setTimeout(r, 3000))
-        batchData = await getBatch(batchResp.batchId)
-      }
+      // 4. Poll batch status until terminal (with timeout)
+      await pollBatchUntilDone(batchResp.batchId)
 
       setStep('done')
     } catch (e: unknown) {
