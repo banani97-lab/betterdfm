@@ -9,7 +9,7 @@ const FEATURE_GROUPS = [
   {
     icon: Search,
     title: 'Catch Issues Early',
-    desc: 'Trace width, clearance, annular ring, drill size, solder mask dam, edge clearance, aspect ratio — 16 checks that catch fab-killing issues before your engineers open a CAM tool.',
+    desc: 'Trace width, clearance, annular ring, drill size, solder mask dam, edge clearance, aspect ratio, component spacing, tombstoning risk — 22 checks that catch fab- and assembly-killing issues before your engineers open a CAM tool.',
   },
   {
     icon: Eye,
