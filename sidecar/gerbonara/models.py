@@ -86,6 +86,7 @@ class Component(BaseModel):
     packageClass: str = "" # IPC class (e.g. "0402") when classifiable
     heightMM: float = 0.0  # from ODB++ `.comp_height`, 0 if not declared
     mountType: str = ""    # "smt" | "thmt" | "pressfit" | "manual" | "other"
+    packageType: str = ""  # "discrete" | "leaded" | "bga" | "through_hole" (for spacing)
 
 
 class BoardData(BaseModel):

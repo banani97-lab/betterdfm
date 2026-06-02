@@ -111,6 +111,16 @@ export interface BoardData {
   polygons?: BoardPolygon[]
 }
 
+// Per-package-class keepout radii (mm) for the component-spacing rule. When
+// present, the rule uses max(radius[a], radius[b]) per pair instead of the flat
+// minComponentSpacingMM. A zero field falls back to minComponentSpacingMM.
+export interface ComponentSpacingClasses {
+  discreteMM: number
+  leadedMM: number
+  bgaMM: number
+  throughHoleMM: number
+}
+
 export interface ProfileRules {
   minTraceWidthMM: number
   minClearanceMM: number
@@ -129,6 +139,7 @@ export interface ProfileRules {
   maxComponentHeightTopMM?: number
   maxComponentHeightBottomMM?: number
   minComponentSpacingMM?: number
+  componentSpacing?: ComponentSpacingClasses
   flagThroughHoleOnBottom?: boolean
   minMountingHoleKeepoutMM?: number
   enableFiducialPlacementCheck?: boolean

@@ -3,29 +3,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, Cog, FolderOpen, Info, LogOut, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, FolderOpen, Info, Plus, RefreshCw, Upload, X } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
-import { clearToken, canWrite, isLoggedIn } from '@/lib/auth'
+import { canWrite, isLoggedIn } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
+import { useUiSettings } from '@/lib/useUiSettings'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { ThemeToggle } from '@/components/ui/theme-toggle'
-import { UI_SETTINGS_STORAGE_KEY } from '@/lib/branding'
 import { cn } from '@/lib/utils'
-
-type BackgroundStyle = 'spotlight' | 'studio' | 'grid' | 'aurora'
-type TableDensity = 'comfortable' | 'compact'
-
-interface UiSettings {
-  background: BackgroundStyle
-  tableDensity: TableDensity
-}
-
-const DEFAULT_UI_SETTINGS: UiSettings = {
-  background: 'studio',
-  tableDensity: 'comfortable',
-}
 
 function formatDate(iso: string) {
   return new Date(iso).toLocaleString([], {
@@ -70,16 +57,11 @@ function scoreColor(n: number): string {
   return '#dc2626'
 }
 
-function applyBackground(background: BackgroundStyle) {
-  document.documentElement.setAttribute('data-ui-bg', background)
-}
-
 export default function DashboardPage() {
   const router = useRouter()
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [projects, setProjects] = useState<Project[]>([])
-  const [settings, setSettings] = useState<UiSettings>(DEFAULT_UI_SETTINGS)
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const { settings } = useUiSettings()
   const [infoSubmissionId, setInfoSubmissionId] = useState<string | null>(null)
   const [overviewCache, setOverviewCache] = useState<Record<string, OverviewEntry>>({})
   const [retrying, setRetrying] = useState<Set<string>>(new Set())
@@ -110,40 +92,6 @@ export default function DashboardPage() {
     }
     fetchSubmissions()
   }, [router, fetchSubmissions])
-
-  useEffect(() => {
-    try {
-      const raw = localStorage.getItem(UI_SETTINGS_STORAGE_KEY)
-      if (!raw) {
-        applyBackground(DEFAULT_UI_SETTINGS.background)
-        return
-      }
-      const parsed = JSON.parse(raw) as Partial<UiSettings>
-      const parsedBackground = parsed.background
-      const next: UiSettings = {
-        background: (
-          parsedBackground === 'spotlight' ||
-          parsedBackground === 'studio' ||
-          parsedBackground === 'grid' ||
-          parsedBackground === 'aurora'
-            ? parsedBackground
-            : parsedBackground === 'default'
-              ? 'spotlight'
-              : DEFAULT_UI_SETTINGS.background
-        ),
-        tableDensity: parsed.tableDensity === 'compact' ? 'compact' : 'comfortable',
-      }
-      setSettings(next)
-      applyBackground(next.background)
-    } catch {
-      applyBackground(DEFAULT_UI_SETTINGS.background)
-    }
-  }, [])
-
-  useEffect(() => {
-    applyBackground(settings.background)
-    localStorage.setItem(UI_SETTINGS_STORAGE_KEY, JSON.stringify(settings))
-  }, [settings])
 
   // Auto-refresh when any submission is ANALYZING
   useEffect(() => {
@@ -191,11 +139,6 @@ export default function DashboardPage() {
     }
   }
 
-  const handleLogout = () => {
-    clearToken()
-    router.replace('/login')
-  }
-
   const infoSubmission = submissions.find((s) => s.id === infoSubmissionId) ?? null
   const isCompact = settings.tableDensity === 'compact'
   const rowPadding = settings.tableDensity === 'compact' ? 'py-3 md:py-3' : 'py-4 md:py-5'
@@ -209,78 +152,9 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen">
-      <header className="group/taskbar bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 md:gap-4 sticky top-0 z-30">
+      <header className="bg-card/65 border-b border-border/80 px-4 py-3 md:px-6 md:py-4 flex flex-wrap md:flex-nowrap items-center justify-between gap-3 md:gap-4 sticky top-0 z-30">
         <RapidDFMLogo className="shrink-0" />
-        <div className="flex w-full md:w-auto flex-wrap md:flex-nowrap items-center justify-end gap-2">
-          <ThemeToggle className="h-11 w-11" />
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
-            onClick={() => setSettingsOpen(true)}
-            aria-label="Open settings"
-            title="Open settings"
-          >
-            <span className="flex items-center justify-center w-full">
-              <Cog className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
-              <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
-                Settings
-              </span>
-            </span>
-          </Button>
-
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
-            onClick={handleLogout}
-            aria-label="Sign out"
-            title="Sign out"
-          >
-            <span className="flex items-center justify-center w-full">
-              <LogOut className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
-              <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
-                Sign out
-              </span>
-            </span>
-          </Button>
-
-          <Link href="/projects">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
-              aria-label="Projects"
-              title="Projects"
-            >
-              <span className="flex items-center justify-center w-full">
-                <FolderOpen className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
-                <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
-                  Projects
-                </span>
-              </span>
-            </Button>
-          </Link>
-
-          {canWrite() && (
-            <Link href="/upload">
-              <Button
-                size="icon"
-                className="h-10 w-auto px-3 md:h-11 md:w-11 md:px-0 overflow-hidden transition-all duration-300 md:group-hover/taskbar:w-32"
-                aria-label="Upload"
-                title="Upload"
-              >
-                <span className="flex items-center justify-center w-full">
-                  <Plus className="h-5 w-5 shrink-0 transition-transform duration-300 md:group-hover/taskbar:-translate-x-0.5" />
-                  <span className="ml-2 whitespace-nowrap text-sm md:ml-0 md:max-w-0 md:opacity-0 md:overflow-hidden md:transition-all md:duration-300 md:group-hover/taskbar:max-w-20 md:group-hover/taskbar:opacity-100 md:group-hover/taskbar:ml-2">
-                    Upload
-                  </span>
-                </span>
-              </Button>
-            </Link>
-          )}
-        </div>
+        <AppTaskbar />
       </header>
 
       <main className={cn('mx-auto py-8', isCompact ? 'max-w-5xl px-4 sm:px-5' : 'max-w-7xl px-4 sm:px-6')}>
@@ -565,94 +439,6 @@ export default function DashboardPage() {
                   </>
                 )
               })()}
-            </div>
-          </aside>
-        </div>
-      )}
-
-      {settingsOpen && (
-        <div className="fixed inset-0 z-50">
-          <button
-            type="button"
-            className="absolute inset-0 bg-black/45"
-            onClick={() => setSettingsOpen(false)}
-            aria-label="Close settings"
-          />
-          <aside
-            className="absolute right-0 top-0 h-full w-full max-w-lg bg-card border-l border-border shadow-2xl p-6 overflow-y-auto"
-            role="dialog"
-            aria-modal="true"
-            aria-label="Settings"
-          >
-            <div className="flex items-start justify-between gap-4 mb-6">
-              <div>
-                <p className="text-xs uppercase tracking-[0.12em] text-muted-foreground mb-2">General Settings</p>
-                <h2 className="text-2xl font-semibold text-foreground">Workspace Preferences</h2>
-              </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-10 w-10"
-                onClick={() => setSettingsOpen(false)}
-                aria-label="Close settings panel"
-              >
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-
-            <div className="space-y-6">
-              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
-                <h3 className="font-medium text-foreground mb-3">Background Style</h3>
-                <div className="grid grid-cols-4 gap-3">
-                  {[
-                    { id: 'studio', label: 'Studio' },
-                    { id: 'spotlight', label: 'Spotlight' },
-                    { id: 'grid', label: 'Grid' },
-                    { id: 'aurora', label: 'Aurora' },
-                  ].map((bg) => (
-                    <button
-                      key={bg.id}
-                      type="button"
-                      className={cn(
-                        'rounded-lg border p-3 text-left transition-colors',
-                        settings.background === bg.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
-                      )}
-                      onClick={() => setSettings((prev) => ({ ...prev, background: bg.id as BackgroundStyle }))}
-                    >
-                      <p className="text-sm font-medium text-foreground">{bg.label}</p>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
-                <h3 className="font-medium text-foreground mb-3">Submissions Layout</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[
-                    { id: 'comfortable', label: 'Comfortable' },
-                    { id: 'compact', label: 'Compact' },
-                  ].map((density) => (
-                    <button
-                      key={density.id}
-                      type="button"
-                      className={cn(
-                        'rounded-lg border p-3 text-left transition-colors',
-                        settings.tableDensity === density.id ? 'border-primary bg-primary/10' : 'border-border hover:bg-muted/40'
-                      )}
-                      onClick={() => setSettings((prev) => ({ ...prev, tableDensity: density.id as TableDensity }))}
-                    >
-                      <p className="text-sm font-medium text-foreground">{density.label}</p>
-                    </button>
-                  ))}
-                </div>
-              </section>
-
-              <section className="rounded-xl border border-border/80 bg-muted/20 p-4">
-                <h3 className="font-medium text-foreground mb-3">Quick Access</h3>
-                <Link href="/admin/profile" onClick={() => setSettingsOpen(false)}>
-                  <Button variant="outline" className="w-full justify-start">Capability Profiles</Button>
-                </Link>
-              </section>
             </div>
           </aside>
         </div>

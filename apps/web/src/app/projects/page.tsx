@@ -8,6 +8,7 @@ import { getProjects, createProject, archiveProject, restoreProject, getSubmissi
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { track } from '@/lib/analytics'
@@ -118,11 +119,12 @@ export default function ProjectsPage() {
             projectLimitReached ? (
               <p className="text-xs text-muted-foreground">Project limit reached ({usage!.projects.used}/{usage!.projects.limit}). Upgrade to create more.</p>
             ) : (
-              <Button onClick={() => setShowCreate(true)}>
+              <Button variant="outline" onClick={() => setShowCreate(true)}>
                 <Plus className="h-4 w-4 mr-2" /> New Project
               </Button>
             )
           )}
+          <AppTaskbar expandOnHover={false} />
         </div>
       </header>
 

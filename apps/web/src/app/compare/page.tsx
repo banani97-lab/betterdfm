@@ -18,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { BoardViewer, type BoardViewerTransform } from '@/components/ui/BoardViewer'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
 
@@ -208,6 +209,7 @@ function ComparePageInner() {
           <RapidDFMLogo className="shrink-0" />
           <h1 className="text-lg font-semibold text-foreground">Design Comparison</h1>
           <AppBackButton href={backHref} label={backLabel} className="ml-auto shrink-0" />
+          <AppTaskbar expandOnHover={false} className="w-auto" />
         </div>
 
         {/* Comparison header: Job A → delta → Job B */}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Save, Plus, Trash2, HelpCircle } from 'lucide-react'
+import { Save, Plus, Trash2, HelpCircle, ChevronDown } from 'lucide-react'
 import {
   getProfiles,
   createProfile,
@@ -16,6 +16,7 @@ import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
+import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -37,6 +38,7 @@ const DEFAULT_RULES: ProfileRules = {
   maxComponentHeightTopMM: 10,
   maxComponentHeightBottomMM: 5,
   minComponentSpacingMM: 0.5,
+  componentSpacing: { discreteMM: 0.254, leadedMM: 1.27, bgaMM: 3.175, throughHoleMM: 3.175 },
   flagThroughHoleOnBottom: true,
   minMountingHoleKeepoutMM: 0.5,
   enableFiducialPlacementCheck: true,
@@ -46,57 +48,101 @@ const DEFAULT_RULES: ProfileRules = {
   enableViaInPadCheck: true,
 }
 
-const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc: string }> = [
-  { key: 'minTraceWidthMM', label: 'Min Trace Width', unit: 'mm', step: '0.01',
-    desc: 'Flag trace segments narrower than this. Thinner traces are harder to etch cleanly and carry less current.' },
-  { key: 'minClearanceMM', label: 'Min Clearance', unit: 'mm', step: '0.01',
-    desc: 'Minimum spacing between different-net copper features. Below this, you risk shorts during fabrication or bridging during assembly.' },
-  { key: 'minDrillDiamMM', label: 'Min Drill Diameter', unit: 'mm', step: '0.01',
-    desc: 'Smallest mechanical drill the fab can reliably produce. Below this you need laser drilling.' },
-  { key: 'maxDrillDiamMM', label: 'Max Drill Diameter', unit: 'mm', step: '0.1',
-    desc: 'Largest drill the fab will accept before routing is required instead. Tooling holes commonly exceed this.' },
-  { key: 'minAnnularRingMM', label: 'Min Annular Ring', unit: 'mm', step: '0.01',
-    desc: 'Copper ring remaining around a drill hit after drilling tolerances. Below this, drill breakout can sever the connection.' },
-  { key: 'maxAspectRatio', label: 'Max Aspect Ratio', unit: ':1', step: '0.5',
-    desc: 'Ratio of board thickness to smallest drill diameter. Higher ratios require premium electroplating — 10:1 is standard, 12:1 is HDI.' },
-  { key: 'minSolderMaskDamMM', label: 'Min Solder Mask Dam', unit: 'mm', step: '0.01',
-    desc: 'Narrowest solder mask web between two pad openings. Below this the mask flakes off during reflow and you lose solder bridge protection.' },
-  { key: 'minEdgeClearanceMM', label: 'Min Edge Clearance', unit: 'mm', step: '0.01',
-    desc: 'Minimum distance from copper features to the board outline. Features too close risk exposure on the routed edge.' },
-  { key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01',
-    desc: 'Edge-to-edge spacing between drill holes. Below this, adjacent drill walls can break through into each other.' },
-  { key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01',
-    desc: 'Drill hole edge to nearest other-net copper. Protects against drill bit wander clipping a neighboring trace.' },
-  { key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005',
-    desc: 'Thinnest copper feature width that will survive etching. Thinner slivers become acid traps or shorts.' },
-  { key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1',
-    desc: 'Flag when the two traces on a 2-pad component differ in width by more than this ratio. Thermal asymmetry is a major cause of tombstoning during reflow.' },
-  { key: 'maxComponentHeightTopMM', label: 'Max Component Height (Top)', unit: 'mm', step: '0.5',
-    desc: 'SMT-only cap on top-side component height. Limited by stencil printer head clearance and reflow oven conveyor height. Typical is 10 mm; precision assembly lines may need lower.' },
-  { key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5',
-    desc: 'SMT-only cap on bottom-side component height. Limited by wave-solder pallet clearance and reflow pallet support height. Typical is 5 mm.' },
-  { key: 'minComponentSpacingMM', label: 'Min Component Spacing', unit: 'mm', step: '0.05',
-    desc: 'Minimum courtyard edge-to-edge gap between adjacent same-side components. Below this, the pick-and-place nozzle cannot reach the part and rework becomes difficult. IPC-7351B nominal density implies about 0.5 mm.' },
-  { key: 'minMountingHoleKeepoutMM', label: 'Min Mounting-Hole Keepout', unit: 'mm', step: '0.05',
-    desc: 'Minimum copper keepout from the edge of a non-plated mounting hole. Protects copper from the screw head and washer footprint per IPC-2221B generic clearance.' },
-]
+// A single configurable check. `number` and `select` carry a threshold; `toggle`
+// is an on/off check with no numeric value; `spacing` is the per-package-class
+// component-spacing sub-panel (a nested object, rendered full width).
+const PACKAGE_CLASS_OPTIONS = ['01005', '0201', '0402', '0603', '0805', '1206', '1210', '1812', '2010', '2512']
 
-// Discrete checks with no numeric threshold — each is a simple on/off switch.
-const TOGGLE_FIELDS: Array<{ key: keyof ProfileRules; label: string; desc: string }> = [
-  { key: 'enableSilkscreenOnPadCheck', label: 'Silkscreen-on-Pad Check',
-    desc: 'Flag silkscreen features overlapping copper pads, which can lift or contaminate the solder joint.' },
-  { key: 'flagThroughHoleOnBottom', label: 'Through-Hole on Bottom Side',
-    desc: 'Flag THT / press-fit parts on the bottom side, which cannot be wave or reflow soldered normally.' },
-  { key: 'enableFiducialPlacementCheck', label: 'Fiducial-Placement Check',
-    desc: 'Flag collinear global fiducials and fine-pitch / BGA parts missing a nearby local fiducial (IPC-7351).' },
-  { key: 'enableFiducialCountCheck', label: 'Fiducial-Count Check',
-    desc: 'Require at least 3 fiducials for pick-and-place alignment when the board has any.' },
-  { key: 'enablePadSizeForPackageCheck', label: 'Pad-Size-for-Package Check',
-    desc: 'Flag passive pad geometry outside the IPC-7351 envelope for the detected package class.' },
-  { key: 'enableTombstoningRiskCheck', label: 'Tombstoning-Risk Check',
-    desc: 'Flag small 2-pad passives with unbalanced pad areas that can tombstone during reflow.' },
-  { key: 'enableViaInPadCheck', label: 'Via-in-Pad Check',
-    desc: 'Flag vias landing in SMT lands, which can wick solder away from the joint (IPC-4761 / 7093).' },
+type RuleField =
+  | { kind: 'number'; key: keyof ProfileRules; label: string; unit: string; step: string; desc: string }
+  | { kind: 'toggle'; key: keyof ProfileRules; label: string; desc: string }
+  | { kind: 'select'; key: keyof ProfileRules; label: string; desc: string }
+  | { kind: 'spacing'; label: string; desc: string }
+
+// Every check, bucketed by manufacturing stage (bare-board fabrication first,
+// then assembly). Mixing numeric thresholds and on/off toggles within a bucket
+// keeps everything about one stage in one place.
+const RULE_GROUPS: Array<{ title: string; blurb?: string; fields: RuleField[] }> = [
+  {
+    title: 'Copper & Routing',
+    blurb: 'Bare-board copper features: widths, spacings, and outline clearance.',
+    fields: [
+      { kind: 'number', key: 'minTraceWidthMM', label: 'Min Trace Width', unit: 'mm', step: '0.01',
+        desc: 'Flag trace segments narrower than this. Thinner traces are harder to etch cleanly and carry less current.' },
+      { kind: 'number', key: 'minClearanceMM', label: 'Min Clearance', unit: 'mm', step: '0.01',
+        desc: 'Minimum spacing between different-net copper features. Below this, you risk shorts during fabrication or bridging during assembly.' },
+      { kind: 'number', key: 'minCopperSliverMM', label: 'Min Copper Sliver', unit: 'mm', step: '0.005',
+        desc: 'Thinnest copper feature width that will survive etching. Thinner slivers become acid traps or shorts.' },
+      { kind: 'number', key: 'minEdgeClearanceMM', label: 'Min Edge Clearance', unit: 'mm', step: '0.01',
+        desc: 'Minimum distance from copper features to the board outline. Features too close risk exposure on the routed edge.' },
+    ],
+  },
+  {
+    title: 'Drilling & Vias',
+    blurb: 'Hole sizes, hole-to-feature spacings, and plating aspect ratio.',
+    fields: [
+      { kind: 'number', key: 'minDrillDiamMM', label: 'Min Drill Diameter', unit: 'mm', step: '0.01',
+        desc: 'Smallest mechanical drill the fab can reliably produce. Below this you need laser drilling.' },
+      { kind: 'number', key: 'maxDrillDiamMM', label: 'Max Drill Diameter', unit: 'mm', step: '0.1',
+        desc: 'Largest drill the fab will accept before routing is required instead. Tooling holes commonly exceed this.' },
+      { kind: 'number', key: 'minAnnularRingMM', label: 'Min Annular Ring', unit: 'mm', step: '0.01',
+        desc: 'Copper ring remaining around a drill hit after drilling tolerances. Below this, drill breakout can sever the connection.' },
+      { kind: 'number', key: 'minDrillToDrillMM', label: 'Min Drill-to-Drill', unit: 'mm', step: '0.01',
+        desc: 'Edge-to-edge spacing between drill holes. Below this, adjacent drill walls can break through into each other.' },
+      { kind: 'number', key: 'minDrillToCopperMM', label: 'Min Drill-to-Copper', unit: 'mm', step: '0.01',
+        desc: 'Drill hole edge to nearest other-net copper. Protects against drill bit wander clipping a neighboring trace.' },
+      { kind: 'number', key: 'maxAspectRatio', label: 'Max Aspect Ratio', unit: ':1', step: '0.5',
+        desc: 'Ratio of board thickness to smallest drill diameter. Higher ratios require premium electroplating — 10:1 is standard, 12:1 is HDI.' },
+    ],
+  },
+  {
+    title: 'Solder Mask, Silkscreen & Mechanical',
+    blurb: 'Surface-finish webs, silkscreen overlap, and mounting-hole keepout.',
+    fields: [
+      { kind: 'number', key: 'minSolderMaskDamMM', label: 'Min Solder Mask Dam', unit: 'mm', step: '0.01',
+        desc: 'Narrowest solder mask web between two pad openings. Below this the mask flakes off during reflow and you lose solder bridge protection.' },
+      { kind: 'number', key: 'minMountingHoleKeepoutMM', label: 'Min Mounting-Hole Keepout', unit: 'mm', step: '0.05',
+        desc: 'Minimum copper keepout from the edge of a non-plated mounting hole. Protects copper from the screw head and washer footprint per IPC-2221B generic clearance.' },
+      { kind: 'toggle', key: 'enableSilkscreenOnPadCheck', label: 'Silkscreen-on-Pad Check',
+        desc: 'Flag silkscreen features overlapping copper pads, which can lift or contaminate the solder joint.' },
+    ],
+  },
+  {
+    title: 'Assembly: Placement',
+    blurb: 'Component spacing, height limits, side restrictions, and fiducials.',
+    fields: [
+      { kind: 'number', key: 'minComponentSpacingMM', label: 'Min Component Spacing', unit: 'mm', step: '0.05',
+        desc: 'Baseline minimum courtyard edge-to-edge gap between adjacent same-side components. Below this, the pick-and-place nozzle cannot reach the part and rework becomes difficult. IPC-7351B nominal density implies about 0.5 mm. Used as the fallback when the per-class radii below are unset.' },
+      { kind: 'spacing', label: 'Component Spacing by Package Class',
+        desc: 'Per-class keepout radii for the component-spacing check. The required gap between two parts is the larger of their two radii, so a discrete next to a BGA uses the BGA radius. A zero field falls back to Min Component Spacing. Defaults follow CM practice: discrete 0.254 mm (10 mil), leaded QFN/QFP/PLCC/connector 1.27 mm (50 mil), BGA and through-hole pin 3.175 mm (125 mil).' },
+      { kind: 'number', key: 'maxComponentHeightTopMM', label: 'Max Component Height (Top)', unit: 'mm', step: '0.5',
+        desc: 'SMT-only cap on top-side component height. Limited by stencil printer head clearance and reflow oven conveyor height. Typical is 10 mm; precision assembly lines may need lower.' },
+      { kind: 'number', key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5',
+        desc: 'SMT-only cap on bottom-side component height. Limited by wave-solder pallet clearance and reflow pallet support height. Typical is 5 mm.' },
+      { kind: 'toggle', key: 'flagThroughHoleOnBottom', label: 'Through-Hole on Bottom Side',
+        desc: 'Flag THT / press-fit parts on the bottom side, which cannot be wave or reflow soldered normally.' },
+      { kind: 'toggle', key: 'enableFiducialCountCheck', label: 'Fiducial-Count Check',
+        desc: 'Require at least 3 fiducials for pick-and-place alignment when the board has any.' },
+      { kind: 'toggle', key: 'enableFiducialPlacementCheck', label: 'Fiducial-Placement Check',
+        desc: 'Flag collinear global fiducials and fine-pitch / BGA parts missing a nearby local fiducial (IPC-7351).' },
+    ],
+  },
+  {
+    title: 'Assembly: Footprints & Soldering',
+    blurb: 'Package capability, land geometry, and reflow solder-joint risks.',
+    fields: [
+      { kind: 'select', key: 'smallestPackageClass', label: 'Smallest Placeable Package',
+        desc: 'The smallest passive package class your line can place. Components smaller than this are flagged by the package-capability check. Leave unset to skip.' },
+      { kind: 'toggle', key: 'enablePadSizeForPackageCheck', label: 'Pad-Size-for-Package Check',
+        desc: 'Flag passive pad geometry outside the IPC-7351 envelope for the detected package class.' },
+      { kind: 'number', key: 'maxTraceImbalanceRatio', label: 'Max Trace Imbalance Ratio', unit: ':1', step: '0.1',
+        desc: 'Flag when the two traces on a 2-pad component differ in width by more than this ratio. Thermal asymmetry is a major cause of tombstoning during reflow.' },
+      { kind: 'toggle', key: 'enableTombstoningRiskCheck', label: 'Tombstoning-Risk Check',
+        desc: 'Flag small 2-pad passives with unbalanced pad areas that can tombstone during reflow.' },
+      { kind: 'toggle', key: 'enableViaInPadCheck', label: 'Via-in-Pad Check',
+        desc: 'Flag vias landing in SMT lands, which can wick solder away from the joint (IPC-4761 / 7093).' },
+    ],
+  },
 ]
 
 export default function AdminProfilePage() {
@@ -110,6 +156,8 @@ export default function AdminProfilePage() {
   const [creating, setCreating] = useState(false)
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [newName, setNewName] = useState('')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
+  const toggleGroup = (title: string) => setCollapsed((c) => ({ ...c, [title]: !c[title] }))
   const { usage } = useUsage()
   const profileLimitReached = usage ? (usage.profiles.limit !== -1 && usage.profiles.used >= usage.profiles.limit) : false
 
@@ -186,11 +234,103 @@ export default function AdminProfilePage() {
     setRules((r) => ({ ...r, [key]: parseFloat(val) || 0 }))
   }
 
+  const SPACING_DEFAULTS = { discreteMM: 0.254, leadedMM: 1.27, bgaMM: 3.175, throughHoleMM: 3.175 }
+
+  const setSpacingClass = (key: keyof typeof SPACING_DEFAULTS, val: string) => {
+    setRules((r) => ({
+      ...r,
+      componentSpacing: { ...SPACING_DEFAULTS, ...(r.componentSpacing ?? {}), [key]: parseFloat(val) || 0 },
+    }))
+  }
+
+  const renderField = (f: RuleField) => {
+    if (f.kind === 'spacing') {
+      return (
+        <div key="spacing" className="col-span-2 rounded-md border border-border/70 bg-muted/20 p-3">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs font-semibold text-foreground">{f.label}</span>
+            <RuleHelp text={f.desc} />
+          </div>
+          <div className="grid grid-cols-2 gap-3 mt-2">
+            {([
+              ['discreteMM', 'Discrete (R/C/L)'],
+              ['leadedMM', 'Leaded (QFN/QFP/PLCC/connector)'],
+              ['bgaMM', 'BGA'],
+              ['throughHoleMM', 'Through-Hole Pin'],
+            ] as Array<[keyof typeof SPACING_DEFAULTS, string]>).map(([key, label]) => (
+              <div key={key}>
+                <Label className="block text-xs mb-1">{label}</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    type="number"
+                    step="0.05"
+                    min="0"
+                    value={rules.componentSpacing?.[key] ?? SPACING_DEFAULTS[key]}
+                    onChange={(e) => setSpacingClass(key, e.target.value)}
+                    className="flex-1"
+                  />
+                  <span className="text-xs text-muted-foreground w-8 flex-shrink-0">mm</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )
+    }
+    return (
+      <div key={f.key}>
+        <div className="flex items-center gap-1.5 mb-1">
+          <Label className="block text-xs">{f.label}</Label>
+          <RuleHelp text={f.desc} />
+        </div>
+        {f.kind === 'number' && (
+          <div className="flex items-center gap-2">
+            <Input
+              type="number"
+              step={f.step}
+              min="0"
+              value={rules[f.key] as number ?? 0}
+              onChange={(e) => setRuleValue(f.key, e.target.value)}
+              className="flex-1"
+            />
+            <span className="text-xs text-muted-foreground w-8 flex-shrink-0">{f.unit}</span>
+          </div>
+        )}
+        {f.kind === 'select' && (
+          <select
+            value={(rules[f.key] as string | undefined) ?? ''}
+            onChange={(e) => setRules((r) => ({ ...r, [f.key]: e.target.value }))}
+            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Not set (skip check)</option>
+            {PACKAGE_CLASS_OPTIONS.map((o) => (
+              <option key={o} value={o}>{o}</option>
+            ))}
+          </select>
+        )}
+        {f.kind === 'toggle' && (
+          <label className="flex items-center gap-2 cursor-pointer h-9">
+            <input
+              type="checkbox"
+              checked={(rules[f.key] as boolean | undefined) ?? true}
+              onChange={(e) => setRules((r) => ({ ...r, [f.key]: e.target.checked }))}
+              className="w-4 h-4"
+            />
+            <span className="text-xs text-muted-foreground">
+              {((rules[f.key] as boolean | undefined) ?? true) ? 'Enabled' : 'Disabled'}
+            </span>
+          </label>
+        )}
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen">
-      <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
-        <RapidDFMLogo />
-        <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
+      <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center gap-4 sticky top-0 z-30">
+        <RapidDFMLogo className="shrink-0" />
+        <h1 className="text-xl font-semibold text-foreground truncate">Capability Profiles</h1>
+        <AppTaskbar expandOnHover={false} className="w-auto ml-auto shrink-0" />
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">
@@ -266,69 +406,44 @@ export default function AdminProfilePage() {
                 </label>
               </div>
 
-              <h3 className="font-semibold text-foreground mb-4">Manufacturing Rules</h3>
-              <div className="grid grid-cols-2 gap-4">
-                {RULE_FIELDS.map(({ key, label, unit, step, desc }) => (
-                  <div key={key}>
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <Label className="block text-xs">{label}</Label>
-                      <RuleHelp text={desc} />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Input
-                        type="number"
-                        step={step}
-                        min="0"
-                        value={rules[key] as number ?? 0}
-                        onChange={(e) => setRuleValue(key, e.target.value)}
-                        className="flex-1"
-                      />
-                      <span className="text-xs text-muted-foreground w-8 flex-shrink-0">{unit}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-4">
-                <Label className="mb-1 block text-xs">Smallest Placeable Package</Label>
-                <select
-                  value={rules.smallestPackageClass ?? ''}
-                  onChange={(e) => setRules((r) => ({ ...r, smallestPackageClass: e.target.value }))}
-                  className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-foreground">Manufacturing Rules</h3>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const anyOpen = RULE_GROUPS.some((g) => !collapsed[g.title])
+                    setCollapsed(Object.fromEntries(RULE_GROUPS.map((g) => [g.title, anyOpen])))
+                  }}
+                  className="text-xs text-muted-foreground hover:text-foreground"
                 >
-                  <option value="">Not set (skip check)</option>
-                  <option value="01005">01005</option>
-                  <option value="0201">0201</option>
-                  <option value="0402">0402</option>
-                  <option value="0603">0603</option>
-                  <option value="0805">0805</option>
-                  <option value="1206">1206</option>
-                  <option value="1210">1210</option>
-                  <option value="1812">1812</option>
-                  <option value="2010">2010</option>
-                  <option value="2512">2512</option>
-                </select>
+                  {RULE_GROUPS.some((g) => !collapsed[g.title]) ? 'Collapse all' : 'Expand all'}
+                </button>
               </div>
-
-              <div className="mt-4 pt-4 border-t border-border">
-                <h3 className="text-sm font-semibold text-foreground mb-1">On/Off Checks</h3>
-                <p className="text-xs text-muted-foreground mb-3">Discrete checks with no numeric threshold. Turn off any that don&apos;t apply to your process.</p>
-                {TOGGLE_FIELDS.map((t) => (
-                  <div key={t.key} className="mt-3">
-                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={(rules[t.key] as boolean | undefined) ?? true}
-                        onChange={(e) => setRules((r) => ({ ...r, [t.key]: e.target.checked }))}
-                        className="w-4 h-4"
-                      />
-                      <div>
-                        <span className="text-sm font-medium text-foreground">{t.label}</span>
-                        <p className="text-xs text-muted-foreground">{t.desc}</p>
-                      </div>
-                    </label>
-                  </div>
-                ))}
+              <div className="space-y-3">
+                {RULE_GROUPS.map((group) => {
+                  const open = !collapsed[group.title]
+                  return (
+                    <div key={group.title} className="border border-border rounded-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => toggleGroup(group.title)}
+                        aria-expanded={open}
+                        className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 text-left transition-colors"
+                      >
+                        <span className="text-sm font-semibold text-foreground">{group.title}</span>
+                        <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
+                      </button>
+                      {open && (
+                        <div className="p-4">
+                          {group.blurb && <p className="text-xs text-muted-foreground mb-3">{group.blurb}</p>}
+                          <div className="grid grid-cols-2 gap-4">
+                            {group.fields.map((f) => renderField(f))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
 
               {message && (
