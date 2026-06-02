@@ -24,10 +24,13 @@ const DENSITY_OPTIONS: Array<{ id: TableDensity; label: string }> = [
 
 // AppTaskbar is the global navigation cluster: theme toggle, settings panel,
 // sign out, projects, and upload. It is self-contained — drop it into the
-// right side of any page header. The buttons expand on hover of the cluster
-// (`group/taskbar`), so the hover effect works regardless of the surrounding
-// header layout.
-export function AppTaskbar({ className }: { className?: string }) {
+// right side of any page header.
+//
+// By default the buttons reveal their labels on hover of the cluster
+// (`group/taskbar`). On headers that also carry a page title there isn't room
+// for the expanded labels, so pass `expandOnHover={false}` to keep the cluster
+// at its compact icon width (labels remain available via tooltips).
+export function AppTaskbar({ className, expandOnHover = true }: { className?: string; expandOnHover?: boolean }) {
   const router = useRouter()
   const [settingsOpen, setSettingsOpen] = useState(false)
   const { settings, update } = useUiSettings()
@@ -39,7 +42,7 @@ export function AppTaskbar({ className }: { className?: string }) {
 
   return (
     <>
-      <div className={cn('group/taskbar flex w-full md:w-auto flex-wrap md:flex-nowrap items-center justify-end gap-2', className)}>
+      <div className={cn('flex w-full md:w-auto flex-wrap md:flex-nowrap items-center justify-end gap-2', expandOnHover && 'group/taskbar', className)}>
         <ThemeToggle className="h-11 w-11" />
 
         <Button

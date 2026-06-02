@@ -327,12 +327,10 @@ export default function AdminProfilePage() {
 
   return (
     <div className="min-h-screen">
-      <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
-        <RapidDFMLogo />
-        <div className="flex items-center gap-4">
-          <h1 className="text-xl font-semibold text-foreground">Capability Profiles</h1>
-          <AppTaskbar className="w-auto" />
-        </div>
+      <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center gap-4 sticky top-0 z-30">
+        <RapidDFMLogo className="shrink-0" />
+        <h1 className="text-xl font-semibold text-foreground truncate">Capability Profiles</h1>
+        <AppTaskbar expandOnHover={false} className="w-auto ml-auto shrink-0" />
       </header>
 
       <main className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-3 gap-6">

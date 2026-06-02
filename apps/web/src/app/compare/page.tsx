@@ -209,7 +209,7 @@ function ComparePageInner() {
           <RapidDFMLogo className="shrink-0" />
           <h1 className="text-lg font-semibold text-foreground">Design Comparison</h1>
           <AppBackButton href={backHref} label={backLabel} className="ml-auto shrink-0" />
-          <AppTaskbar className="w-auto" />
+          <AppTaskbar expandOnHover={false} className="w-auto" />
         </div>
 
         {/* Comparison header: Job A → delta → Job B */}
