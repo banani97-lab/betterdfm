@@ -36,6 +36,9 @@ const DEFAULT_RULES: ProfileRules = {
   enableSilkscreenOnPadCheck: true,
   maxComponentHeightTopMM: 10,
   maxComponentHeightBottomMM: 5,
+  minComponentSpacingMM: 0.5,
+  flagThroughHoleOnBottom: true,
+  minMountingHoleKeepoutMM: 0.5,
 }
 
 const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string; step: string; desc: string }> = [
@@ -67,6 +70,10 @@ const RULE_FIELDS: Array<{ key: keyof ProfileRules; label: string; unit: string;
     desc: 'SMT-only cap on top-side component height. Limited by stencil printer head clearance and reflow oven conveyor height. Typical is 10 mm; precision assembly lines may need lower.' },
   { key: 'maxComponentHeightBottomMM', label: 'Max Component Height (Bottom)', unit: 'mm', step: '0.5',
     desc: 'SMT-only cap on bottom-side component height. Limited by wave-solder pallet clearance and reflow pallet support height. Typical is 5 mm.' },
+  { key: 'minComponentSpacingMM', label: 'Min Component Spacing', unit: 'mm', step: '0.05',
+    desc: 'Minimum courtyard edge-to-edge gap between adjacent same-side components. Below this, the pick-and-place nozzle cannot reach the part and rework becomes difficult. IPC-7351B nominal density implies about 0.5 mm.' },
+  { key: 'minMountingHoleKeepoutMM', label: 'Min Mounting-Hole Keepout', unit: 'mm', step: '0.05',
+    desc: 'Minimum copper keepout from the edge of a non-plated mounting hole. Protects copper from the screw head and washer footprint per IPC-2221B generic clearance.' },
 ]
 
 export default function AdminProfilePage() {
@@ -291,6 +298,21 @@ export default function AdminProfilePage() {
                   <div>
                     <span className="text-sm font-medium text-foreground">Enable Silkscreen-on-Pad Check</span>
                     <p className="text-xs text-muted-foreground">Check for silkscreen features overlapping copper pads</p>
+                  </div>
+                </label>
+              </div>
+
+              <div className="mt-4">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={rules.flagThroughHoleOnBottom ?? true}
+                    onChange={(e) => setRules((r) => ({ ...r, flagThroughHoleOnBottom: e.target.checked }))}
+                    className="w-4 h-4"
+                  />
+                  <div>
+                    <span className="text-sm font-medium text-foreground">Flag Through-Hole on Bottom Side</span>
+                    <p className="text-xs text-muted-foreground">Flag THT / press-fit parts on the bottom side, which can&apos;t be wave or reflow soldered normally</p>
                   </div>
                 </label>
               </div>

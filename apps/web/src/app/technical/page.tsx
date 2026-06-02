@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 
 const TOC = [
   { id: 'overview', label: 'Overview' },
@@ -210,22 +210,30 @@ function Callout({ number, title, children }: { number: number; title: string; c
 }
 
 const RULES = [
-  { id: 'trace-width', sev: 'ERROR', desc: 'Trace width ≥ minTraceWidthMM' },
-  { id: 'clearance', sev: 'ERROR', desc: 'Trace/pad spacing ≥ minClearanceMM' },
-  { id: 'drill-size', sev: 'ERROR', desc: 'Drill diameter within min/max bounds' },
-  { id: 'annular-ring', sev: 'ERROR', desc: 'Copper ring around vias ≥ minAnnularRingMM' },
-  { id: 'drill-to-drill', sev: 'ERROR', desc: 'Hole-to-hole spacing ≥ minDrillToDrillMM' },
-  { id: 'drill-to-copper', sev: 'ERROR', desc: 'Hole edge to nearest copper ≥ minDrillToCopperMM' },
-  { id: 'aspect-ratio', sev: 'WARNING', desc: 'Board thickness ÷ drill diameter ≤ maxAspectRatio' },
-  { id: 'solder-mask-dam', sev: 'WARNING', desc: 'Solder mask bridge between pads ≥ minSolderMaskDamMM' },
-  { id: 'edge-clearance', sev: 'WARNING', desc: 'Copper distance from board outline ≥ minEdgeClearanceMM' },
-  { id: 'copper-sliver', sev: 'WARNING', desc: 'Narrow copper features ≥ minCopperSliverMM' },
-  { id: 'silkscreen-on-pad', sev: 'INFO', desc: 'Silkscreen does not overlap pads' },
-  { id: 'pad-size-for-package', sev: 'WARNING', desc: 'Pad dimensions match IPC-7351 for component package' },
-  { id: 'tombstoning-risk', sev: 'WARNING', desc: 'Pad asymmetry within package (reflow imbalance)' },
-  { id: 'package-capability', sev: 'WARNING', desc: 'Component package class vs. CM capability profile' },
-  { id: 'trace-imbalance', sev: 'WARNING', desc: 'Thermal trace balance on multi-pad components' },
-  { id: 'fiducial', sev: 'INFO', desc: 'Fiducial marker presence and placement clearance' },
+  // Bare-board / fab (12)
+  { id: 'trace-width', group: 'fab', sev: 'ERROR', desc: 'Trace width ≥ minTraceWidthMM' },
+  { id: 'clearance', group: 'fab', sev: 'ERROR', desc: 'Trace/pad spacing ≥ minClearanceMM' },
+  { id: 'drill-size', group: 'fab', sev: 'ERROR', desc: 'Drill diameter within min/max bounds' },
+  { id: 'annular-ring', group: 'fab', sev: 'ERROR', desc: 'Copper ring around vias ≥ minAnnularRingMM' },
+  { id: 'drill-to-drill', group: 'fab', sev: 'ERROR', desc: 'Hole-to-hole spacing ≥ minDrillToDrillMM' },
+  { id: 'drill-to-copper', group: 'fab', sev: 'ERROR', desc: 'Hole edge to nearest copper ≥ minDrillToCopperMM' },
+  { id: 'aspect-ratio', group: 'fab', sev: 'WARNING', desc: 'Board thickness ÷ drill diameter ≤ maxAspectRatio' },
+  { id: 'solder-mask-dam', group: 'fab', sev: 'WARNING', desc: 'Solder mask bridge between pads ≥ minSolderMaskDamMM' },
+  { id: 'edge-clearance', group: 'fab', sev: 'WARNING', desc: 'Copper distance from board outline ≥ minEdgeClearanceMM' },
+  { id: 'copper-sliver', group: 'fab', sev: 'WARNING', desc: 'Narrow copper features ≥ minCopperSliverMM' },
+  { id: 'mounting-hole-keepout', group: 'fab', sev: 'WARNING', desc: 'Copper keepout around non-plated mounting holes ≥ minMountingHoleKeepoutMM (IPC-2221B)' },
+  { id: 'silkscreen-on-pad', group: 'fab', sev: 'INFO', desc: 'Silkscreen does not overlap pads' },
+  // Assembly (10)
+  { id: 'fiducial-count', group: 'assembly', sev: 'WARNING', desc: 'Board has ≥ 3 fiducials for pick-and-place (skipped if none found)' },
+  { id: 'pad-size-for-package', group: 'assembly', sev: 'ERROR', desc: 'Pad geometry within IPC-7351 envelope for the package class' },
+  { id: 'package-capability', group: 'assembly', sev: 'ERROR', desc: 'No package smaller than the CM’s smallestPackageClass' },
+  { id: 'tombstoning-risk', group: 'assembly', sev: 'ERROR', desc: 'Pad area ratio on small 2-pad passives ≤ 1.3 (reflow imbalance)' },
+  { id: 'trace-imbalance', group: 'assembly', sev: 'ERROR', desc: 'Thermal trace/pour balance into 2-pad components ≤ maxTraceImbalanceRatio' },
+  { id: 'component-height', group: 'assembly', sev: 'ERROR', desc: 'SMT component height within per-side limits (maxComponentHeightTop/BottomMM)' },
+  { id: 'component-spacing', group: 'assembly', sev: 'WARNING', desc: 'Same-side courtyard edge-to-edge gap ≥ minComponentSpacingMM (IPC-7351B); ERROR on overlap' },
+  { id: 'via-in-pad', group: 'assembly', sev: 'WARNING', desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093)' },
+  { id: 'through-hole-on-bottom', group: 'assembly', sev: 'WARNING', desc: 'Through-hole / press-fit parts on the bottom side (flagThroughHoleOnBottom)' },
+  { id: 'fiducial-placement', group: 'assembly', sev: 'WARNING', desc: 'Global fiducials non-collinear; local fiducials for fine-pitch/BGA (IPC-7351)' },
 ] as const
 
 export default function TechnicalPage() {
@@ -351,7 +359,7 @@ export default function TechnicalPage() {
           <section style={{ marginBottom: '4rem' }}>
             <h2 style={h2Style}>What is RapidDFM?</h2>
             <p style={pStyle}>
-              RapidDFM is a SaaS Design-for-Manufacturability (DFM) analysis platform aimed at contract PCB manufacturers. A CM white-labels it as a portal — their customers upload ODB++ files, the platform runs 16 manufacturing rule checks against a configurable capability profile, and returns a scored manufacturability report with violations pinpointed on an interactive SVG board viewer.
+              RapidDFM is a SaaS Design-for-Manufacturability (DFM) analysis platform aimed at contract PCB manufacturers. A CM white-labels it as a portal — their customers upload ODB++ files, the platform runs 22 manufacturing rule checks against a configurable capability profile, and returns a scored manufacturability report with violations pinpointed on an interactive SVG board viewer.
             </p>
             <p style={pStyle}>
               The core insight: CMs today do this review manually, spending 30–60 minutes per board opening CAM tools and checking clearances, drill sizes, and annular rings by eye. RapidDFM automates the entire first pass in under 30 seconds, surfaces all violations with coordinates and severity, and gives customers a shareable link they can use to track revisions.
@@ -363,10 +371,10 @@ export default function TechnicalPage() {
               marginTop: '1.5rem',
             }}>
               {[
-                { label: '16', sub: 'DFM rules' },
+                { label: '22', sub: 'DFM rules' },
                 { label: '<30s', sub: 'analysis time' },
                 { label: '2', sub: 'file formats' },
-                { label: 'A–D', sub: 'mfg grade' },
+                { label: 'A–F', sub: 'mfg grade' },
               ].map(({ label, sub }) => (
                 <div key={sub} style={{
                   background: '#111418',
@@ -431,7 +439,7 @@ export default function TechnicalPage() {
                 {/* Row 4: Worker → DFM → DB + S3 result blobs */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
                   <ServiceBox label="Go Worker" sub="ECS · 5 goroutines" color="#00acd7" />
-                  <Arrow label="⑥ run 17 rules" />
+                  <Arrow label="⑥ run 22 rules" />
                   <ServiceBox label="DFM Engine" sub="Go library" color="#d4891a" />
                   <Arrow label="⑦ score + metadata" />
                   <ServiceBox label="PostgreSQL" sub="RDS · GORM" color="#336791" />
@@ -509,7 +517,7 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
 }`}</Code>
 
             <p style={pStyle}>
-              All 17 rules run concurrently via <code style={inlineCode}>sync.WaitGroup</code>. Since every rule receives read-only board data, there's no contention — no mutexes needed inside individual rules.
+              All 22 rules run concurrently via <code style={inlineCode}>sync.WaitGroup</code>. Since every rule receives read-only board data, there's no contention — no mutexes needed inside individual rules.
             </p>
 
             {/* Rules table */}
@@ -527,20 +535,45 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
                   </tr>
                 </thead>
                 <tbody>
-                  {RULES.map((rule, i) => (
-                    <tr key={rule.id} style={{
-                      background: i % 2 === 0 ? 'transparent' : '#0d1117',
-                      borderBottom: '1px solid #1a1f2a',
-                    }}>
-                      <td style={{ ...tdStyle, fontFamily: 'ui-monospace, monospace', color: '#d4891a', fontSize: '12px' }}>
-                        {rule.id}
-                      </td>
-                      <td style={tdStyle}>
-                        <Tag type={rule.sev as 'ERROR' | 'WARNING' | 'INFO'} />
-                      </td>
-                      <td style={{ ...tdStyle, color: '#94a3b8' }}>{rule.desc}</td>
-                    </tr>
-                  ))}
+                  {RULES.map((rule, i) => {
+                    const prev = RULES[i - 1]
+                    const showGroup = !prev || prev.group !== rule.group
+                    return (
+                      <Fragment key={rule.id}>
+                        {showGroup && (
+                          <tr style={{ background: '#111418' }}>
+                            <td colSpan={3} style={{
+                              padding: '7px 12px',
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              letterSpacing: '0.08em',
+                              textTransform: 'uppercase',
+                              color: '#d4891a',
+                              fontFamily: 'ui-monospace, monospace',
+                              borderTop: '1px solid #1e2432',
+                              borderBottom: '1px solid #1a1f2a',
+                            }}>
+                              {rule.group === 'fab'
+                                ? 'Bare-board / fab — 12'
+                                : 'Assembly — 10'}
+                            </td>
+                          </tr>
+                        )}
+                        <tr style={{
+                          background: i % 2 === 0 ? 'transparent' : '#0d1117',
+                          borderBottom: '1px solid #1a1f2a',
+                        }}>
+                          <td style={{ ...tdStyle, fontFamily: 'ui-monospace, monospace', color: '#d4891a', fontSize: '12px' }}>
+                            {rule.id}
+                          </td>
+                          <td style={tdStyle}>
+                            <Tag type={rule.sev as 'ERROR' | 'WARNING' | 'INFO'} />
+                          </td>
+                          <td style={{ ...tdStyle, color: '#94a3b8' }}>{rule.desc}</td>
+                        </tr>
+                      </Fragment>
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -660,23 +693,17 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
                 <div>
-                  <div style={{ fontSize: '11px', color: '#d4891a', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>RULE WEIGHTS</div>
+                  <div style={{ fontSize: '11px', color: '#d4891a', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>RULE WEIGHTS (by tier)</div>
                   {[
                     ['clearance', '3.0'],
-                    ['trace-width', '2.5'],
-                    ['annular-ring', '2.5'],
-                    ['drill-size', '2.0'],
-                    ['drill-to-copper', '2.0'],
-                    ['drill-to-drill', '1.5'],
-                    ['aspect-ratio', '1.5'],
-                    ['edge-clearance', '1.0'],
-                    ['solder-mask-dam', '0.75'],
-                    ['copper-sliver', '0.5'],
-                    ['silkscreen-on-pad', '0.25'],
+                    ['trace-width · annular-ring', '2.5'],
+                    ['drill-* · edge-clearance · package-capability · component-height', '2.0'],
+                    ['aspect-ratio · trace-imbalance · tombstoning-risk · pad-size · silkscreen · component-spacing', '1.5'],
+                    ['all others (via-in-pad, fiducials, mask-dam, sliver, …)', '1.0'],
                   ].map(([rule, weight]) => (
-                    <div key={rule} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '2px 0', color: '#94a3b8' }}>
-                      <span style={{ fontFamily: 'ui-monospace, monospace', color: '#d4891a' }}>{rule}</span>
-                      <span style={{ color: '#e2e8f0', fontWeight: 600 }}>{weight}</span>
+                    <div key={rule} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12px', padding: '3px 0', color: '#94a3b8' }}>
+                      <span style={{ fontFamily: 'ui-monospace, monospace', color: '#d4891a', lineHeight: 1.4 }}>{rule}</span>
+                      <span style={{ color: '#e2e8f0', fontWeight: 600, flexShrink: 0 }}>{weight}</span>
                     </div>
                   ))}
                 </div>
@@ -700,7 +727,7 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
                 </div>
                 <div>
                   <div style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>GRADE THRESHOLDS</div>
-                  {[['A', '90 – 100', '#34d399'], ['B', '75 – 90', '#4a9eff'], ['C', '60 – 75', '#fbbf24'], ['D', '< 60', '#f87171']].map(([grade, range, color]) => (
+                  {[['A', '90 – 100', '#34d399'], ['B', '75 – 90', '#4a9eff'], ['C', '60 – 75', '#fbbf24'], ['D', '40 – 60', '#fb923c'], ['F', '< 40', '#f87171']].map(([grade, range, color]) => (
                     <div key={grade} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '3px 0' }}>
                       <span style={{
                         display: 'inline-flex',
@@ -1109,7 +1136,7 @@ NET {
               },
               {
                 title: 'Per-rule score caps sum to 100',
-                body: 'Each rule\'s maximum contribution to the penalty is calibrated so all caps sum exactly to 100. This prevents a single dense-board violation type (e.g. 10,000 clearance hits) from auto-failing the score. A board where only clearance is maximally violated still scores 83 — grade B, still fixable.',
+                body: 'Each rule\'s maximum contribution to the penalty is calibrated so all 22 caps sum exactly to 100. This prevents a single dense-board violation type (e.g. 10,000 clearance hits) from auto-failing the score. A board where only clearance is maximally violated still scores 87 — grade B, still fixable. Adding a rule means rebalancing the existing caps to hold the sum at 100.',
               },
               {
                 title: 'Spatial deduplication post-collection',
@@ -1129,7 +1156,7 @@ NET {
               },
               {
                 title: 'Concurrent rule execution',
-                body: 'All 17 rules receive the same read-only BoardData struct. No synchronisation is needed inside individual rules. The WaitGroup pattern keeps the runner simple and the per-rule code free of concurrency concerns.',
+                body: 'All 22 rules receive the same read-only BoardData struct. No synchronisation is needed inside individual rules. The WaitGroup pattern keeps the runner simple and the per-rule code free of concurrency concerns.',
               },
             ].map(({ title, body }, i) => (
               <Callout key={title} number={i + 1} title={title}>{body}</Callout>
@@ -1148,6 +1175,7 @@ NET {
               <div style={{ background: '#111418', border: '1px solid #1e2432', borderRadius: '8px', padding: '1.25rem' }}>
                 <div style={{ fontSize: '12px', fontWeight: 700, color: '#e2e8f0', marginBottom: '0.75rem' }}>CI Pipeline</div>
                 {[
+                  'Go format check (gofmt -l)',
                   'Engine tests (go test ./...)',
                   'Worker build (go build)',
                   'API build (go build)',

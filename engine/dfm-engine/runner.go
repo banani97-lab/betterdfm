@@ -29,6 +29,11 @@ func NewRunner() *Runner {
 			&TraceImbalanceRule{},
 			&FiducialRule{},
 			&ComponentHeightRule{},
+			&ComponentSpacingRule{},
+			&ViaInPadRule{},
+			&ThroughHoleOnBottomRule{},
+			&FiducialPlacementRule{},
+			&MountingHoleKeepoutRule{},
 		},
 	}
 }

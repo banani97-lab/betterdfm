@@ -25,8 +25,8 @@ func (r *TombstoningRiskRule) Run(board BoardData, _ ProfileRules) []Violation {
 
 	// Group pads by RefDes, only for small passive package classes
 	type padInfo struct {
-		area  float64
-		pad   Pad
+		area float64
+		pad  Pad
 	}
 	type refLayer struct{ ref, layer string }
 	groups := map[refLayer][]padInfo{}

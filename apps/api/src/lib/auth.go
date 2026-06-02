@@ -41,10 +41,10 @@ type jwksResponse struct {
 }
 
 type JWTMiddleware struct {
-	issuer   string
-	audience string // Cognito app client ID for audience validation
-	mu       sync.RWMutex
-	keys     map[string]*rsa.PublicKey
+	issuer    string
+	audience  string // Cognito app client ID for audience validation
+	mu        sync.RWMutex
+	keys      map[string]*rsa.PublicKey
 	fetchedAt time.Time
 }
 

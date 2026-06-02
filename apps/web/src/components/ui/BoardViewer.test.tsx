@@ -58,7 +58,7 @@ function syntheticBoardData(): BoardData {
 
 function makeViolation(overrides: Partial<Violation> = {}): Violation {
   return {
-    id: 'v1', jobId: 'j1', ruleId: 'trace-width', severity: 'ERROR',
+    id: 'v1', orgId: 'org1', jobId: 'j1', ruleId: 'trace-width', severity: 'ERROR',
     layer: 'top_copper', x: 10, y: 5, message: 'Too narrow', suggestion: 'Widen',
     count: 1, measuredMM: 0.08, limitMM: 0.1, unit: 'mm',
     netName: '', refDes: '', x2: 0, y2: 0, ignored: false,

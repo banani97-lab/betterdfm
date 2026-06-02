@@ -32,7 +32,7 @@ function makeBoard(overrides: Partial<BoardData> = {}): BoardData {
 
 function makeViolation(overrides: Partial<Violation> = {}): Violation {
   return {
-    id: 'v1', jobId: 'j1', ruleId: 'clearance',
+    id: 'v1', orgId: 'org1', jobId: 'j1', ruleId: 'clearance',
     severity: 'ERROR', layer: 'top_copper',
     x: 10, y: 10, x2: 0, y2: 0,
     message: 'msg', suggestion: 'sug',

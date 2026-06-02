@@ -68,8 +68,8 @@ func TestDrillToDrill_ViaAndDrillTooClose(t *testing.T) {
 	// Via drill radius = 0.15mm, drill radius = 0.15mm, centers 0.2mm apart → gap = -0.1mm → skip.
 	// Centers 0.4mm apart → gap = 0.1mm < 0.25mm → violation.
 	board := BoardData{
-		Drills: []Drill{{X: 0, Y: 0, DiamMM: 0.3, Plated: true}},
-		Vias:   []Via{{X: 0.4, Y: 0, OuterDiamMM: 0.6, DrillDiamMM: 0.3}},
+		Drills:  []Drill{{X: 0, Y: 0, DiamMM: 0.3, Plated: true}},
+		Vias:    []Via{{X: 0.4, Y: 0, OuterDiamMM: 0.6, DrillDiamMM: 0.3}},
 		Outline: rectOutline(60, 40),
 	}
 	profile := ProfileRules{MinDrillToDrillMM: 0.25}

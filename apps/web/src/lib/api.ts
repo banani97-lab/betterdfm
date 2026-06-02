@@ -128,6 +128,9 @@ export interface ProfileRules {
   enableSilkscreenOnPadCheck?: boolean
   maxComponentHeightTopMM?: number
   maxComponentHeightBottomMM?: number
+  minComponentSpacingMM?: number
+  flagThroughHoleOnBottom?: boolean
+  minMountingHoleKeepoutMM?: number
 }
 
 export interface CapabilityProfile {

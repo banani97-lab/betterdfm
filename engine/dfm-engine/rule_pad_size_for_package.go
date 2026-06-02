@@ -49,7 +49,6 @@ func (r *PadSizeForPackageRule) Run(board BoardData, _ ProfileRules) []Violation
 	// mounting lands we want to measure against IPC-7351.
 	outerLayers := outerCopperLayerSet(board.Layers)
 
-
 	// Track unclassified components (non-empty RefDes but empty PackageClass)
 	unclassifiedRefs := map[string]struct{}{}
 

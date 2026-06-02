@@ -576,4 +576,3 @@ func (h *ShareHandler) SharedAnalyze(c echo.Context) error {
 // to the shared routes group. Example:
 //   import "github.com/labstack/echo/v4/middleware"
 //   sharedGroup.Use(middleware.RateLimiter(middleware.NewRateLimiterMemoryStore(20)))
-

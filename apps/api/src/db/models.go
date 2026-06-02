@@ -40,22 +40,25 @@ type CapabilityProfile struct {
 
 // ProfileRules is the Go struct serialized to JSON in CapabilityProfile.Rules
 type ProfileRules struct {
-	MinTraceWidthMM    float64 `json:"minTraceWidthMM"`
-	MinClearanceMM     float64 `json:"minClearanceMM"`
-	MinDrillDiamMM     float64 `json:"minDrillDiamMM"`
-	MaxDrillDiamMM     float64 `json:"maxDrillDiamMM"`
-	MinAnnularRingMM   float64 `json:"minAnnularRingMM"`
-	MaxAspectRatio     float64 `json:"maxAspectRatio"`
-	MinSolderMaskDamMM float64 `json:"minSolderMaskDamMM"`
-	MinEdgeClearanceMM float64 `json:"minEdgeClearanceMM"`
-	MinDrillToDrillMM  float64 `json:"minDrillToDrillMM"`
-	MinDrillToCopperMM float64 `json:"minDrillToCopperMM"`
+	MinTraceWidthMM            float64 `json:"minTraceWidthMM"`
+	MinClearanceMM             float64 `json:"minClearanceMM"`
+	MinDrillDiamMM             float64 `json:"minDrillDiamMM"`
+	MaxDrillDiamMM             float64 `json:"maxDrillDiamMM"`
+	MinAnnularRingMM           float64 `json:"minAnnularRingMM"`
+	MaxAspectRatio             float64 `json:"maxAspectRatio"`
+	MinSolderMaskDamMM         float64 `json:"minSolderMaskDamMM"`
+	MinEdgeClearanceMM         float64 `json:"minEdgeClearanceMM"`
+	MinDrillToDrillMM          float64 `json:"minDrillToDrillMM"`
+	MinDrillToCopperMM         float64 `json:"minDrillToCopperMM"`
 	MinCopperSliverMM          float64 `json:"minCopperSliverMM"`
 	SmallestPackageClass       string  `json:"smallestPackageClass,omitempty"`
 	MaxTraceImbalanceRatio     float64 `json:"maxTraceImbalanceRatio"`
 	EnableSilkscreenOnPadCheck *bool   `json:"enableSilkscreenOnPadCheck"`
 	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
 	MaxComponentHeightBottomMM float64 `json:"maxComponentHeightBottomMM"`
+	MinComponentSpacingMM      float64 `json:"minComponentSpacingMM"`
+	FlagThroughHoleOnBottom    *bool   `json:"flagThroughHoleOnBottom"`
+	MinMountingHoleKeepoutMM   float64 `json:"minMountingHoleKeepoutMM"`
 }
 
 // Project groups related submissions
@@ -102,15 +105,15 @@ type Submission struct {
 
 // AnalysisJob is one analysis run
 type AnalysisJob struct {
-	ID           string         `gorm:"primaryKey" json:"id"`
-	OrgID        string         `json:"orgId"`
-	SubmissionID string         `json:"submissionId"`
-	ProfileID    string         `json:"profileId"`
-	Status       string         `json:"status"` // PENDING | PROCESSING | DONE | FAILED
-	CreatedAt    time.Time      `gorm:"autoCreateTime" json:"createdAt"`
-	StartedAt    *time.Time     `json:"startedAt"`
-	CompletedAt  *time.Time     `json:"completedAt"`
-	ErrorMsg     string         `json:"errorMsg"`
+	ID            string         `gorm:"primaryKey" json:"id"`
+	OrgID         string         `json:"orgId"`
+	SubmissionID  string         `json:"submissionId"`
+	ProfileID     string         `json:"profileId"`
+	Status        string         `json:"status"` // PENDING | PROCESSING | DONE | FAILED
+	CreatedAt     time.Time      `gorm:"autoCreateTime" json:"createdAt"`
+	StartedAt     *time.Time     `json:"startedAt"`
+	CompletedAt   *time.Time     `json:"completedAt"`
+	ErrorMsg      string         `json:"errorMsg"`
 	BoardData     datatypes.JSON `json:"boardData" gorm:"type:jsonb"`
 	BoardDataKey  string         `json:"-" gorm:"column:board_data_key"`
 	ViolationsKey string         `json:"-" gorm:"column:violations_key"`
@@ -124,8 +127,8 @@ type ShareLink struct {
 	ID          string     `gorm:"primaryKey" json:"id"`
 	OrgID       string     `gorm:"index" json:"orgId"`
 	Token       string     `gorm:"uniqueIndex" json:"token"`
-	ProjectID   *string    `json:"projectId"`   // nullable — share a whole project
-	JobID       *string    `json:"jobId"`        // nullable — share a single job
+	ProjectID   *string    `json:"projectId"` // nullable — share a whole project
+	JobID       *string    `json:"jobId"`     // nullable — share a single job
 	CreatedBy   string     `json:"createdBy"`
 	ExpiresAt   *time.Time `json:"expiresAt"`
 	AllowUpload bool       `gorm:"default:false" json:"allowUpload"`

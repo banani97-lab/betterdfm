@@ -6,6 +6,24 @@ on:
   pull_request:
 
 jobs:
+  go-fmt:
+    name: Go Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Check gofmt
+        run: |
+          unformatted=$(gofmt -l engine apps workers)
+          if [ -n "$unformatted" ]; then
+            echo "::error::The following Go files are not gofmt-formatted:"
+            echo "$unformatted"
+            echo "Run 'gofmt -w engine apps workers' and commit the result."
+            exit 1
+          fi
+
   engine-tests:
     name: Go Engine Tests
     runs-on: ubuntu-latest

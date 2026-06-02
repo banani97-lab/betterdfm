@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	dfmengine "github.com/betterdfm/dfm-engine"
 	"github.com/betterdfm/api/src/db"
 	"github.com/betterdfm/api/src/lib"
+	dfmengine "github.com/betterdfm/dfm-engine"
 	"github.com/fogleman/gg"
 	"github.com/go-pdf/fpdf"
 	"github.com/labstack/echo/v4"
@@ -221,16 +221,16 @@ func trunc(s string, n int) string {
 // ruleDisplayName returns a human-readable name for a rule ID.
 func ruleDisplayName(id string) string {
 	names := map[string]string{
-		"trace-width":       "Trace Width",
-		"clearance":         "Copper Clearance",
-		"drill-size":        "Drill Size",
-		"annular-ring":      "Annular Ring",
-		"aspect-ratio":      "Drill Aspect Ratio",
-		"solder-mask-dam":   "Solder Mask Dam",
-		"edge-clearance":    "Edge Clearance",
-		"drill-to-drill":    "Drill-to-Drill Spacing",
-		"drill-to-copper":   "Drill-to-Copper Spacing",
-		"copper-sliver":     "Copper Sliver",
+		"trace-width":          "Trace Width",
+		"clearance":            "Copper Clearance",
+		"drill-size":           "Drill Size",
+		"annular-ring":         "Annular Ring",
+		"aspect-ratio":         "Drill Aspect Ratio",
+		"solder-mask-dam":      "Solder Mask Dam",
+		"edge-clearance":       "Edge Clearance",
+		"drill-to-drill":       "Drill-to-Drill Spacing",
+		"drill-to-copper":      "Drill-to-Copper Spacing",
+		"copper-sliver":        "Copper Sliver",
 		"silkscreen-on-pad":    "Silkscreen on Pad",
 		"fiducial-count":       "Fiducial Count",
 		"pad-size-for-package": "Pad Size for Package",

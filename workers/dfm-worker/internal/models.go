@@ -4,7 +4,7 @@ import "time"
 
 // Batch groups multiple submissions uploaded together
 type Batch struct {
-	ID        string    `gorm:"primaryKey"`
+	ID        string `gorm:"primaryKey"`
 	OrgID     string
 	ProjectID *string
 	UserID    string
@@ -19,15 +19,15 @@ type Batch struct {
 
 // DB models mirroring the API's models
 type AnalysisJob struct {
-	ID           string     `gorm:"primaryKey"`
-	OrgID        string
-	SubmissionID string
-	ProfileID    string
-	Status       string
-	CreatedAt    time.Time  `gorm:"autoCreateTime"`
-	StartedAt    *time.Time
-	CompletedAt  *time.Time
-	ErrorMsg     string
+	ID            string `gorm:"primaryKey"`
+	OrgID         string
+	SubmissionID  string
+	ProfileID     string
+	Status        string
+	CreatedAt     time.Time `gorm:"autoCreateTime"`
+	StartedAt     *time.Time
+	CompletedAt   *time.Time
+	ErrorMsg      string
 	BoardData     []byte `gorm:"type:jsonb"`
 	BoardDataKey  string `gorm:"column:board_data_key"`
 	ViolationsKey string `gorm:"column:violations_key"`
@@ -37,7 +37,7 @@ type AnalysisJob struct {
 }
 
 type Submission struct {
-	ID        string  `gorm:"primaryKey"`
+	ID        string `gorm:"primaryKey"`
 	OrgID     string
 	UserID    string
 	ProjectID *string

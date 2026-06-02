@@ -6,6 +6,7 @@ import type { Violation } from '@/lib/api'
 function makeViolation(overrides: Partial<Violation> = {}): Violation {
   return {
     id: 'v1',
+    orgId: 'org1',
     jobId: 'j1',
     ruleId: 'trace-width',
     severity: 'ERROR',

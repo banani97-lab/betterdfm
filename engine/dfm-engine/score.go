@@ -47,6 +47,18 @@ func ruleWeight(id string) float64 {
 		// assembled on this line" issues, same severity class as
 		// edge-clearance or drill-to-copper.
 		return 2.0
+	case "component-spacing":
+		// Assembly tier: courtyards too close block nozzle access / rework,
+		// on par with tombstoning-risk and trace-imbalance.
+		return 1.5
+	case "via-in-pad":
+		return 1.0
+	case "through-hole-on-bottom":
+		return 1.0
+	case "fiducial-placement":
+		return 1.0
+	case "mounting-hole-keepout":
+		return 1.0
 	case "solder-mask-dam":
 		return 1.0
 	case "copper-sliver":
@@ -82,7 +94,7 @@ func severityWeight(sev string) float64 {
 //
 // Representative values:
 //
-//	 5% off limit → ~0.22   25% off → 0.50   100%+ off → 1.00
+//	5% off limit → ~0.22   25% off → 0.50   100%+ off → 1.00
 func marginMult(v Violation) float64 {
 	if v.MeasuredMM == 0 || v.LimitMM == 0 {
 		return 1.0
@@ -105,35 +117,35 @@ func marginMult(v Violation) float64 {
 // Calibration: all caps sum to exactly 100, so when every rule hits its cap the
 // score reaches exactly 0 (grade F). Single-rule-maxed scores:
 //
-//	clearance alone maxed          → score 83  (grade B — still needs fixes)
-//	trace-width alone maxed        → score 86  (grade B)
-//	package-capability alone maxed → score 93  (grade A — need different CM or package)
+//	clearance alone maxed          → score 87  (grade B — still needs fixes)
+//	trace-width alone maxed        → score 89  (grade B)
+//	package-capability alone maxed → score 95  (grade A — need different CM or package)
 //	all rules maxed                → score  0  (grade F — truly unmanufacturable)
 func ruleMaxContribution(id string) float64 {
 	// All caps must sum to exactly 100.
 	switch id {
 	case "clearance":
-		return 14.0
+		return 13.0
 	case "trace-width":
-		return 12.0
+		return 11.0
 	case "annular-ring":
-		return 8.0
+		return 7.0
 	case "drill-size":
-		return 7.0
+		return 6.0
 	case "drill-to-copper":
-		return 7.0
+		return 6.0
 	case "edge-clearance":
-		return 7.0
+		return 6.0
 	case "package-capability":
-		return 6.0
+		return 5.0
 	case "drill-to-drill":
-		return 6.0
+		return 5.0
 	case "aspect-ratio":
-		return 5.0
+		return 4.0
 	case "trace-imbalance":
-		return 5.0
+		return 4.0
 	case "tombstoning-risk":
-		return 5.0
+		return 4.0
 	case "pad-size-for-package":
 		return 3.0
 	case "silkscreen-on-pad":
@@ -142,9 +154,19 @@ func ruleMaxContribution(id string) float64 {
 		return 3.0
 	case "component-height":
 		// Tier-2 cap. One over-height SMT part per side can brick an
-		// assembly line, so cap at 5 — on par with trace-imbalance /
-		// tombstoning-risk rather than the cosmetic rules at 3.
-		return 5.0
+		// assembly line, so cap on par with the other assembly placement rules.
+		return 4.0
+	case "component-spacing":
+		// Assembly placement tier. Courtyards too tight to place or rework.
+		return 4.0
+	case "via-in-pad":
+		return 2.0
+	case "through-hole-on-bottom":
+		return 2.0
+	case "fiducial-placement":
+		return 2.0
+	case "mounting-hole-keepout":
+		return 2.0
 	case "copper-sliver":
 		return 2.0
 	case "fiducial-count":
@@ -152,7 +174,7 @@ func ruleMaxContribution(id string) float64 {
 	default:
 		return 3.0
 	}
-	// Sum: 14+12+8+7+7+7+6+6+5+5+5+5+3+3+3+2+2 = 100
+	// Sum: 13+11+7+6+6+6+5+5+4+4+4+3+3+3+4+4+2+2+2+2+2+2 = 100 (22 rules)
 }
 
 // outlineBBox returns the width and height of the bounding box of outline points in mm.
@@ -201,13 +223,15 @@ func scoreGrade(score int) (string, string) {
 // ComputeScore calculates the manufacturability score from violations and board outline.
 //
 // Penalty formula (per violation):
-//   p_i = ruleWeight(ruleId) * severityWeight(severity) * marginMult(v)
+//
+//	p_i = ruleWeight(ruleId) * severityWeight(severity) * marginMult(v)
 //
 // Per-rule normalization with cap:
-//   raw_norm_r  = sum(p_i for rule r) / areaFactor
-//   capped_r    = min(raw_norm_r, ruleMaxContribution(r))
-//   P_norm      = sum(capped_r across all rules)
-//   score       = clamp(round(100 - P_norm), 0, 100)
+//
+//	raw_norm_r  = sum(p_i for rule r) / areaFactor
+//	capped_r    = min(raw_norm_r, ruleMaxContribution(r))
+//	P_norm      = sum(capped_r across all rules)
+//	score       = clamp(round(100 - P_norm), 0, 100)
 //
 // The per-rule cap ensures that even a rule hitting the 500-violation ceiling
 // (due to dense routing on a complex board) cannot single-handedly force the

@@ -55,7 +55,6 @@ func (r *EdgeClearanceRule) Run(board BoardData, profile ProfileRules) []Violati
 	)
 	limit := profile.MinEdgeClearanceMM
 
-
 	// Check component pads and fiducials only (skip anonymous pads like pour thermals)
 	for _, pad := range board.Pads {
 		if len(violations) >= maxViol {
