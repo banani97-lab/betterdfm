@@ -131,12 +131,39 @@ func msgTraceImbalance(refDes string, wide, narrow, ratio float64) string {
 	return fmt.Sprintf("Trace width imbalance on %s: %.3f mm vs %.3f mm (%.1f:1 ratio)", refDes, wide, narrow, ratio)
 }
 
-func msgComponentSpacing(refA, refB string, measured, limit float64) (string, string) {
+// spacingLabel renders a package class for spacing messages. Empty/unknown
+// reads as a plain "component" so messages never show an internal token.
+func spacingLabel(ptype string) string {
+	switch ptype {
+	case "discrete":
+		return "discrete"
+	case "bga":
+		return "BGA"
+	case "through_hole":
+		return "through-hole"
+	case "leaded":
+		return "leaded"
+	default:
+		return ""
+	}
+}
+
+// refWithType formats "BGA U7" / "discrete C4", or just the refdes when the
+// class is unknown.
+func refWithType(ref, ptype string) string {
+	if lbl := spacingLabel(ptype); lbl != "" {
+		return lbl + " " + ref
+	}
+	return ref
+}
+
+func msgComponentSpacing(refA, refB, ptypeA, ptypeB string, measured, limit float64) (string, string) {
+	a, b := refWithType(refA, ptypeA), refWithType(refB, ptypeB)
 	if measured <= geomEps {
-		return fmt.Sprintf("Components %s and %s overlap (land patterns touch), below minimum spacing %.4f mm", refA, refB, limit),
+		return fmt.Sprintf("%s and %s overlap (land patterns touch), below minimum spacing %.4f mm", a, b, limit),
 			fmt.Sprintf("Separate %s and %s so their land patterns are at least %.4f mm apart for placement and rework access.", refA, refB, limit)
 	}
-	return fmt.Sprintf("Components %s and %s are %.4f mm apart, below minimum spacing %.4f mm", refA, refB, measured, limit),
+	return fmt.Sprintf("%s and %s are %.4f mm apart, below minimum spacing %.4f mm", a, b, measured, limit),
 		fmt.Sprintf("Increase spacing between %s and %s to at least %.4f mm for pick-and-place nozzle and rework access.", refA, refB, limit)
 }
 

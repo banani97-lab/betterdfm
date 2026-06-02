@@ -94,6 +94,11 @@ type Component struct {
 	PackageClass string  `json:"packageClass,omitempty"` // IPC class like "0402" if classifiable
 	HeightMM     float64 `json:"heightMM,omitempty"`     // 0 when not declared
 	MountType    string  `json:"mountType,omitempty"`    // "smt" | "thmt" | "pressfit" | "manual" | "other"
+	// PackageType is the coarse assembly class the component-spacing rule keys
+	// off: "discrete" | "leaded" | "bga" | "through_hole". Set by the parser
+	// from the ODB++ PKG record (IPC name token + pin-grid geometry + mount
+	// type). Empty when unclassifiable; rules treat empty as "leaded".
+	PackageType string `json:"packageType,omitempty"`
 }
 
 // ProfileRules defines the CM's manufacturing capabilities
@@ -119,8 +124,15 @@ type ProfileRules struct {
 	// Assembly placement checks.
 	// MinComponentSpacingMM is the minimum courtyard edge-to-edge gap between
 	// same-side components for pick-and-place nozzle access and rework
-	// (IPC-7351B nominal-density courtyard excess). 0 disables.
+	// (IPC-7351B nominal-density courtyard excess). 0 disables. Acts as the
+	// flat fallback when ComponentSpacing is nil, and as the per-field fallback
+	// for any zero entry inside ComponentSpacing.
 	MinComponentSpacingMM float64 `json:"minComponentSpacingMM"`
+	// ComponentSpacing, when non-nil, expands component-spacing into per-package
+	// class keepout radii. The pair threshold is max(radius[a], radius[b]) where
+	// radius is selected by each part's PackageType. nil preserves the legacy
+	// single-threshold behavior driven by MinComponentSpacingMM.
+	ComponentSpacing *ComponentSpacingClasses `json:"componentSpacing,omitempty"`
 	// FlagThroughHoleOnBottom flags through-hole / press-fit parts placed on
 	// the bottom side, which can't be wave/reflow soldered normally. nil or
 	// true enables the check; false disables it.
@@ -138,6 +150,19 @@ type ProfileRules struct {
 	EnablePadSizeForPackageCheck *bool `json:"enablePadSizeForPackageCheck"`
 	EnableTombstoningRiskCheck   *bool `json:"enableTombstoningRiskCheck"`
 	EnableViaInPadCheck          *bool `json:"enableViaInPadCheck"`
+}
+
+// ComponentSpacingClasses holds the per-package-class keepout radii used by the
+// component-spacing rule. Each field is the minimum edge-to-edge gap that class
+// requires to a neighbor; the rule uses max(radius[a], radius[b]) for a pair. A
+// zero field falls back to ProfileRules.MinComponentSpacingMM. Defaults (IPC /
+// CM practice): discrete 0.254 (10 mil), leaded 1.27 (50 mil) for QFN/QFP/PLCC/
+// connector, BGA and through-hole pin 3.175 (125 mil).
+type ComponentSpacingClasses struct {
+	DiscreteMM    float64 `json:"discreteMM"`
+	LeadedMM      float64 `json:"leadedMM"`
+	BGAMM         float64 `json:"bgaMM"`
+	ThroughHoleMM float64 `json:"throughHoleMM"`
 }
 
 // Violation is a single DFM issue found.

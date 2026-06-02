@@ -1708,36 +1708,53 @@ def _classify_package(part_name: str) -> str:
 
 
 def _parse_eda_packages(eda_path: Path, units: str) -> dict[int, dict]:
-    """Parse eda/data PKG records → {pkg_index: {"name": str, "bbox_w_mm": float, "bbox_h_mm": float}}."""
+    """Parse eda/data PKG records, keyed by 0-based package index (the value a
+    CMP record's pkg_ref points at).
+
+    Each entry: {"name", "bbox_w_mm", "bbox_h_mm", "pins": [(x_mm, y_mm)],
+    "pad_shapes": set[str]}. Pins and pad shapes feed package-type
+    classification (BGA grid detection); name/bbox feed passive-size fallback
+    and the refdes spatial-index tolerance.
+    """
     pkgs: dict[int, dict] = {}
     try:
         text = eda_path.read_text(errors="replace")
     except OSError:
         return pkgs
 
-    pkg_idx = 0
+    pkg_idx = -1
+    cur: dict | None = None
     for line in text.splitlines():
         s = line.strip()
-        if not s.startswith("PKG "):
-            continue
-        parts = s.rstrip(";").split()
-        if len(parts) < 7:
+        if s.startswith("PKG "):
             pkg_idx += 1
-            continue
-        try:
-            name = parts[1]
-            xmin = _coord_to_mm(float(parts[3]), units)
-            ymin = _coord_to_mm(float(parts[4]), units)
-            xmax = _coord_to_mm(float(parts[5]), units)
-            ymax = _coord_to_mm(float(parts[6]), units)
-            pkgs[pkg_idx] = {
-                "name": name,
-                "bbox_w_mm": abs(xmax - xmin),
-                "bbox_h_mm": abs(ymax - ymin),
-            }
-        except (ValueError, IndexError):
-            pass
-        pkg_idx += 1
+            cur = {"name": "", "bbox_w_mm": 0.0, "bbox_h_mm": 0.0,
+                   "pins": [], "pad_shapes": set()}
+            pkgs[pkg_idx] = cur
+            parts = s.rstrip(";").split()
+            if len(parts) >= 2:
+                cur["name"] = parts[1]
+            if len(parts) >= 7:
+                try:
+                    xmin = _coord_to_mm(float(parts[3]), units)
+                    ymin = _coord_to_mm(float(parts[4]), units)
+                    xmax = _coord_to_mm(float(parts[5]), units)
+                    ymax = _coord_to_mm(float(parts[6]), units)
+                    cur["bbox_w_mm"] = abs(xmax - xmin)
+                    cur["bbox_h_mm"] = abs(ymax - ymin)
+                except (ValueError, IndexError):
+                    pass
+        elif cur is not None and s.startswith("PIN "):
+            # PIN <name> <type> <x> <y> ... — capture land centroid.
+            parts = s.split()
+            try:
+                cur["pins"].append((_coord_to_mm(float(parts[3]), units),
+                                    _coord_to_mm(float(parts[4]), units)))
+            except (ValueError, IndexError):
+                pass
+        elif cur is not None and len(s) >= 3 and s[:3] in ("CR ", "RC ", "SQ ", "OV "):
+            # Pad-shape primitive following a PIN (CR=circle, RC=rect, etc.).
+            cur["pad_shapes"].add(s[:2])
 
     return pkgs
 
@@ -1758,6 +1775,73 @@ def _classify_by_bbox(w_mm: float, h_mm: float) -> str:
     for pkg, lo_min, lo_max, hi_min, hi_max in _body_ranges:
         if lo_min <= lo <= lo_max and hi_min <= hi <= hi_max:
             return pkg
+    return ""
+
+
+def _grid_dims(pins: list[tuple[float, float]], tol: float = 0.15) -> tuple[int, int]:
+    """Count distinct rows and columns in a pin layout. Coordinates within `tol`
+    mm collapse into one row/column, so a regular array reports (rows, cols)."""
+    def clusters(vals: list[float]) -> int:
+        uniq = sorted(set(round(v, 3) for v in vals))
+        if not uniq:
+            return 0
+        c = 1
+        for a, b in zip(uniq, uniq[1:]):
+            if abs(b - a) > tol:
+                c += 1
+        return c
+    return clusters([y for _, y in pins]), clusters([x for x, _ in pins])
+
+
+# Package-type tokens emitted on Component.packageType for the spacing rule.
+_PKG_TYPE_DISCRETE = "discrete"
+_PKG_TYPE_LEADED = "leaded"
+_PKG_TYPE_BGA = "bga"
+_PKG_TYPE_THROUGH_HOLE = "through_hole"
+
+_PASSIVE_NAME_RE = re.compile(r"^(RES|CAP|IND)", re.IGNORECASE)
+
+
+def _classify_package_type(
+    name: str, pins: list[tuple[float, float]], pad_shapes: set[str],
+    mount_type: str,
+) -> str:
+    """Classify a package into the coarse assembly class the component-spacing
+    rule keys off: discrete | leaded | bga | through_hole. Returns "" when no
+    signal is available (the engine then treats it as leaded).
+
+    Order matters: mount type wins (a through-hole pin field needs the largest
+    keepout regardless of footprint), then passive name token, then the
+    geometric BGA test, then a name-based BGA fallback, then leaded as the
+    residual for anything with pads.
+
+    The BGA geometry was validated against a real board (3/3 recall, 0 false
+    positives): round pads only, at least a 2×2 grid, ≥8 balls, ≥50% grid fill,
+    and a near-square aspect (≤3:1, which rejects 2×N strip connectors).
+    """
+    mt = (mount_type or "").lower()
+    if mt in ("thmt", "pressfit"):
+        return _PKG_TYPE_THROUGH_HOLE
+
+    nm = (name or "").upper()
+    if _PASSIVE_NAME_RE.match(nm) or _classify_package(name):
+        return _PKG_TYPE_DISCRETE
+
+    n = len(pins)
+    if n >= 8 and pad_shapes and pad_shapes <= {"CR"}:
+        rows, cols = _grid_dims(pins)
+        cells = rows * cols
+        if cells:
+            lo, hi = min(rows, cols), max(rows, cols)
+            fill = n / cells
+            if lo >= 2 and fill >= 0.5 and hi / lo <= 3.0:
+                return _PKG_TYPE_BGA
+
+    if nm.startswith("BGA"):
+        return _PKG_TYPE_BGA
+
+    if n >= 1 or nm:
+        return _PKG_TYPE_LEADED
     return ""
 
 
@@ -1945,15 +2029,26 @@ def _parse_components(
             # _DEFAULT_TOLERANCE, missing the pads at the far ends.
             bbox_w_mm = 0.0
             bbox_h_mm = 0.0
-            if pkg_ref in eda_pkgs:
-                bbox_w_mm = float(eda_pkgs[pkg_ref].get("bbox_w_mm", 0.0) or 0.0)
-                bbox_h_mm = float(eda_pkgs[pkg_ref].get("bbox_h_mm", 0.0) or 0.0)
+            pkg_rec = eda_pkgs.get(pkg_ref, {})
+            if pkg_rec:
+                bbox_w_mm = float(pkg_rec.get("bbox_w_mm", 0.0) or 0.0)
+                bbox_h_mm = float(pkg_rec.get("bbox_h_mm", 0.0) or 0.0)
+
+            # Coarse assembly class for the component-spacing rule. Prefer the
+            # EDA PKG name (standard IPC-7351 token) and its pin grid; fall back
+            # to the CMP part name when no EDA record is present.
+            package_type = _classify_package_type(
+                pkg_rec.get("name") or part_name,
+                pkg_rec.get("pins", []),
+                pkg_rec.get("pad_shapes", set()),
+                mount_type,
+            )
 
             components.append({
                 "x": x_mm, "y": y_mm, "refDes": refdes, "partName": part_name,
                 "side": side, "heightMM": height_mm, "mountType": mount_type,
                 "bboxWMM": bbox_w_mm, "bboxHMM": bbox_h_mm,
-                "rotationDeg": rotation_deg,
+                "rotationDeg": rotation_deg, "packageType": package_type,
             })
         except (ValueError, IndexError):
             pass
@@ -2442,6 +2537,7 @@ def parse_odb(file_path: str) -> BoardData:
                 packageClass=_classify_package(c.get("partName", "")) or "",
                 heightMM=float(c.get("heightMM", 0.0) or 0.0),
                 mountType=c.get("mountType", ""),
+                packageType=c.get("packageType", ""),
             ))
 
     logger.info("ODB++ done: %d layers, %d traces, %d pads, %d vias, %d drills, %d polygons, %d components",

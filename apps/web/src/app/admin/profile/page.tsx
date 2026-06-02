@@ -37,6 +37,7 @@ const DEFAULT_RULES: ProfileRules = {
   maxComponentHeightTopMM: 10,
   maxComponentHeightBottomMM: 5,
   minComponentSpacingMM: 0.5,
+  componentSpacing: { discreteMM: 0.254, leadedMM: 1.27, bgaMM: 3.175, throughHoleMM: 3.175 },
   flagThroughHoleOnBottom: true,
   minMountingHoleKeepoutMM: 0.5,
   enableFiducialPlacementCheck: true,
@@ -186,6 +187,15 @@ export default function AdminProfilePage() {
     setRules((r) => ({ ...r, [key]: parseFloat(val) || 0 }))
   }
 
+  const SPACING_DEFAULTS = { discreteMM: 0.254, leadedMM: 1.27, bgaMM: 3.175, throughHoleMM: 3.175 }
+
+  const setSpacingClass = (key: keyof typeof SPACING_DEFAULTS, val: string) => {
+    setRules((r) => ({
+      ...r,
+      componentSpacing: { ...SPACING_DEFAULTS, ...(r.componentSpacing ?? {}), [key]: parseFloat(val) || 0 },
+    }))
+  }
+
   return (
     <div className="min-h-screen">
       <header className="bg-card/65 border-b border-border/80 px-6 py-4 flex items-center justify-between gap-4 sticky top-0 z-30">
@@ -308,6 +318,37 @@ export default function AdminProfilePage() {
                   <option value="2010">2010</option>
                   <option value="2512">2512</option>
                 </select>
+              </div>
+
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <h3 className="text-sm font-semibold text-foreground">Component Spacing by Package Class</h3>
+                  <RuleHelp text="Per-class keepout radii for the component-spacing check. The required gap between two parts is the larger of their two radii, so a discrete next to a BGA uses the BGA radius. A zero field falls back to Min Component Spacing above. Defaults follow CM practice: discrete 0.254 mm (10 mil), leaded QFN/QFP/PLCC/connector 1.27 mm (50 mil), BGA and through-hole pin 3.175 mm (125 mil)." />
+                </div>
+                <p className="text-xs text-muted-foreground mb-3">Package class is detected from the ODB++ data (IPC name + pad geometry + mount type).</p>
+                <div className="grid grid-cols-2 gap-4">
+                  {([
+                    ['discreteMM', 'Discrete (R/C/L)'],
+                    ['leadedMM', 'Leaded (QFN/QFP/PLCC/connector)'],
+                    ['bgaMM', 'BGA'],
+                    ['throughHoleMM', 'Through-Hole Pin'],
+                  ] as Array<[keyof typeof SPACING_DEFAULTS, string]>).map(([key, label]) => (
+                    <div key={key}>
+                      <Label className="block text-xs mb-1">{label}</Label>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.05"
+                          min="0"
+                          value={rules.componentSpacing?.[key] ?? SPACING_DEFAULTS[key]}
+                          onChange={(e) => setSpacingClass(key, e.target.value)}
+                          className="flex-1"
+                        />
+                        <span className="text-xs text-muted-foreground w-8 flex-shrink-0">mm</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="mt-4 pt-4 border-t border-border">

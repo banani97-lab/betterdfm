@@ -57,8 +57,13 @@ type ProfileRules struct {
 	MaxComponentHeightTopMM    float64 `json:"maxComponentHeightTopMM"`
 	MaxComponentHeightBottomMM float64 `json:"maxComponentHeightBottomMM"`
 	MinComponentSpacingMM      float64 `json:"minComponentSpacingMM"`
-	FlagThroughHoleOnBottom    *bool   `json:"flagThroughHoleOnBottom"`
-	MinMountingHoleKeepoutMM   float64 `json:"minMountingHoleKeepoutMM"`
+	// ComponentSpacing, when set, expands component-spacing into per-package
+	// class keepout radii (discrete/leaded/BGA/through-hole). nil keeps the flat
+	// MinComponentSpacingMM threshold. Mirrors dfmengine.ProfileRules so the
+	// JSONB round-trips through both structs.
+	ComponentSpacing         *ComponentSpacingClasses `json:"componentSpacing,omitempty"`
+	FlagThroughHoleOnBottom  *bool                    `json:"flagThroughHoleOnBottom"`
+	MinMountingHoleKeepoutMM float64                  `json:"minMountingHoleKeepoutMM"`
 	// nil or true enables the rule; false disables it. On/off toggles for the
 	// discrete checks that have no numeric threshold.
 	EnableFiducialPlacementCheck *bool `json:"enableFiducialPlacementCheck"`
@@ -66,6 +71,16 @@ type ProfileRules struct {
 	EnablePadSizeForPackageCheck *bool `json:"enablePadSizeForPackageCheck"`
 	EnableTombstoningRiskCheck   *bool `json:"enableTombstoningRiskCheck"`
 	EnableViaInPadCheck          *bool `json:"enableViaInPadCheck"`
+}
+
+// ComponentSpacingClasses holds per-package-class keepout radii (mm) for the
+// component-spacing rule. Mirrors dfmengine.ComponentSpacingClasses. A zero
+// field falls back to ProfileRules.MinComponentSpacingMM.
+type ComponentSpacingClasses struct {
+	DiscreteMM    float64 `json:"discreteMM"`
+	LeadedMM      float64 `json:"leadedMM"`
+	BGAMM         float64 `json:"bgaMM"`
+	ThroughHoleMM float64 `json:"throughHoleMM"`
 }
 
 // Project groups related submissions
