@@ -235,10 +235,11 @@ All work lands on branch `feat/itar-govcloud-migration` as a single PR, built ph
 - Phase 4 / WS7: tenant-isolation authz tests proving cross-org reads 404 across jobs/submissions/violations/board data. Audit found existing handlers already scope every primary lookup by org_id; tests lock it in. Pure-Go sqlite, test-only.
 
 - Phase 5 / WS2 (CI): separate `deploy-govcloud.yml` (manual trigger, keyless OIDC, builds+pushes 4 images, updates 4 ECS services); commercial `deploy.yml` left intact for deliberate cutover.
+- Phase 6 / WS6: CloudTrail (mgmt + S3 data events on uploads) to a CMK-encrypted, log-file-validated bucket + CloudWatch Logs; SNS + metric-filter alarms (root usage, unauthorized API, console-without-MFA); incident-response runbook (`docs/INCIDENT-RESPONSE.md`). `validate` clean.
 
-**Remaining:**
-- WS6: CloudTrail (mgmt + S3 data events) + centralized logs + incident-reporting process.
-- WS4: internal worker->gerbonara TLS hop (lower priority; inside a private subnet).
+**Buildable scope is complete.** Remaining items need AWS apply or are deferred:
+- WS4 internal worker->gerbonara TLS hop: **deferred** (deliberate). The hop is in a private subnet with SGs restricting gerbonara ingress to the worker only; plaintext there is an accepted residual risk for the non-CUI alpha. Before CUI, close it via app-level TLS in uvicorn or an internal ALB/Cloud Map with ACM Private CA. Documented, not built (avoids brittle private-CA plumbing now).
+- Apply: bootstrap -> root `terraform apply`; then run `deploy-govcloud.yml`. Needs `github_org` in tfvars.
 - Then: open the single PR; pursue 3PAO equivalency (Phase 7); flip on real CUI (Phase 8).
 
 **Domain:** building domain-optional; `domain_name` empty for now (web on ALB :80, api on :8080; see alb.tf). Set `domain_name` later to switch on ACM + HTTPS host routing + Cognito callbacks.
