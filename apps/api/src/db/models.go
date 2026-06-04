@@ -123,6 +123,12 @@ type Submission struct {
 	FileKey   string    `json:"fileKey"`  // S3 key
 	Status    string    `json:"status"`   // UPLOADED | ANALYZING | DONE | FAILED
 	CreatedAt time.Time `json:"createdAt"`
+
+	// NonCUIAcknowledged records that the uploader affirmed the design is not
+	// ITAR-controlled or CUI / export-controlled technical data. Enforced at
+	// upload time while the non-CUI alpha guardrail is active (NON_CUI_ALPHA_MODE).
+	NonCUIAcknowledged bool       `gorm:"column:non_cui_acknowledged" json:"nonCuiAcknowledged"`
+	NonCUIAckAt        *time.Time `gorm:"column:non_cui_ack_at" json:"nonCuiAckAt,omitempty"`
 }
 
 // AnalysisJob is one analysis run

@@ -39,9 +39,10 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 	}
 
 	var req struct {
-		ProjectID *string `json:"projectId"`
-		ProfileID *string `json:"profileId"`
-		Files     []struct {
+		ProjectID          *string `json:"projectId"`
+		ProfileID          *string `json:"profileId"`
+		NonCUIAcknowledged bool    `json:"nonCuiAcknowledged"`
+		Files              []struct {
 			Filename string `json:"filename"`
 			FileType string `json:"fileType"`
 		} `json:"files"`
@@ -51,6 +52,10 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 	}
 	if len(req.Files) == 0 {
 		return echo.NewHTTPError(http.StatusBadRequest, "at least one file required")
+	}
+	// Non-CUI alpha guardrail: one acknowledgment covers the whole batch.
+	if lib.RequireNonCUIAck() && !req.NonCUIAcknowledged {
+		return echo.NewHTTPError(http.StatusBadRequest, lib.ErrNonCUIAckRequired)
 	}
 
 	// Check tier-specific batch file limit
@@ -76,6 +81,10 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 
 	batchID := uuid.New().String()
 	now := time.Now()
+	var ackAt *time.Time
+	if req.NonCUIAcknowledged {
+		ackAt = &now
+	}
 
 	batch := db.Batch{
 		ID:        batchID,
@@ -109,15 +118,17 @@ func (h *BatchesHandler) CreateBatch(c echo.Context) error {
 		fileKey := fmt.Sprintf("submissions/%s/%s%s", user.OrgID, subID, ext)
 
 		submissions = append(submissions, db.Submission{
-			ID:        subID,
-			OrgID:     user.OrgID,
-			UserID:    user.Sub,
-			BatchID:   &batchID,
-			Filename:  f.Filename,
-			FileType:  f.FileType,
-			FileKey:   fileKey,
-			Status:    "UPLOADED",
-			CreatedAt: now,
+			ID:                 subID,
+			OrgID:              user.OrgID,
+			UserID:             user.Sub,
+			BatchID:            &batchID,
+			Filename:           f.Filename,
+			FileType:           f.FileType,
+			FileKey:            fileKey,
+			Status:             "UPLOADED",
+			CreatedAt:          now,
+			NonCUIAcknowledged: req.NonCUIAcknowledged,
+			NonCUIAckAt:        ackAt,
 		})
 
 		contentType := "application/octet-stream"

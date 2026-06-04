@@ -91,9 +91,10 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 	user := lib.GetUser(c)
 
 	var req struct {
-		Filename  string  `json:"filename"`
-		FileType  string  `json:"fileType"` // ODB_PLUS_PLUS
-		ProjectID *string `json:"projectId"`
+		Filename           string  `json:"filename"`
+		FileType           string  `json:"fileType"` // ODB_PLUS_PLUS
+		ProjectID          *string `json:"projectId"`
+		NonCUIAcknowledged bool    `json:"nonCuiAcknowledged"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -103,6 +104,10 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 	}
 	if req.FileType != "ODB_PLUS_PLUS" {
 		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be ODB_PLUS_PLUS")
+	}
+	// Non-CUI alpha guardrail: refuse to issue an upload URL for unacknowledged data.
+	if lib.RequireNonCUIAck() && !req.NonCUIAcknowledged {
+		return echo.NewHTTPError(http.StatusBadRequest, lib.ErrNonCUIAckRequired)
 	}
 
 	submissionID := uuid.New().String()
@@ -120,16 +125,23 @@ func (h *SubmissionsHandler) CreateSubmission(c echo.Context) error {
 		}
 	}
 
+	now := time.Now()
+	var ackAt *time.Time
+	if req.NonCUIAcknowledged {
+		ackAt = &now
+	}
 	submission := db.Submission{
-		ID:        submissionID,
-		OrgID:     user.OrgID,
-		UserID:    user.Sub,
-		ProjectID: req.ProjectID,
-		Filename:  req.Filename,
-		FileType:  req.FileType,
-		FileKey:   fileKey,
-		Status:    "UPLOADED",
-		CreatedAt: time.Now(),
+		ID:                 submissionID,
+		OrgID:              user.OrgID,
+		UserID:             user.Sub,
+		ProjectID:          req.ProjectID,
+		Filename:           req.Filename,
+		FileType:           req.FileType,
+		FileKey:            fileKey,
+		Status:             "UPLOADED",
+		CreatedAt:          now,
+		NonCUIAcknowledged: req.NonCUIAcknowledged,
+		NonCUIAckAt:        ackAt,
 	}
 	if err := h.db.Create(&submission).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())

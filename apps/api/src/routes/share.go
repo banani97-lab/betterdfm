@@ -451,10 +451,11 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 	}
 
 	var req struct {
-		Filename      string `json:"filename"`
-		FileType      string `json:"fileType"`
-		UploaderName  string `json:"uploaderName"`
-		UploaderEmail string `json:"uploaderEmail"`
+		Filename           string `json:"filename"`
+		FileType           string `json:"fileType"`
+		UploaderName       string `json:"uploaderName"`
+		UploaderEmail      string `json:"uploaderEmail"`
+		NonCUIAcknowledged bool   `json:"nonCuiAcknowledged"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -464,6 +465,11 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 	}
 	if req.FileType != "ODB_PLUS_PLUS" {
 		return echo.NewHTTPError(http.StatusBadRequest, "fileType must be ODB_PLUS_PLUS")
+	}
+	// Non-CUI alpha guardrail: external portal uploads are the highest-risk
+	// vector for controlled data, so the acknowledgment is required here too.
+	if lib.RequireNonCUIAck() && !req.NonCUIAcknowledged {
+		return echo.NewHTTPError(http.StatusBadRequest, lib.ErrNonCUIAckRequired)
 	}
 	req.UploaderName = strings.TrimSpace(req.UploaderName)
 	req.UploaderEmail = strings.TrimSpace(req.UploaderEmail)
@@ -481,16 +487,23 @@ func (h *ShareHandler) SharedUpload(c echo.Context) error {
 	}
 	fileKey := fmt.Sprintf("submissions/%s/%s%s", link.OrgID, submissionID, ext)
 
+	now := time.Now()
+	var ackAt *time.Time
+	if req.NonCUIAcknowledged {
+		ackAt = &now
+	}
 	submission := db.Submission{
-		ID:        submissionID,
-		OrgID:     link.OrgID,
-		UserID:    "shared:" + link.ID,
-		ProjectID: link.ProjectID,
-		Filename:  req.Filename,
-		FileType:  req.FileType,
-		FileKey:   fileKey,
-		Status:    "UPLOADED",
-		CreatedAt: time.Now(),
+		ID:                 submissionID,
+		OrgID:              link.OrgID,
+		UserID:             "shared:" + link.ID,
+		ProjectID:          link.ProjectID,
+		Filename:           req.Filename,
+		FileType:           req.FileType,
+		FileKey:            fileKey,
+		Status:             "UPLOADED",
+		CreatedAt:          now,
+		NonCUIAcknowledged: req.NonCUIAcknowledged,
+		NonCUIAckAt:        ackAt,
 	}
 	if err := h.db.Create(&submission).Error; err != nil {
 		return echo.NewHTTPError(http.StatusInternalServerError, err.Error())
