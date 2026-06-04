@@ -214,3 +214,25 @@ Phases 1-2 can start in the current repo today and carry no GovCloud dependency.
 - CMMC certification of RapidDFM itself (we enable customers' CMMC; we are assessed as their CSP via FedRAMP Moderate equivalency).
 - Bedrock or any in-boundary AI replacement for the removed OpenAI feature.
 - Multi-region / DR posture beyond what GovCloud single-region provides.
+
+---
+
+## 13. Implementation status (live)
+
+All work lands on branch `feat/itar-govcloud-migration` as a single PR, built phase by phase.
+
+**Done (committed):**
+- Phase 1 / non-CUI guardrail: hard acknowledgment gate on all three upload vectors (direct, batch, shared portal), `NON_CUI_ALPHA_MODE` (fail-safe ON), UI checkboxes + notices. Browser-verified.
+- Phase 2 / WS3: OpenAI egress removed; deterministic fallback is the sole overview generator.
+- Phase 2 / WS1: region/partition config-driven; FIPS endpoints auto-enabled for `us-gov-*` regions (or `AWS_USE_FIPS_ENDPOINT=true`) across api, worker, sidecar; sidecar `us-east-1` default dropped.
+
+**Next AWS-independent code (not yet started):**
+- WS5 (code): build-tag the dev auth bypass out of the production binary (`apps/api/src/lib/auth.go:169`, `:206`) and hard-fail when `JWT_ISSUER` is empty; same for the frontend bypass.
+- WS7 (code): tenant-isolation enforcement + authz tests (one org cannot read another's submissions/violations/board data).
+
+**Paused on (needs AWS provisioning before Terraform / WS0, WS2, WS4, WS6):**
+1. GovCloud account + target region (recommend `us-gov-west-1`).
+2. Terraform state backend (S3 bucket + DynamoDB lock table in gov), or permission for IaC to create.
+3. Account ID + naming/tagging conventions + preferred VPC CIDR.
+4. KMS CMK ownership model: single CMK w/ prefix-scoped policies vs per-tenant data keys (open decision #3).
+5. GitHub OIDC provider in the gov account (exists vs IaC creates it) for keyless CI.
