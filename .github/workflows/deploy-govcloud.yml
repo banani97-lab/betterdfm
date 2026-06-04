@@ -1,0 +1,117 @@
+name: Deploy GovCloud
+
+# Manual-only by design: the commercial deploy.yml is unchanged and stays the
+# default pipeline. This deploys the ITAR/CUI boundary in GovCloud via keyless
+# OIDC (no static AWS keys). Cut over deliberately when ready.
+#
+# Required GitHub repo variables (set from `terraform output`):
+#   GOVCLOUD_DEPLOY_ROLE_ARN   github_deploy_role_arn
+#   GOVCLOUD_ECR_REGISTRY      <account>.dkr.ecr.us-gov-west-1.amazonaws.com
+#   GOVCLOUD_ECS_CLUSTER       ecs_cluster (e.g. rapiddfm)
+#   GOVCLOUD_API_URL           api_url   (baked into the web client bundle)
+#   GOVCLOUD_COGNITO_REGION    us-gov-west-1
+#   GOVCLOUD_COGNITO_CLIENT_ID        cognito_app_client_id
+#   GOVCLOUD_ADMIN_COGNITO_CLIENT_ID  cognito_admin_client_id
+
+on:
+  workflow_dispatch:
+    inputs:
+      services:
+        description: "Space-separated services to deploy (default: all)"
+        required: false
+        default: "web api worker gerbonara"
+
+permissions:
+  id-token: write # assume the deploy role via OIDC
+  contents: read
+
+env:
+  AWS_REGION: us-gov-west-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.GOVCLOUD_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build and push images
+        env:
+          ECR: ${{ vars.GOVCLOUD_ECR_REGISTRY }}
+          SHA: ${{ github.sha }}
+          SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          set -euo pipefail
+          build_push() { # name, dockerfile, context, extra build args
+            local name="$1" dockerfile="$2" context="$3"; shift 3
+            echo "::group::build $name"
+            docker build -f "$dockerfile" "$@" \
+              -t "$ECR/rapiddfm-$name:latest" \
+              -t "$ECR/rapiddfm-$name:$SHA" \
+              "$context"
+            docker push "$ECR/rapiddfm-$name:latest"
+            docker push "$ECR/rapiddfm-$name:$SHA"
+            echo "::endgroup::"
+          }
+
+          for svc in $SERVICES; do
+            case "$svc" in
+              web)
+                build_push web apps/web/Dockerfile apps/web \
+                  --build-arg "NEXT_PUBLIC_API_URL=${{ vars.GOVCLOUD_API_URL }}" \
+                  --build-arg "NEXT_PUBLIC_COGNITO_REGION=${{ vars.GOVCLOUD_COGNITO_REGION }}" \
+                  --build-arg "NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ vars.GOVCLOUD_COGNITO_CLIENT_ID }}" \
+                  --build-arg "NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID=${{ vars.GOVCLOUD_ADMIN_COGNITO_CLIENT_ID }}"
+                ;;
+              api)       build_push api apps/api/Dockerfile . ;;
+              worker)    build_push worker workers/dfm-worker/Dockerfile . ;;
+              gerbonara) build_push gerbonara sidecar/gerbonara/Dockerfile sidecar/gerbonara ;;
+              *) echo "unknown service: $svc" && exit 1 ;;
+            esac
+          done
+
+      - name: Register task definitions and update services
+        env:
+          ECR: ${{ vars.GOVCLOUD_ECR_REGISTRY }}
+          SHA: ${{ github.sha }}
+          CLUSTER: ${{ vars.GOVCLOUD_ECS_CLUSTER }}
+          SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          set -euo pipefail
+          for svc in $SERVICES; do
+            family="rapiddfm-$svc"
+            image="$ECR/rapiddfm-$svc:$SHA"
+            echo "::group::deploy $svc ($image)"
+
+            TASK_DEF=$(aws ecs describe-task-definition --task-definition "$family" \
+              --region "$AWS_REGION" --query 'taskDefinition')
+
+            echo "$TASK_DEF" | jq \
+              --arg IMG "$image" --arg NAME "$svc" \
+              '.containerDefinitions |= map(if .name == $NAME then .image = $IMG else . end)
+               | del(.taskDefinitionArn, .revision, .status, .requiresAttributes,
+                     .compatibilities, .registeredAt, .registeredBy)' > /tmp/$svc.json
+
+            NEW_ARN=$(aws ecs register-task-definition --cli-input-json file:///tmp/$svc.json \
+              --region "$AWS_REGION" --query 'taskDefinition.taskDefinitionArn' --output text)
+
+            aws ecs update-service --cluster "$CLUSTER" --service "$family" \
+              --task-definition "$NEW_ARN" --region "$AWS_REGION" >/dev/null
+            echo "::endgroup::"
+          done
+
+      - name: Wait for services to stabilize
+        env:
+          CLUSTER: ${{ vars.GOVCLOUD_ECS_CLUSTER }}
+          SERVICES: ${{ github.event.inputs.services }}
+        run: |
+          set -euo pipefail
+          names=""
+          for svc in $SERVICES; do names="$names rapiddfm-$svc"; done
+          aws ecs wait services-stable --cluster "$CLUSTER" --services $names --region "$AWS_REGION"
