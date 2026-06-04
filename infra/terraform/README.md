@@ -23,22 +23,34 @@ SQS, Cognito), WS4 (encryption enforcement), WS6 (CloudTrail + central logs).
 
 ## Usage
 
+The GovCloud account starts empty, so first bootstrap a remote state backend
+(an encrypted S3 bucket; S3 native locking means no DynamoDB needed), then run
+the root module against it.
+
 ```bash
-cd infra/terraform
+# 0. Bootstrap the state backend (LOCAL state, run once).
+cd infra/terraform/bootstrap
+terraform init
+terraform apply                      # creates the state bucket + its CMK
+terraform output backend_hcl         # copy these lines...
 
-# 1. Point at your existing GovCloud state backend.
-cp backend.hcl.example backend.hcl   # fill in bucket + dynamodb_table
+# 1. ...into the root module's backend config.
+cd ..
+cp backend.hcl.example backend.hcl   # paste the bootstrap output values
 
-# 2. Set inputs (GitHub org/repo are required for the OIDC trust).
+# 2. Set inputs (github_org is required for the OIDC trust).
 cp terraform.tfvars.example terraform.tfvars   # edit
 
-# 3. Init + review + apply (with US-person GovCloud credentials).
+# 3. Init against the remote backend, then review + apply.
 terraform init -backend-config=backend.hcl
 terraform plan
 terraform apply
 ```
 
-`backend.hcl` and `terraform.tfvars` are gitignored; never commit real values.
+Run everything with US-person GovCloud credentials. `backend.hcl` and
+`terraform.tfvars` are gitignored; never commit real values. The bootstrap
+module keeps LOCAL state (it creates the backend the root module uses) - back
+that state up out of band.
 
 ## Key outputs
 

@@ -1,7 +1,12 @@
-# Copy to backend.hcl (gitignored) and fill in your existing GovCloud state
-# backend, then: terraform init -backend-config=backend.hcl
-bucket         = "REPLACE-with-your-gov-tfstate-bucket"
-key            = "rapiddfm/govcloud/terraform.tfstate"
-region         = "us-gov-west-1"
-dynamodb_table = "REPLACE-with-your-lock-table"
-encrypt        = true
+# Copy to backend.hcl (gitignored), then: terraform init -backend-config=backend.hcl
+#
+# The values come straight from the bootstrap module's output:
+#   cd bootstrap && terraform init && terraform apply && terraform output backend_hcl
+#
+# Uses S3 native state locking (use_lockfile), so no DynamoDB table is needed.
+bucket       = "rapiddfm-tfstate-REPLACE-account-id"
+key          = "rapiddfm/govcloud/terraform.tfstate"
+region       = "us-gov-west-1"
+kms_key_id   = "REPLACE-with-bootstrap-state_kms_key_arn"
+encrypt      = true
+use_lockfile = true

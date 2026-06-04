@@ -1,0 +1,6 @@
+# Bootstrap uses LOCAL state. Do not commit it (may contain sensitive ARNs).
+# Back it up out-of-band, or migrate it into the bucket it creates.
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl

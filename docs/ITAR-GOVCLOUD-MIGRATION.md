@@ -221,7 +221,7 @@ Phases 1-2 can start in the current repo today and carry no GovCloud dependency.
 
 All work lands on branch `feat/itar-govcloud-migration` as a single PR, built phase by phase.
 
-**Decisions locked:** region `us-gov-west-1`; existing TF state backend (values via `backend.hcl`); single CMK + S3 prefix scoping; GitHub OIDC created in IaC.
+**Decisions locked:** region `us-gov-west-1`; TF state backend **bootstrapped** (empty account; `infra/terraform/bootstrap/` creates an encrypted S3 state bucket, S3 native locking so no DynamoDB); single CMK + S3 prefix scoping; GitHub OIDC created in IaC.
 
 **Done (committed):**
 - Phase 1 / non-CUI guardrail: hard acknowledgment gate on all three upload vectors (direct, batch, shared portal), `NON_CUI_ALPHA_MODE` (fail-safe ON), UI checkboxes + notices. Browser-verified.
