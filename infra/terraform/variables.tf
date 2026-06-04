@@ -51,13 +51,15 @@ variable "log_retention_days" {
 }
 
 variable "github_org" {
-  description = "GitHub org/owner that owns the repo allowed to assume the deploy role."
+  description = "GitHub repo OWNER (personal username or org login) allowed to assume the deploy role. Empty = skip GitHub OIDC / the CI deploy role entirely (fine for manual deploys)."
   type        = string
+  default     = ""
 }
 
 variable "github_repo" {
-  description = "GitHub repository name allowed to assume the deploy role."
+  description = "GitHub repository name (only used when github_org is set)."
   type        = string
+  default     = "betterdfm"
 }
 
 variable "github_deploy_branch" {

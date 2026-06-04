@@ -200,7 +200,8 @@ data "aws_iam_policy_document" "deploy" {
 }
 
 resource "aws_iam_role_policy" "deploy" {
+  count  = local.enable_github_oidc ? 1 : 0
   name   = "deploy"
-  role   = aws_iam_role.github_deploy.id
+  role   = aws_iam_role.github_deploy[0].id
   policy = data.aws_iam_policy_document.deploy.json
 }

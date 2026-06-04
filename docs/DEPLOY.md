@@ -40,8 +40,9 @@ cd ..
 cp backend.hcl.example backend.hcl          # paste the bootstrap output
 cp terraform.tfvars.example terraform.tfvars
 # In terraform.tfvars set:
-#   domain_name = "gov.rapiddfm.com"
-#   github_org  = "<your-github-org>"
+#   domain_name = "gov.rapiddfm.com"   (already pre-set in the example)
+#   github_org  = ""                   (OPTIONAL - leave empty; CI/OIDC is
+#                                        skipped, manual deploys use your creds)
 terraform init -backend-config=backend.hcl
 ```
 

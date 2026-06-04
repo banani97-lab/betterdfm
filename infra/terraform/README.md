@@ -38,7 +38,8 @@ terraform output backend_hcl         # copy these lines...
 cd ..
 cp backend.hcl.example backend.hcl   # paste the bootstrap output values
 
-# 2. Set inputs (github_org is required for the OIDC trust).
+# 2. Set inputs. domain_name is pre-set; github_org is OPTIONAL (leave empty to
+#    skip the CI deploy role - manual deploys do not need it).
 cp terraform.tfvars.example terraform.tfvars   # edit
 
 # 3. Init against the remote backend, then review + apply.

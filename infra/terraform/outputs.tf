@@ -35,10 +35,10 @@ output "kms_alias" {
 }
 
 output "github_oidc_provider_arn" {
-  value = aws_iam_openid_connect_provider.github.arn
+  value = local.enable_github_oidc ? aws_iam_openid_connect_provider.github[0].arn : null
 }
 
 output "github_deploy_role_arn" {
-  description = "Role ARN the deploy workflow assumes via OIDC (set as a CI variable)."
-  value       = aws_iam_role.github_deploy.arn
+  description = "Role ARN the deploy workflow assumes via OIDC (null when github_org is unset)."
+  value       = local.enable_github_oidc ? aws_iam_role.github_deploy[0].arn : null
 }
