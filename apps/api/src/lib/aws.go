@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -14,6 +16,35 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
 	"github.com/google/uuid"
 )
+
+// fipsRequired reports whether AWS clients must use FIPS 140-validated
+// endpoints. It is forced on in any GovCloud region (us-gov-*) so an ITAR/CUI
+// deployment cannot accidentally talk to non-FIPS endpoints, and can also be
+// set explicitly via AWS_USE_FIPS_ENDPOINT. Commercial/dev regions are left on
+// standard endpoints so local development and tests are unaffected.
+func fipsRequired() bool {
+	if strings.HasPrefix(strings.ToLower(os.Getenv("AWS_REGION")), "us-gov-") {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AWS_USE_FIPS_ENDPOINT"))) {
+	case "true", "1", "on", "yes", "enabled":
+		return true
+	}
+	return false
+}
+
+// awsLoadOptions returns region/partition-aware LoadDefaultConfig options.
+// Region and partition resolve automatically from AWS_REGION (so the gov
+// partition is selected by setting a us-gov-* region); FIPS is layered on when
+// required.
+func awsLoadOptions() []func(*awsconfig.LoadOptions) error {
+	if fipsRequired() {
+		return []func(*awsconfig.LoadOptions) error{
+			awsconfig.WithUseFIPSEndpoint(aws.FIPSEndpointStateEnabled),
+		}
+	}
+	return nil
+}
 
 type AWSClients struct {
 	S3         *s3.Client
@@ -26,7 +57,7 @@ type AWSClients struct {
 }
 
 func NewAWSClients(ctx context.Context, bucket, queueURL, userPoolID string) (*AWSClients, error) {
-	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsLoadOptions()...)
 	if err != nil {
 		return nil, fmt.Errorf("load AWS config: %w", err)
 	}

@@ -4,7 +4,9 @@ import (
 	"context"
 	"log"
 	"os"
+	"strings"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/sqs"
@@ -12,6 +14,32 @@ import (
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
+
+// fipsRequired reports whether AWS clients must use FIPS 140-validated
+// endpoints. Forced on in any GovCloud region (us-gov-*) so an ITAR/CUI
+// deployment cannot reach non-FIPS endpoints; also settable via
+// AWS_USE_FIPS_ENDPOINT. Commercial/dev regions stay on standard endpoints.
+func fipsRequired() bool {
+	if strings.HasPrefix(strings.ToLower(os.Getenv("AWS_REGION")), "us-gov-") {
+		return true
+	}
+	switch strings.ToLower(strings.TrimSpace(os.Getenv("AWS_USE_FIPS_ENDPOINT"))) {
+	case "true", "1", "on", "yes", "enabled":
+		return true
+	}
+	return false
+}
+
+// awsLoadOptions returns region/partition-aware LoadDefaultConfig options.
+// Region and partition resolve from AWS_REGION; FIPS is layered on when required.
+func awsLoadOptions() []func(*config.LoadOptions) error {
+	if fipsRequired() {
+		return []func(*config.LoadOptions) error{
+			config.WithUseFIPSEndpoint(aws.FIPSEndpointStateEnabled),
+		}
+	}
+	return nil
+}
 
 func main() {
 	internal.InitAnalytics()
@@ -32,7 +60,7 @@ func main() {
 	}
 	log.Println("connected to database")
 
-	cfg, err := config.LoadDefaultConfig(context.Background())
+	cfg, err := config.LoadDefaultConfig(context.Background(), awsLoadOptions()...)
 	if err != nil {
 		log.Fatalf("failed to load AWS config: %v", err)
 	}

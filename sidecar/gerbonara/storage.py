@@ -6,6 +6,7 @@ import tempfile
 from pathlib import Path
 
 import boto3
+from botocore.config import Config
 from botocore.exceptions import ClientError
 
 from models import BoardData, Layer, Trace, Pad, Via, Drill, Point
@@ -15,11 +16,35 @@ logger = logging.getLogger(__name__)
 _s3_client = None
 
 
+def _fips_required() -> bool:
+    """Whether to use FIPS 140-validated endpoints. Forced on in GovCloud
+    regions (us-gov-*) so an ITAR/CUI deployment cannot reach non-FIPS
+    endpoints; also settable via AWS_USE_FIPS_ENDPOINT."""
+    region = os.environ.get("AWS_REGION", "").lower()
+    if region.startswith("us-gov-"):
+        return True
+    return os.environ.get("AWS_USE_FIPS_ENDPOINT", "").strip().lower() in (
+        "true",
+        "1",
+        "on",
+        "yes",
+        "enabled",
+    )
+
+
 def _get_s3_client():
-    """Return a module-level singleton boto3 S3 client."""
+    """Return a module-level singleton boto3 S3 client.
+
+    Region/partition resolve from AWS_REGION (no commercial us-east-1 default,
+    so a missing region fails loud rather than silently using the wrong
+    partition). FIPS endpoints are enforced when required.
+    """
     global _s3_client
     if _s3_client is None:
-        _s3_client = boto3.client("s3", region_name=os.environ.get("AWS_REGION", "us-east-1"))
+        cfg = Config(use_fips_endpoint=True) if _fips_required() else None
+        _s3_client = boto3.client(
+            "s3", region_name=os.environ.get("AWS_REGION"), config=cfg
+        )
     return _s3_client
 
 
