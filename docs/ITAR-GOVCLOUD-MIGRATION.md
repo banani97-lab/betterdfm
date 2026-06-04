@@ -228,14 +228,15 @@ All work lands on branch `feat/itar-govcloud-migration` as a single PR, built ph
 - Phase 2 / WS3: OpenAI egress removed; deterministic fallback is the sole overview generator.
 - Phase 2 / WS1: region/partition config-driven; FIPS endpoints auto-enabled for `us-gov-*` regions (or `AWS_USE_FIPS_ENDPOINT=true`) across api, worker, sidecar; sidecar `us-east-1` default dropped.
 - Phase 3 / WS0: GovCloud Terraform foundation in `infra/terraform/` (VPC + private subnets + flow logs, customer-managed CMK, GitHub OIDC + deploy role). `terraform fmt` + `validate` clean.
+- Phase 5 / WS2: GovCloud app tier (ECR, S3 SSE-KMS+TLS-only, SQS, RDS encrypted+force_ssl, Cognito MFA/invite-only, ECS Fargate x4 + Cloud Map, ALB domain-optional, least-privilege task roles, deploy perms on OIDC role). `validate` clean. NOTE: much of WS4 (S3/RDS/SQS/log encryption) landed here; remaining WS4 item is the internal worker->gerbonara TLS hop.
 
 **Next AWS-independent code (not yet started):**
 - WS5 (code): build-tag the dev auth bypass out of the production binary (`apps/api/src/lib/auth.go:169`, `:206`) and hard-fail when `JWT_ISSUER` is empty; same for the frontend bypass.
 - WS7 (code): tenant-isolation enforcement + authz tests (one org cannot read another's submissions/violations/board data).
 
-**Remaining Terraform:**
-- WS2: ECS/Fargate for web + api + worker + gerbonara, ALB, RDS Postgres, S3, SQS, Cognito, ECR, security groups; attach deploy perms to the OIDC role; rewrite the deploy workflow off App Runner/Vercel.
-- WS4: encryption enforcement (S3 SSE-KMS + TLS-only bucket policy, RDS encryption, TLS).
+**Remaining:**
+- WS2 (CI): rewrite the deploy workflow off App Runner/Vercel to assume the GovCloud OIDC role, push the 4 images to ECR, and update the 4 ECS services. Touches the live commercial pipeline; cutover approach TBD.
+- WS4: internal worker->gerbonara TLS hop (the rest landed in WS2).
 - WS6: CloudTrail (mgmt + S3 data events) + centralized logs + incident-reporting process.
 
-**Input needed for WS2:** a custom domain for the gov deployment (for the ALB ACM cert + Cognito callback URLs), or confirmation to start without one.
+**Domain:** building domain-optional; `domain_name` empty for now (web on ALB :80, api on :8080; see alb.tf). Set `domain_name` later to switch on ACM + HTTPS host routing + Cognito callbacks.
