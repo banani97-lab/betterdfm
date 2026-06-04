@@ -165,9 +165,13 @@ func extractBearerToken(c echo.Context) (string, error) {
 func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Dev bypass: if no issuer configured, skip auth
+			// No issuer configured: only dev builds carry a bypass; prod fails closed.
 			if m.issuer == "" {
-				c.Set("user", &UserClaims{Sub: "dev-user", Email: "dev@localhost", OrgID: "default-org", Role: "ADMIN"})
+				u := devUserClaims()
+				if u == nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "authentication is not configured")
+				}
+				c.Set("user", u)
 				return next(c)
 			}
 
@@ -202,9 +206,13 @@ func (m *JWTMiddleware) Middleware() echo.MiddlewareFunc {
 func (m *JWTMiddleware) AdminMiddleware() echo.MiddlewareFunc {
 	return func(next echo.HandlerFunc) echo.HandlerFunc {
 		return func(c echo.Context) error {
-			// Dev bypass: if no issuer configured, skip auth
+			// No issuer configured: only dev builds carry a bypass; prod fails closed.
 			if m.issuer == "" {
-				c.Set("admin", &AdminClaims{Sub: "dev-admin", Email: "admin@localhost"})
+				a := devAdminClaims()
+				if a == nil {
+					return echo.NewHTTPError(http.StatusInternalServerError, "authentication is not configured")
+				}
+				c.Set("admin", a)
 				return next(c)
 			}
 

@@ -37,6 +37,10 @@ services:
     build:
       context: ./apps/api
       dockerfile: Dockerfile
+      args:
+        # Local dev: include the auth bypass so an empty JWT_ISSUER works.
+        # Production images are built without this (CI passes no BUILD_TAGS).
+        BUILD_TAGS: dev
     ports:
       - "8080:8080"
     depends_on:

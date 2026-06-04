@@ -13,7 +13,10 @@ WORKDIR /workspace/apps/api
 COPY apps/api/go.mod ./
 COPY apps/api/ .
 RUN go mod tidy
-RUN go build -o /server ./cmd/server
+# BUILD_TAGS is empty for production images (no dev auth bypass). Local dev
+# (docker-compose) passes BUILD_TAGS=dev to keep the JWT_ISSUER-empty bypass.
+ARG BUILD_TAGS=""
+RUN go build -tags "$BUILD_TAGS" -o /server ./cmd/server
 
 FROM alpine:3.19
 RUN apk add --no-cache ca-certificates curl

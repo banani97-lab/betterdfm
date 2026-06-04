@@ -28,6 +28,12 @@ func main() {
 	}
 	sqsQueueURL := os.Getenv("SQS_QUEUE_URL")
 	jwtIssuer := os.Getenv("JWT_ISSUER")
+	// Fail closed: a production build (no dev tag) must have a real issuer, or
+	// every request would hit the (now removed) auth bypass. Dev builds may run
+	// without one.
+	if jwtIssuer == "" && !lib.DevAuthBypassEnabled {
+		log.Fatal("JWT_ISSUER must be set: this is a production build with no dev auth bypass")
+	}
 	cognitoClientID := os.Getenv("COGNITO_CLIENT_ID")
 	adminCognitoClientID := os.Getenv("ADMIN_COGNITO_CLIENT_ID")
 	cognitoUserPoolID := os.Getenv("COGNITO_USER_POOL_ID")

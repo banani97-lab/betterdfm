@@ -12,6 +12,11 @@ const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
 // ── Dev mode ──────────────────────────────────────────────────────────────────
 
 export function isDevMode(): boolean {
+  // Never enter the auth bypass in a production build, even if the Cognito
+  // client ID is missing. In production a missing client ID is a
+  // misconfiguration, not an invitation to skip auth (the API is the
+  // authoritative gate regardless). Build-tagged out of prod on the backend.
+  if (process.env.NODE_ENV === 'production') return false
   return !CLIENT_ID
 }
 
