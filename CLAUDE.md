@@ -123,12 +123,12 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | annular-ring | ERROR | Copper ring around vias >= minAnnularRingMM |
 | drill-to-drill | ERROR | Hole-to-hole spacing >= minDrillToDrillMM |
 | drill-to-copper | ERROR | Hole-to-trace clearance >= minDrillToCopperMM |
-| aspect-ratio | WARNING | Board thickness / drill diameter <= maxAspectRatio |
+| aspect-ratio | ERROR | Board thickness / drill diameter <= maxAspectRatio |
 | solder-mask-dam | WARNING | Solder mask bridge between pads >= minSolderMaskDamMM |
-| edge-clearance | WARNING | Copper distance from board outline >= minEdgeClearanceMM |
+| edge-clearance | ERROR | Copper distance from board outline >= minEdgeClearanceMM |
 | copper-sliver | WARNING | Copper feature width >= minCopperSliverMM |
 | mounting-hole-keepout | WARNING | Copper keepout around non-plated mounting holes (>=2mm) >= `profile.MinMountingHoleKeepoutMM` (off when 0). IPC-2221B |
-| silkscreen-on-pad | INFO | Silkscreen does not overlap pads |
+| silkscreen-on-pad | ERROR | Silkscreen does not overlap pads |
 
 **Assembly (10):**
 
