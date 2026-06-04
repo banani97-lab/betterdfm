@@ -243,13 +243,13 @@ export default function AdminProfilePage() {
     }))
   }
 
-  const renderField = (f: RuleField) => {
+  const renderField = (f: RuleField, side: 'left' | 'right' = 'right') => {
     if (f.kind === 'spacing') {
       return (
         <div key="spacing" className="col-span-2 rounded-md border border-border/70 bg-muted/20 p-3">
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-xs font-semibold text-foreground">{f.label}</span>
-            <RuleHelp text={f.desc} />
+            <RuleHelp text={f.desc} side="left" />
           </div>
           <div className="grid grid-cols-2 gap-3 mt-2">
             {([
@@ -281,7 +281,7 @@ export default function AdminProfilePage() {
       <div key={f.key}>
         <div className="flex items-center gap-1.5 mb-1">
           <Label className="block text-xs">{f.label}</Label>
-          <RuleHelp text={f.desc} />
+          <RuleHelp text={f.desc} side={side} />
         </div>
         {f.kind === 'number' && (
           <div className="flex items-center gap-2">
@@ -423,12 +423,12 @@ export default function AdminProfilePage() {
                 {RULE_GROUPS.map((group) => {
                   const open = !collapsed[group.title]
                   return (
-                    <div key={group.title} className="border border-border rounded-lg overflow-hidden">
+                    <div key={group.title} className="border border-border rounded-lg">
                       <button
                         type="button"
                         onClick={() => toggleGroup(group.title)}
                         aria-expanded={open}
-                        className="w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 text-left transition-colors"
+                        className={`w-full flex items-center justify-between px-4 py-3 bg-muted/40 hover:bg-muted/60 text-left transition-colors ${open ? 'rounded-t-lg' : 'rounded-lg'}`}
                       >
                         <span className="text-sm font-semibold text-foreground">{group.title}</span>
                         <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${open ? '' : '-rotate-90'}`} />
@@ -437,7 +437,21 @@ export default function AdminProfilePage() {
                         <div className="p-4">
                           {group.blurb && <p className="text-xs text-muted-foreground mb-3">{group.blurb}</p>}
                           <div className="grid grid-cols-2 gap-4">
-                            {group.fields.map((f) => renderField(f))}
+                            {(() => {
+                              // Track the grid column so each field's tooltip opens
+                              // into the panel: left column → 'right', right column →
+                              // 'left'. A full-width 'spacing' field resets to col 0.
+                              let col = 0
+                              return group.fields.map((f) => {
+                                if (f.kind === 'spacing') {
+                                  col = 0
+                                  return renderField(f, 'right')
+                                }
+                                const side = col === 0 ? 'right' : 'left'
+                                col = (col + 1) % 2
+                                return renderField(f, side)
+                              })
+                            })()}
                           </div>
                         </div>
                       )}
@@ -472,9 +486,12 @@ export default function AdminProfilePage() {
 
 // RuleHelp renders a small ? icon that reveals a popover with the rule's
 // explanation on hover/focus. CSS-only via Tailwind's `group-hover` — no
-// portal/positioning library needed since the panel is short and the form
-// has ample horizontal space.
-function RuleHelp({ text }: { text: string }) {
+// portal/positioning library needed. The popover opens beside the icon; `side`
+// is set per grid column ('right' for the left column, 'left' for the right
+// column) so it always grows *into* the narrow two-column panel rather than off
+// the right edge. max-w clamps it on very narrow viewports as a backstop.
+function RuleHelp({ text, side = 'right' }: { text: string; side?: 'left' | 'right' }) {
+  const pos = side === 'left' ? 'right-5' : 'left-5'
   return (
     <span className="group relative inline-flex">
       <HelpCircle
@@ -485,7 +502,7 @@ function RuleHelp({ text }: { text: string }) {
       />
       <span
         role="tooltip"
-        className="invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 absolute left-5 top-1/2 -translate-y-1/2 z-20 w-64 rounded-md border bg-card text-foreground px-3 py-2 text-xs leading-relaxed shadow-lg transition-opacity"
+        className={`invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 absolute ${pos} top-1/2 -translate-y-1/2 z-20 w-64 max-w-[calc(100vw-1rem)] rounded-md border bg-card text-foreground px-3 py-2 text-xs leading-relaxed shadow-lg transition-opacity`}
       >
         {text}
       </span>
