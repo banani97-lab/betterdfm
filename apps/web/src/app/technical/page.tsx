@@ -225,15 +225,15 @@ const RULES = [
   { id: 'silkscreen-on-pad', group: 'fab', sev: 'ERROR', desc: 'Silkscreen does not overlap pads' },
   // Assembly (10)
   { id: 'fiducial-count', group: 'assembly', sev: 'WARNING', desc: 'Board has ≥ 3 fiducials for pick-and-place (skipped if none found; enableFiducialCountCheck)' },
-  { id: 'pad-size-for-package', group: 'assembly', sev: 'ERROR', desc: 'Pad geometry within IPC-7351 envelope for the package class (enablePadSizeForPackageCheck)' },
+  { id: 'pad-size-for-package', group: 'assembly', sev: ['ERROR', 'INFO'], desc: 'Pad geometry within IPC-7351 envelope for the package class; ERROR when undersized, INFO when oversized (enablePadSizeForPackageCheck)' },
   { id: 'package-capability', group: 'assembly', sev: 'ERROR', desc: 'No package smaller than the CM’s smallestPackageClass' },
   { id: 'tombstoning-risk', group: 'assembly', sev: 'ERROR', desc: 'Pad area ratio on small 2-pad passives ≤ 1.3 (reflow imbalance; enableTombstoningRiskCheck)' },
   { id: 'trace-imbalance', group: 'assembly', sev: 'ERROR', desc: 'Thermal trace/pour balance into 2-pad components ≤ maxTraceImbalanceRatio' },
-  { id: 'component-height', group: 'assembly', sev: 'ERROR', desc: 'SMT component height within per-side limits (maxComponentHeightTop/BottomMM)' },
+  { id: 'component-height', group: 'assembly', sev: ['ERROR', 'INFO'], desc: 'SMT component height within per-side limits; ERROR over limit, INFO when parts lack height data (maxComponentHeightTop/BottomMM)' },
   { id: 'component-spacing', group: 'assembly', sev: 'WARNING', desc: 'Same-side courtyard edge-to-edge gap (IPC-7351B): flat minComponentSpacingMM, or per-package-class keepouts via componentSpacing (discrete/leaded/BGA/through-hole, pair limit = larger of the two); ERROR on overlap' },
-  { id: 'via-in-pad', group: 'assembly', sev: 'WARNING', desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093; enableViaInPadCheck)' },
+  { id: 'via-in-pad', group: 'assembly', sev: ['WARNING', 'INFO'], desc: 'Via landing in an SMT land; WARNING fine-pitch/BGA, INFO otherwise (IPC-4761/7093; enableViaInPadCheck)' },
   { id: 'through-hole-on-bottom', group: 'assembly', sev: 'WARNING', desc: 'Through-hole / press-fit parts on the bottom side (flagThroughHoleOnBottom)' },
-  { id: 'fiducial-placement', group: 'assembly', sev: 'WARNING', desc: 'Global fiducials non-collinear; local fiducials for fine-pitch/BGA (IPC-7351, enableFiducialPlacementCheck)' },
+  { id: 'fiducial-placement', group: 'assembly', sev: ['WARNING', 'INFO'], desc: 'WARNING when global fiducials are collinear; INFO when fine-pitch/BGA parts lack a local fiducial (IPC-7351, enableFiducialPlacementCheck)' },
 ] as const
 
 export default function TechnicalPage() {
@@ -567,7 +567,11 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
                             {rule.id}
                           </td>
                           <td style={tdStyle}>
-                            <Tag type={rule.sev as 'ERROR' | 'WARNING' | 'INFO'} />
+                            <span style={{ display: 'inline-flex', gap: '4px', flexWrap: 'wrap' }}>
+                              {((Array.isArray(rule.sev) ? rule.sev : [rule.sev]) as Array<'ERROR' | 'WARNING' | 'INFO'>).map((s) => (
+                                <Tag key={s} type={s} />
+                              ))}
+                            </span>
                           </td>
                           <td style={{ ...tdStyle, color: '#94a3b8' }}>{rule.desc}</td>
                         </tr>
