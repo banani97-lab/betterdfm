@@ -67,8 +67,9 @@ resource "aws_cognito_user_pool_client" "app" {
   name         = "${var.name_prefix}-app"
   user_pool_id = aws_cognito_user_pool.main.id
 
-  generate_secret                      = false
-  explicit_auth_flows                  = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  generate_secret = false
+  # USER_PASSWORD_AUTH is what the app's /api/auth/signin routes use (InitiateAuth).
+  explicit_auth_flows                  = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
   supported_identity_providers         = ["COGNITO"]
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true
@@ -83,8 +84,9 @@ resource "aws_cognito_user_pool_client" "admin" {
   name         = "${var.name_prefix}-admin"
   user_pool_id = aws_cognito_user_pool.main.id
 
-  generate_secret                      = false
-  explicit_auth_flows                  = ["ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
+  generate_secret = false
+  # USER_PASSWORD_AUTH is what the app's /api/auth/signin routes use (InitiateAuth).
+  explicit_auth_flows                  = ["ALLOW_USER_PASSWORD_AUTH", "ALLOW_USER_SRP_AUTH", "ALLOW_REFRESH_TOKEN_AUTH"]
   supported_identity_providers         = ["COGNITO"]
   allowed_oauth_flows                  = ["code"]
   allowed_oauth_flows_user_pool_client = true

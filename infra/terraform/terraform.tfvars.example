@@ -4,6 +4,11 @@ name_prefix = "rapiddfm"
 vpc_cidr    = "10.60.0.0/16"
 az_count    = 2
 
+# Gov subdomain (parallel to the existing Vercel production domain, which is
+# left untouched). This serves app.<domain> -> web and api.<domain> -> api over
+# HTTPS via ACM. Empty = no-domain alpha (HTTP on the ALB DNS).
+domain_name = "gov.yourdomain.com"
+
 # Required: the GitHub repo allowed to assume the deploy role via OIDC.
 github_org           = "REPLACE-your-org"
 github_repo          = "betterdfm"
