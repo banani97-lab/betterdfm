@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const OPENAI_API_KEY = process.env.OPENAI_API_KEY || "";
-const OPENAI_MODEL = process.env.OPENAI_OVERVIEW_MODEL || "gpt-4o-mini";
+// NOTE: This route deliberately makes NO external model calls. RapidDFM runs
+// inside an ITAR/CUI boundary, so derived DFM technical data must not egress to
+// a third-party service. The overview is generated deterministically on-box.
 
 interface JobResponse {
   id: string;
@@ -232,63 +233,6 @@ async function fetchApiJson<T>(
   throw new Error(`Fetch failed for ${path}. Tried: ${errors.join(" | ")}`);
 }
 
-async function generateOverviewWithAI(args: {
-  job: JobResponse;
-  counts: OverviewCounts;
-  topIssues: string[];
-  dominantCauses: string[];
-}): Promise<string> {
-  const { job, counts, topIssues, dominantCauses } = args;
-
-  const prompt = [
-    "Write a technical DFM overview for a PCB engineer.",
-    "Use plain English and no markdown.",
-    "Length: 4-8 sentences (roughly up to ~2x longer than a short summary).",
-    "Focus on root causes driving most errors and warnings, and what to fix first.",
-    "Do NOT mention the exact MFG score, grade, or exact counts of errors/warnings because those are already shown elsewhere in the UI.",
-    `Job status: ${job.status}.`,
-    `Active finding profile: errors=${counts.errors}, warnings=${counts.warnings}, infos=${counts.infos}.`,
-    "Dominant cause clusters:",
-    ...dominantCauses,
-    "Top issues:",
-    ...topIssues,
-  ].join("\n");
-
-  const res = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: OPENAI_MODEL,
-      temperature: 0.3,
-      max_tokens: 420,
-      messages: [
-        {
-          role: "system",
-          content:
-            "You summarize PCB design-for-manufacturability analysis results for engineers. Be technical, direct, and practical.",
-        },
-        { role: "user", content: prompt },
-      ],
-    }),
-  });
-
-  if (!res.ok) {
-    const text = await res.text().catch(() => res.statusText);
-    throw new Error(`OpenAI error: ${res.status} ${text}`);
-  }
-
-  const data = await res.json();
-  const message = data?.choices?.[0]?.message?.content;
-  if (typeof message !== "string" || !message.trim()) {
-    throw new Error("OpenAI returned an empty overview");
-  }
-
-  return message.trim();
-}
-
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
@@ -310,30 +254,12 @@ export async function POST(req: NextRequest) {
     const topIssues = topIssueLines(violations ?? []);
     const dominantCauses = dominantCauseLines(violations ?? []);
 
-    let overview = fallbackOverview(job, counts, topIssues, dominantCauses);
-    let generatedWith: "ai" | "fallback" = "fallback";
-
-    if (OPENAI_API_KEY) {
-      try {
-        overview = await generateOverviewWithAI({
-          job,
-          counts,
-          topIssues,
-          dominantCauses,
-        });
-        generatedWith = "ai";
-      } catch (err) {
-        console.error(
-          "[ai/submission-overview] AI generation failed, using fallback:",
-          err,
-        );
-      }
-    }
+    const overview = fallbackOverview(job, counts, topIssues, dominantCauses);
 
     return NextResponse.json({
       overview,
       counts,
-      generatedWith,
+      generatedWith: "fallback",
     });
   } catch (err) {
     const message =
