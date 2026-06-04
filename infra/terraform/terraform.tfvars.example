@@ -1,0 +1,10 @@
+# Copy to terraform.tfvars (gitignored) and adjust.
+region      = "us-gov-west-1"
+name_prefix = "rapiddfm"
+vpc_cidr    = "10.60.0.0/16"
+az_count    = 2
+
+# Required: the GitHub repo allowed to assume the deploy role via OIDC.
+github_org           = "REPLACE-your-org"
+github_repo          = "betterdfm"
+github_deploy_branch = "main"

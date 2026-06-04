@@ -1,0 +1,11 @@
+# Local config with real values
+backend.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# Provider cache (the lock file .terraform.lock.hcl IS committed for reproducible
+# provider versions).
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log

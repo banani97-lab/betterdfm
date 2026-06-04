@@ -1,0 +1,7 @@
+# Copy to backend.hcl (gitignored) and fill in your existing GovCloud state
+# backend, then: terraform init -backend-config=backend.hcl
+bucket         = "REPLACE-with-your-gov-tfstate-bucket"
+key            = "rapiddfm/govcloud/terraform.tfstate"
+region         = "us-gov-west-1"
+dynamodb_table = "REPLACE-with-your-lock-table"
+encrypt        = true
