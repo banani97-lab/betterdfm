@@ -59,6 +59,8 @@ data "aws_iam_policy_document" "kms" {
         "s3.amazonaws.com",
         "rds.amazonaws.com",
         "sqs.amazonaws.com",
+        "sns.amazonaws.com",
+        "cloudwatch.amazonaws.com",
       ]
     }
 
@@ -66,6 +68,26 @@ data "aws_iam_policy_document" "kms" {
       test     = "StringEquals"
       variable = "aws:SourceAccount"
       values   = [data.aws_caller_identity.current.account_id]
+    }
+  }
+
+  # CloudTrail encrypts log files with the CMK (scoped by the trail ARN in the
+  # encryption context).
+  statement {
+    sid       = "AllowCloudTrailUse"
+    effect    = "Allow"
+    actions   = ["kms:GenerateDataKey*", "kms:DescribeKey"]
+    resources = ["*"]
+
+    principals {
+      type        = "Service"
+      identifiers = ["cloudtrail.amazonaws.com"]
+    }
+
+    condition {
+      test     = "StringLike"
+      variable = "kms:EncryptionContext:aws:cloudtrail:arn"
+      values   = ["arn:${data.aws_partition.current.partition}:cloudtrail:*:${data.aws_caller_identity.current.account_id}:trail/*"]
     }
   }
 
