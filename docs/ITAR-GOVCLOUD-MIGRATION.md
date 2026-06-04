@@ -205,6 +205,7 @@ Phases 1-2 can start in the current repo today and carry no GovCloud dependency.
 - **Deployment model:** **multi-tenant SaaS**, RapidDFM as CSP of record. Enclave model rejected because small-subcontractor alpha/core market lacks enclaves to inherit.
 - **Alpha data:** **non-CUI / synthetic** boards only, with a hard CUI-upload guardrail until equivalency lands.
 - **OpenAI:** **removed entirely**, no Bedrock replacement. Deterministic fallback covers the feature.
+- **Database / Neon:** the current DB is hosted on **Neon** (third-party serverless Postgres, commercial / not GovCloud / not FedRAMP), so it is out-of-boundary and must never hold CUI, same category as Vercel/OpenAI. The in-boundary replacement is the WS2 RDS Postgres (CMK-encrypted, private, force_ssl, DSN in Secrets Manager). Decision: **gov RDS starts fresh** (GORM auto-migrates the schema, `seedDefaultOrg` seeds the default org); existing non-CUI Neon data is not migrated. No code change (app reads a generic `DATABASE_URL`). Retire Neon for the gov/CUI path after cutover; it may remain for the legacy commercial deployment only while that holds no CUI.
 
 ---
 
