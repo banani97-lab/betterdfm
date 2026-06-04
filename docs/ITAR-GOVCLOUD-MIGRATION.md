@@ -230,13 +230,14 @@ All work lands on branch `feat/itar-govcloud-migration` as a single PR, built ph
 - Phase 3 / WS0: GovCloud Terraform foundation in `infra/terraform/` (VPC + private subnets + flow logs, customer-managed CMK, GitHub OIDC + deploy role). `terraform fmt` + `validate` clean.
 - Phase 5 / WS2: GovCloud app tier (ECR, S3 SSE-KMS+TLS-only, SQS, RDS encrypted+force_ssl, Cognito MFA/invite-only, ECS Fargate x4 + Cloud Map, ALB domain-optional, least-privilege task roles, deploy perms on OIDC role). `validate` clean. NOTE: much of WS4 (S3/RDS/SQS/log encryption) landed here; remaining WS4 item is the internal worker->gerbonara TLS hop.
 
-**Next AWS-independent code (not yet started):**
-- WS5 (code): build-tag the dev auth bypass out of the production binary (`apps/api/src/lib/auth.go:169`, `:206`) and hard-fail when `JWT_ISSUER` is empty; same for the frontend bypass.
-- WS7 (code): tenant-isolation enforcement + authz tests (one org cannot read another's submissions/violations/board data).
+- Phase 4 / WS5: dev auth bypass compiled out of prod (build tags `auth_dev.go`/`auth_prod.go`), server hard-fails on empty `JWT_ISSUER` in prod builds; Dockerfile `BUILD_TAGS` arg keeps local dev working; frontend `isDevMode()` false in prod builds.
+- Phase 4 / WS7: tenant-isolation authz tests proving cross-org reads 404 across jobs/submissions/violations/board data. Audit found existing handlers already scope every primary lookup by org_id; tests lock it in. Pure-Go sqlite, test-only.
+
+- Phase 5 / WS2 (CI): separate `deploy-govcloud.yml` (manual trigger, keyless OIDC, builds+pushes 4 images, updates 4 ECS services); commercial `deploy.yml` left intact for deliberate cutover.
 
 **Remaining:**
-- WS2 (CI): rewrite the deploy workflow off App Runner/Vercel to assume the GovCloud OIDC role, push the 4 images to ECR, and update the 4 ECS services. Touches the live commercial pipeline; cutover approach TBD.
-- WS4: internal worker->gerbonara TLS hop (the rest landed in WS2).
 - WS6: CloudTrail (mgmt + S3 data events) + centralized logs + incident-reporting process.
+- WS4: internal worker->gerbonara TLS hop (lower priority; inside a private subnet).
+- Then: open the single PR; pursue 3PAO equivalency (Phase 7); flip on real CUI (Phase 8).
 
 **Domain:** building domain-optional; `domain_name` empty for now (web on ALB :80, api on :8080; see alb.tf). Set `domain_name` later to switch on ACM + HTTPS host routing + Cognito callbacks.
