@@ -13,7 +13,7 @@ Vercel/commercial production without touching it, and how to tear it down. See
   commercial impact (it triggers `deploy.yml` + a Vercel rebuild). The first gov
   bring-up below is done out-of-band, so `main` and Vercel stay untouched.
 - The existing domain keeps pointing at Vercel. Gov uses a **subdomain**
-  (`gov.yourdomain.com`) with its own DNS records, added alongside the existing
+  (`gov.rapiddfm.com`) with its own DNS records, added alongside the existing
   ones. Nothing existing is edited.
 - Everything is reversible: `terraform destroy` + remove the gov DNS records.
 
@@ -21,7 +21,8 @@ Vercel/commercial production without touching it, and how to tear it down. See
 
 - A GovCloud account, with **US-person** credentials configured for the CLI.
 - `terraform` >= 1.10, `docker`, `aws` CLI.
-- A domain you control DNS for (to add the `gov.` subdomain + ACM validation).
+- DNS control for `rapiddfm.com` (to add the `gov.` subdomain + ACM validation).
+  The apex/`www` keep pointing at Vercel; you only add `gov.*` records.
 
 ## 1. Bootstrap the state backend (once)
 
@@ -39,7 +40,7 @@ cd ..
 cp backend.hcl.example backend.hcl          # paste the bootstrap output
 cp terraform.tfvars.example terraform.tfvars
 # In terraform.tfvars set:
-#   domain_name = "gov.yourdomain.com"
+#   domain_name = "gov.rapiddfm.com"
 #   github_org  = "<your-github-org>"
 terraform init -backend-config=backend.hcl
 ```
@@ -78,7 +79,7 @@ aws ecr get-login-password --region us-gov-west-1 | docker login --username AWS 
 
 # web (build args from terraform output: api_url, cognito_app_client_id, cognito_admin_client_id)
 docker build -f apps/web/Dockerfile apps/web \
-  --build-arg NEXT_PUBLIC_API_URL=https://api.gov.yourdomain.com \
+  --build-arg NEXT_PUBLIC_API_URL=https://api.gov.rapiddfm.com \
   --build-arg NEXT_PUBLIC_COGNITO_REGION=us-gov-west-1 \
   --build-arg NEXT_PUBLIC_COGNITO_CLIENT_ID=<cognito_app_client_id> \
   --build-arg NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID=<cognito_admin_client_id> \
@@ -99,7 +100,7 @@ done
 ## 6. DNS for the app
 
 Point the gov subdomains at the ALB (`terraform output alb_dns_name`):
-`app.gov.yourdomain.com` and `api.gov.yourdomain.com` -> ALB (CNAME/ALIAS).
+`app.gov.rapiddfm.com` and `api.gov.rapiddfm.com` -> ALB (CNAME/ALIAS).
 
 ## 7. Seed the first admin
 
@@ -110,8 +111,8 @@ admin can then provision everyone else via the admin route.
 
 ## 8. Smoke test
 
-- `https://api.gov.yourdomain.com/health` -> 200
-- `https://app.gov.yourdomain.com` loads
+- `https://api.gov.rapiddfm.com/health` -> 200
+- `https://app.gov.rapiddfm.com` loads
 - Log in (USER_PASSWORD_AUTH), upload a **non-CUI** board, confirm analysis.
 - Confirm CloudTrail + flow logs are flowing.
 
