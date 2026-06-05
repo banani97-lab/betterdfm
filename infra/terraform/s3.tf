@@ -59,8 +59,12 @@ data "aws_iam_policy_document" "uploads" {
     }
   }
 
+  # Block PUTs that explicitly request a non-KMS encryption (e.g. SSE-S3/AES256).
+  # Uses IfExists so header-less presigned PUTs are allowed and then get the
+  # bucket's default SSE-KMS (CMK) encryption, objects are always CMK-encrypted
+  # at rest either way.
   statement {
-    sid       = "DenyUnencryptedPuts"
+    sid       = "DenyNonKMSPuts"
     effect    = "Deny"
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.uploads.arn}/*"]
@@ -71,7 +75,7 @@ data "aws_iam_policy_document" "uploads" {
     }
 
     condition {
-      test     = "StringNotEquals"
+      test     = "StringNotEqualsIfExists"
       variable = "s3:x-amz-server-side-encryption"
       values   = ["aws:kms"]
     }
