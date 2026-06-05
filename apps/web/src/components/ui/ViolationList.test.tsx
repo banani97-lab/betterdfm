@@ -119,4 +119,27 @@ describe('ViolationList', () => {
       expect(traceWidthPill).toBeInTheDocument()
     }
   })
+
+  it('hides rule chips with no violations in the active severity', () => {
+    const allViols = [
+      makeViolation({ id: 'v1', ruleId: 'trace-width', severity: 'ERROR', message: 'TW error' }),
+      makeViolation({ id: 'v2', ruleId: 'clearance', severity: 'ERROR', message: 'CL error' }),
+      // Only appears as a WARNING -> should not produce an ERROR-tab chip
+      makeViolation({ id: 'v3', ruleId: 'component-height', severity: 'WARNING', message: 'CH warn' }),
+    ]
+    const errorOnly = allViols.filter((v) => v.severity === 'ERROR')
+    render(
+      <ViolationList
+        violations={errorOnly}
+        allViolations={allViols}
+        filter="ERROR"
+        onFilterChange={vi.fn()}
+      />
+    )
+    // Rule chips carry a unique title; target those (labels also appear in rows).
+    expect(screen.getByTitle(/Filter to trace-width only/i)).toBeInTheDocument()
+    expect(screen.getByTitle(/Filter to clearance only/i)).toBeInTheDocument()
+    // The warning-only rule has no error-tab chip.
+    expect(screen.queryByTitle(/component-height/i)).not.toBeInTheDocument()
+  })
 })
