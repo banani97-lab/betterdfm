@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react'
 
 const TOC = [
   { id: 'overview', label: 'Overview' },
+  { id: 'deployments', label: 'Deployments' },
   { id: 'architecture', label: 'Architecture' },
   { id: 'dfm-engine', label: 'DFM Engine' },
   { id: 'geometry', label: '↳ Geometry' },
@@ -388,6 +389,93 @@ export default function TechnicalPage() {
                 </div>
               ))}
             </div>
+          </section>
+
+          {/* ─── DEPLOYMENT EDITIONS ──────────────────────── */}
+          <SectionAnchor id="deployments" />
+          <section style={{ marginBottom: '4rem' }}>
+            <h2 style={h2Style}>Deployment Editions</h2>
+            <p style={pStyle}>
+              RapidDFM ships in two deployment editions from one codebase. The <strong style={{ color: '#e2e8f0' }}>Public Cloud</strong> edition is the commercial multi-tenant SaaS detailed throughout the rest of this page. The <strong style={{ color: '#e2e8f0' }}>GovCloud</strong> edition runs the same services inside an AWS GovCloud (US) boundary so contract manufacturers can analyze export-controlled (ITAR) and CUI designs, with access restricted to US persons. The two run in completely separate AWS accounts and partitions.
+            </p>
+
+            {/* Public Cloud vs GovCloud comparison */}
+            <div style={{
+              background: '#0d1117',
+              border: '1px solid #1e2432',
+              borderRadius: '12px',
+              marginTop: '1.5rem',
+              marginBottom: '1.5rem',
+              overflowX: 'auto',
+            }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '560px' }}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}></th>
+                    <th style={thStyle}>Public Cloud</th>
+                    <th style={thStyle}>GovCloud</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    { aspect: 'Region / partition', pub: 'us-east-1 (aws)', gov: 'us-gov-west-1 (aws-us-gov), FIPS 140 endpoints' },
+                    { aspect: 'Web hosting', pub: 'Vercel', gov: 'ECS / Fargate behind an ALB' },
+                    { aspect: 'API hosting', pub: 'AWS App Runner', gov: 'ECS / Fargate behind an ALB' },
+                    { aspect: 'Worker + sidecar', pub: 'ECS / Fargate', gov: 'ECS / Fargate, private subnets' },
+                    { aspect: 'Database', pub: 'RDS Postgres', gov: 'RDS Postgres, CMK-encrypted, TLS forced, private' },
+                    { aspect: 'Object storage', pub: 'S3', gov: 'S3, SSE-KMS (customer CMK), TLS-only, versioned' },
+                    { aspect: 'Encryption at rest', pub: 'AWS-managed keys', gov: 'Customer-managed KMS CMK (US-person key policy)' },
+                    { aspect: 'Identity', pub: 'Cognito', gov: 'Cognito, invite-only, no dev bypass in prod' },
+                    { aspect: 'AI overview', pub: 'OpenAI (external call)', gov: 'On-box, deterministic (no external egress)' },
+                    { aspect: 'Audit', pub: 'Standard', gov: 'CloudTrail + VPC flow logs + metric alarms' },
+                    { aspect: 'CI / CD', pub: 'GitHub Actions, static keys', gov: 'GitHub OIDC (keyless) or manual push' },
+                    { aspect: 'Network', pub: 'Public services', gov: 'VPC, private subnets, ALB-only ingress' },
+                    { aspect: 'Compliance posture', pub: 'Commercial SaaS', gov: 'ITAR / CUI boundary; targeting FedRAMP Moderate equivalency' },
+                  ].map((row, i) => (
+                    <tr key={row.aspect} style={{ borderTop: i === 0 ? '1px solid #1e2432' : '1px solid #161b26' }}>
+                      <td style={{ ...tdStyle, color: '#94a3b8', fontWeight: 600, whiteSpace: 'nowrap' }}>{row.aspect}</td>
+                      <td style={{ ...tdStyle, color: '#94a3b8' }}>{row.pub}</td>
+                      <td style={{ ...tdStyle, color: '#cbd5e1' }}>{row.gov}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            <h3 style={h3Style}>The GovCloud boundary</h3>
+            <p style={pStyle}>
+              All four services run in a single VPC in <code style={inlineCode}>us-gov-west-1</code> (partition <code style={inlineCode}>aws-us-gov</code>). Workloads run in private subnets; the only internet-facing component is the ALB. Because the region selects the partition, the application auto-enables FIPS 140-validated endpoints across the API, worker, and sidecar whenever it runs in a <code style={inlineCode}>us-gov-*</code> region.
+            </p>
+
+            <h3 style={h3Style}>Customer-managed encryption</h3>
+            <p style={pStyle}>
+              A single customer-managed KMS CMK, with a key policy scoped to US-person principals, encrypts S3 (SSE-KMS by default, plus a TLS-only and KMS-only bucket policy), RDS (encrypted storage and <code style={inlineCode}>rds.force_ssl</code>), SQS, and CloudWatch Logs. Holding the key under US-person control is what underpins the <code style={inlineCode}>22 CFR 120.54</code> encryption position: properly encrypted technical data, decrypted only in-boundary by US persons, is not an export.
+            </p>
+
+            <h3 style={h3Style}>Identity and access</h3>
+            <p style={pStyle}>
+              Cognito provisioning is invite-only (no self-signup), carrying the same <code style={inlineCode}>orgId</code> / <code style={inlineCode}>role</code> custom attributes the API JWT middleware reads. The local development auth bypass is compiled out of production builds via Go build tags, and the server refuses to start without a real <code style={inlineCode}>JWT_ISSUER</code>. Deploys are keyless through GitHub OIDC (no static AWS keys), or images are pushed manually with US-person credentials.
+            </p>
+
+            <h3 style={h3Style}>No external egress</h3>
+            <p style={pStyle}>
+              The Public Cloud edition phrases its submission overview through an external OpenAI call. The GovCloud build removes that integration entirely and generates the same overview deterministically on-box, so no derived design data ever leaves the boundary.
+            </p>
+
+            <h3 style={h3Style}>Audit and monitoring</h3>
+            <p style={pStyle}>
+              CloudTrail records management events plus S3 object-level (data) events for the uploads bucket, delivered to a CMK-encrypted, log-file-validated bucket and mirrored to CloudWatch Logs. VPC flow logs capture network metadata, and metric-filter alarms fire on root-account usage, unauthorized API calls, and console sign-in without MFA.
+            </p>
+
+            <h3 style={h3Style}>Tenant isolation</h3>
+            <p style={pStyle}>
+              Every data path is scoped by organization, and authz tests prove that a user in one org cannot read another org&apos;s submissions, jobs, violations, or board data, the control that matters most for multi-tenant CUI.
+            </p>
+
+            <h3 style={h3Style}>Non-CUI alpha guardrail</h3>
+            <p style={pStyle}>
+              Until a FedRAMP Moderate equivalency assessment is in place, the environment must not accept controlled data. Every upload path (direct, batch, and shared-portal) requires an explicit acknowledgment that the design is not ITAR-controlled or CUI, enforced server-side before a presigned upload URL is issued.
+            </p>
           </section>
 
           {/* ─── ARCHITECTURE ─────────────────────────────── */}
