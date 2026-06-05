@@ -1,10 +1,18 @@
-# Cognito user pool. MFA mandatory (IA-2), invite-only (no self-signup; US-person
-# provisioning happens admin-side), with the custom orgId/role attributes the API
-# JWT middleware reads (apps/api/src/lib/auth.go).
+# Cognito user pool. Invite-only (no self-signup; US-person provisioning happens
+# admin-side), with the custom orgId/role attributes the API JWT middleware reads
+# (apps/api/src/lib/auth.go).
+#
+# TEMPORARY (non-CUI alpha): mfa_configuration is OPTIONAL, not ON. The frontend
+# sign-in flow does not yet implement TOTP enrollment (it only handles
+# NEW_PASSWORD_REQUIRED), so mandatory MFA would stall login at MFA_SETUP. This
+# MUST return to "ON" before the environment handles anything real or is
+# assessed, once TOTP enrollment is built into the sign-in flow. Tracked in
+# docs/ITAR-GOVCLOUD-MIGRATION.md. TOTP remains available (software token) so
+# users can opt in now. (IA-2)
 resource "aws_cognito_user_pool" "main" {
   name = "${var.name_prefix}-users"
 
-  mfa_configuration = "ON"
+  mfa_configuration = "OPTIONAL"
 
   software_token_mfa_configuration {
     enabled = true

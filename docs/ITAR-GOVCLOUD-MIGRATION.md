@@ -243,3 +243,15 @@ All work lands on branch `feat/itar-govcloud-migration` as a single PR, built ph
 - Then: open the single PR; pursue 3PAO equivalency (Phase 7); flip on real CUI (Phase 8).
 
 **Domain:** building domain-optional; `domain_name` empty for now (web on ALB :80, api on :8080; see alb.tf). Set `domain_name` later to switch on ACM + HTTPS host routing + Cognito callbacks.
+
+---
+
+## 14. Temporary deviations (MUST restore before CUI / assessment)
+
+Tracked, deliberate relaxations made to enable the non-CUI alpha. Each must be reverted before the environment handles anything real or is assessed.
+
+- **Cognito MFA = OPTIONAL (not ON).** The frontend sign-in flow only handles `NEW_PASSWORD_REQUIRED`, not TOTP enrollment (`MFA_SETUP`/`AssociateSoftwareToken`), so mandatory MFA stalls login. Relaxed to OPTIONAL to test the alpha. **Restore `mfa_configuration = "ON"` in `infra/terraform/cognito.tf` once TOTP enrollment is built into the sign-in flow.** (IA-2)
+
+## 15. Deployed (alpha, gov)
+
+GovCloud stack is live and verified end-to-end (us-gov-west-1, account 665462955903): `https://api.gov.rapiddfm.com/health` 200, `https://app.gov.rapiddfm.com` 200, valid ACM TLS. Deployed out-of-band from the branch (no merge); commercial/Vercel untouched. RDS fresh (no Neon migration). First admin seeded manually in Cognito.
