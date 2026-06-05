@@ -89,6 +89,14 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
     return m
   }, [violations])
 
+  // Only show rule chips that have violations in the current severity. A rule
+  // the user has actively filtered to stays visible (so they can unselect it
+  // even if it drops to 0 under a new severity).
+  const visibleRules = useMemo(
+    () => availableRules.filter((ruleId) => (ruleCounts.get(ruleId) ?? 0) > 0 || ruleFilter.has(ruleId)),
+    [availableRules, ruleCounts, ruleFilter]
+  )
+
   const toggleRule = (ruleId: string) => {
     const next = new Set(ruleFilter)
     if (next.has(ruleId)) next.delete(ruleId); else next.add(ruleId)
@@ -134,9 +142,9 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
       </div>
 
       {/* Rule type filter pills */}
-      {availableRules.length > 1 && filter !== 'NONE' && (
+      {visibleRules.length > 1 && filter !== 'NONE' && (
         <div className="flex gap-1 px-2 py-1.5 border-b bg-muted/20 flex-shrink-0 flex-wrap">
-          {availableRules.map((ruleId) => {
+          {visibleRules.map((ruleId) => {
             const active = ruleFilter.size === 0 || ruleFilter.has(ruleId)
             const count = ruleCounts.get(ruleId) ?? 0
             return (
