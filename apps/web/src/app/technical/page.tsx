@@ -1202,7 +1202,7 @@ NET {
 
             <h3 style={h3Style}>Auth</h3>
             <p style={pStyle}>
-              Auth is via AWS Cognito OIDC. A single environment variable gates the entire auth system: if <code style={inlineCode}>NEXT_PUBLIC_COGNITO_CLIENT_ID</code> is empty, the frontend skips Cognito entirely and treats all requests as authenticated. The same pattern exists on the API side with <code style={inlineCode}>JWT_ISSUER</code>. Local development requires zero AWS setup.
+              Auth is via AWS Cognito (OIDC + JWT): the frontend obtains tokens through Cognito and the API validates them on every request. A local development mode lets engineers run the full stack with zero AWS setup; it is disabled whenever Cognito is configured, so production traffic is always authenticated.
             </p>
           </section>
 
