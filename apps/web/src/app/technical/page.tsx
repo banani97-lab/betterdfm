@@ -425,10 +425,10 @@ export default function TechnicalPage() {
                     { aspect: 'Database', pub: 'RDS Postgres', gov: 'RDS Postgres, CMK-encrypted, TLS forced, private' },
                     { aspect: 'Object storage', pub: 'S3', gov: 'S3, SSE-KMS (customer CMK), TLS-only, versioned' },
                     { aspect: 'Encryption at rest', pub: 'AWS-managed keys', gov: 'Customer-managed KMS CMK (US-person key policy)' },
-                    { aspect: 'Identity', pub: 'Cognito', gov: 'Cognito, invite-only, no dev bypass in prod' },
-                    { aspect: 'AI overview', pub: 'OpenAI (external call)', gov: 'On-box, deterministic (no external egress)' },
-                    { aspect: 'Audit', pub: 'Standard', gov: 'CloudTrail + VPC flow logs + metric alarms' },
-                    { aspect: 'CI / CD', pub: 'GitHub Actions, static keys', gov: 'GitHub OIDC (keyless) or manual push' },
+                    { aspect: 'Identity', pub: 'Cognito', gov: 'Cognito with MFA, invite-only' },
+                    { aspect: 'AI overview', pub: 'OpenAI (external call)', gov: 'On-box, no external egress' },
+                    { aspect: 'Audit', pub: 'Standard', gov: 'Full audit logging + alerting' },
+                    { aspect: 'CI / CD', pub: 'GitHub Actions', gov: 'Keyless OIDC deploys' },
                     { aspect: 'Network', pub: 'Public services', gov: 'VPC, private subnets, ALB-only ingress' },
                     { aspect: 'Compliance posture', pub: 'Commercial SaaS', gov: 'ITAR / CUI boundary; targeting FedRAMP Moderate equivalency' },
                   ].map((row, i) => (
@@ -442,39 +442,24 @@ export default function TechnicalPage() {
               </table>
             </div>
 
-            <h3 style={h3Style}>The GovCloud boundary</h3>
+            <h3 style={h3Style}>US-person boundary</h3>
             <p style={pStyle}>
-              All four services run in a single VPC in <code style={inlineCode}>us-gov-west-1</code> (partition <code style={inlineCode}>aws-us-gov</code>). Workloads run in private subnets; the only internet-facing component is the ALB. Because the region selects the partition, the application auto-enables FIPS 140-validated endpoints across the API, worker, and sidecar whenever it runs in a <code style={inlineCode}>us-gov-*</code> region.
+              The GovCloud edition runs in an isolated AWS GovCloud (US) environment with FIPS 140-validated endpoints and a private network. Only the load balancer is internet-facing, and access is limited to US persons.
             </p>
 
-            <h3 style={h3Style}>Customer-managed encryption</h3>
+            <h3 style={h3Style}>Encryption you control</h3>
             <p style={pStyle}>
-              A single customer-managed KMS CMK, with a key policy scoped to US-person principals, encrypts S3 (SSE-KMS by default, plus a TLS-only and KMS-only bucket policy), RDS (encrypted storage and <code style={inlineCode}>rds.force_ssl</code>), SQS, and CloudWatch Logs. Holding the key under US-person control is what underpins the <code style={inlineCode}>22 CFR 120.54</code> encryption position: properly encrypted technical data, decrypted only in-boundary by US persons, is not an export.
+              A customer-managed encryption key, held under US-person control, protects data at rest and in transit. This is the basis for handling ITAR technical data under the <code style={inlineCode}>22 CFR 120.54</code> encryption carve-out: data that is decrypted only in-boundary by US persons is not an export.
             </p>
 
-            <h3 style={h3Style}>Identity and access</h3>
+            <h3 style={h3Style}>In-boundary by design</h3>
             <p style={pStyle}>
-              Cognito provisioning is invite-only (no self-signup), carrying the same <code style={inlineCode}>orgId</code> / <code style={inlineCode}>role</code> custom attributes the API JWT middleware reads. The local development auth bypass is compiled out of production builds via Go build tags, and the server refuses to start without a real <code style={inlineCode}>JWT_ISSUER</code>. Deploys are keyless through GitHub OIDC (no static AWS keys), or images are pushed manually with US-person credentials.
+              Sign-in uses multi-factor authentication with invite-only, US-person provisioning. The edition makes no third-party API calls, so analysis stays entirely within the boundary, and all activity is captured by comprehensive audit logging and security alerting.
             </p>
 
-            <h3 style={h3Style}>No external egress</h3>
+            <h3 style={h3Style}>Strict tenant isolation</h3>
             <p style={pStyle}>
-              The Public Cloud edition phrases its submission overview through an external OpenAI call. The GovCloud build removes that integration entirely and generates the same overview deterministically on-box, so no derived design data ever leaves the boundary.
-            </p>
-
-            <h3 style={h3Style}>Audit and monitoring</h3>
-            <p style={pStyle}>
-              CloudTrail records management events plus S3 object-level (data) events for the uploads bucket, delivered to a CMK-encrypted, log-file-validated bucket and mirrored to CloudWatch Logs. VPC flow logs capture network metadata, and metric-filter alarms fire on root-account usage, unauthorized API calls, and console sign-in without MFA.
-            </p>
-
-            <h3 style={h3Style}>Tenant isolation</h3>
-            <p style={pStyle}>
-              Every data path is scoped by organization, and authz tests prove that a user in one org cannot read another org&apos;s submissions, jobs, violations, or board data, the control that matters most for multi-tenant CUI.
-            </p>
-
-            <h3 style={h3Style}>Non-CUI alpha guardrail</h3>
-            <p style={pStyle}>
-              Until a FedRAMP Moderate equivalency assessment is in place, the environment must not accept controlled data. Every upload path (direct, batch, and shared-portal) requires an explicit acknowledgment that the design is not ITAR-controlled or CUI, enforced server-side before a presigned upload URL is issued.
+              Each customer&apos;s data is isolated per organization, enforced in the application and verified by an automated test suite.
             </p>
           </section>
 
@@ -676,10 +661,10 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
           <section style={{ marginBottom: '4rem' }}>
             <h2 style={h2Style}>Geometric Algorithms</h2>
             <p style={pStyle}>
-              Clearance and edge-clearance rules require computing exact minimum distances between PCB features. Naively treating all pads as circles produces false positives on rectangular and oval pads. The engine implements shape-aware distance functions in <code style={inlineCode}>geom.go</code>.
+              Clearance and edge-clearance checks need exact minimum distances between PCB features. Treating every pad as a circle produces false positives on rectangular and oval pads, so the engine computes shape-aware distances for all common pad geometries.
             </p>
 
-            <h3 style={h3Style}>Shape-aware pad distance (<code style={{ fontFamily: 'ui-monospace, monospace', fontSize: '14px' }}>padEdgeDist</code>)</h3>
+            <h3 style={h3Style}>Shape-aware pad distance</h3>
             <div style={{
               display: 'grid',
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -688,10 +673,10 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
               marginBottom: '1.5rem',
             }}>
               {[
-                { shape: 'CIRCLE', detail: 'dist(point, center) − radius' },
-                { shape: 'RECT', detail: 'Axis-aligned bounding box — clamp point to box, measure residual' },
-                { shape: 'OVAL / Stadium', detail: 'Capsule geometry: rect body + two semicircle caps. Point projected onto spine segment.' },
-                { shape: 'POLYGON', detail: 'Ray-cast point-in-polygon test, then scan all contour segments for minimum distance.' },
+                { shape: 'CIRCLE', detail: 'Exact edge distance' },
+                { shape: 'RECT', detail: 'Exact edge distance for rectangular pads' },
+                { shape: 'OVAL / Stadium', detail: 'Exact edge distance for oval / stadium pads' },
+                { shape: 'POLYGON', detail: 'Exact edge distance for arbitrary polygon pads' },
               ].map(({ shape, detail }) => (
                 <div key={shape} style={{
                   background: '#111418',
@@ -707,14 +692,14 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
               ))}
             </div>
 
-            <h3 style={h3Style}>Segment-to-segment distance (<code style={{ fontFamily: 'ui-monospace, monospace', fontSize: '14px' }}>segToSegDist</code>)</h3>
+            <h3 style={h3Style}>Trace-to-trace clearance</h3>
             <p style={pStyle}>
-              Used for trace-to-trace clearance. The function first tests proper intersection (if lines cross, distance = 0), then computes the four endpoint-to-segment distances and returns the minimum. An epsilon tolerance <code style={inlineCode}>geomEps = 1e-6</code> prevents float-drift from producing false positives on features exactly at rule boundaries.
+              Trace spacing is measured with exact segment-to-segment distance, with a small numerical tolerance so features sitting right on a rule boundary do not produce float-drift false positives.
             </p>
 
-            <h3 style={h3Style}>Spatial grid index</h3>
+            <h3 style={h3Style}>Fast queries on dense boards</h3>
             <p style={pStyle}>
-              Edge-clearance needs point-to-board-outline distance for every copper feature. With a dense board, the naïve O(n) scan of all outline segments is a bottleneck. <code style={inlineCode}>spatial.go</code> builds a 2D grid index over the outline at startup — each query resolves in O(k) where k is the number of segments in the candidate grid cells, typically a tiny fraction of n.
+              Edge-clearance compares every copper feature against the board outline. A spatial index keeps these lookups fast even on dense multi-layer boards, where a naive scan would be the bottleneck.
             </p>
           </section>
 
@@ -765,58 +750,11 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
               marginTop: '1.5rem',
               marginBottom: '1.5rem',
             }}>
-              <div style={{ marginBottom: '1.25rem' }}>
-                <div style={{ fontSize: '11px', color: '#475569', fontFamily: 'ui-monospace, monospace', marginBottom: '8px' }}>PENALTY PER VIOLATION</div>
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem',
-                  flexWrap: 'wrap',
-                  fontFamily: 'ui-monospace, monospace',
-                  fontSize: '14px',
-                }}>
-                  <FormulaBox label="ruleWeight" color="#d4891a" />
-                  <span style={{ color: '#475569' }}>×</span>
-                  <FormulaBox label="severityMult" color="#4a9eff" />
-                  <span style={{ color: '#475569' }}>×</span>
-                  <FormulaBox label="marginMult" color="#34d399" />
-                </div>
+              <div style={{ marginBottom: '1.25rem', fontSize: '13px', color: '#94a3b8', lineHeight: 1.7 }}>
+                Each violation contributes a penalty that scales with the rule&apos;s severity and with how far the measured value deviates from the limit. Per-rule weighting reflects how consequential each rule class is to manufacturability. The result is normalised to a 0&ndash;100 score and a letter grade.
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '1rem' }}>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#d4891a', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>RULE WEIGHTS (by tier)</div>
-                  {[
-                    ['clearance', '3.0'],
-                    ['trace-width · annular-ring', '2.5'],
-                    ['drill-* · edge-clearance · package-capability · component-height', '2.0'],
-                    ['aspect-ratio · trace-imbalance · tombstoning-risk · pad-size · silkscreen · component-spacing', '1.5'],
-                    ['all others (via-in-pad, fiducials, mask-dam, sliver, …)', '1.0'],
-                  ].map(([rule, weight]) => (
-                    <div key={rule} style={{ display: 'flex', justifyContent: 'space-between', gap: '10px', fontSize: '12px', padding: '3px 0', color: '#94a3b8' }}>
-                      <span style={{ fontFamily: 'ui-monospace, monospace', color: '#d4891a', lineHeight: 1.4 }}>{rule}</span>
-                      <span style={{ color: '#e2e8f0', fontWeight: 600, flexShrink: 0 }}>{weight}</span>
-                    </div>
-                  ))}
-                </div>
-                <div>
-                  <div style={{ fontSize: '11px', color: '#4a9eff', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>SEVERITY MULTIPLIERS</div>
-                  {[['ERROR', '10×'], ['WARNING', '3×'], ['INFO', '0.5×']].map(([sev, mult]) => (
-                    <div key={sev} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '2px 0' }}>
-                      <Tag type={sev as 'ERROR' | 'WARNING' | 'INFO'} />
-                      <span style={{ color: '#e2e8f0', fontWeight: 700, fontFamily: 'ui-monospace, monospace' }}>{mult}</span>
-                    </div>
-                  ))}
-                  <div style={{ fontSize: '11px', color: '#34d399', fontFamily: 'ui-monospace, monospace', marginTop: '1rem', marginBottom: '6px' }}>MARGIN MULTIPLIER</div>
-                  <div style={{ fontSize: '12px', color: '#94a3b8', lineHeight: 1.6 }}>
-                    <code style={{ color: '#34d399', fontFamily: 'ui-monospace, monospace' }}>√((limit − measured) / limit)</code>
-                    <br />
-                    <span style={{ display: 'block', marginTop: '6px' }}>5% off limit → ~0.22</span>
-                    <span style={{ display: 'block' }}>25% off limit → 0.50</span>
-                    <span style={{ display: 'block' }}>100%+ off → 1.0</span>
-                    <span style={{ display: 'block' }}>0 measured → hard 1.0</span>
-                  </div>
-                </div>
                 <div>
                   <div style={{ fontSize: '11px', color: '#94a3b8', fontFamily: 'ui-monospace, monospace', marginBottom: '6px' }}>GRADE THRESHOLDS</div>
                   {[['A', '90 – 100', '#34d399'], ['B', '75 – 90', '#4a9eff'], ['C', '60 – 75', '#fbbf24'], ['D', '40 – 60', '#fb923c'], ['F', '< 40', '#f87171']].map(([grade, range, color]) => (
@@ -838,14 +776,14 @@ func (r *Runner) Run(board BoardData, profile ProfileRules) []Violation {
                     </div>
                   ))}
                   <p style={{ fontSize: '11px', color: '#475569', marginTop: '0.75rem', lineHeight: 1.5 }}>
-                    Per-rule penalty caps are calibrated so all maximums sum to exactly 100. A board failing every rule maximally scores 0.
+                    Per-rule caps keep any single rule from dominating the overall score.
                   </p>
                 </div>
               </div>
             </div>
 
             <p style={pStyle}>
-              The square-root margin multiplier is an important calibration choice: it compresses small violations (a trace 5% under limit is much less serious than 50% under) while still giving partial credit. Rules with zero measured value (e.g. a trace with no copper) get a hard 1.0 multiplier regardless.
+              Penalties are weighted so a board barely under a limit is treated very differently from one that grossly violates it, small deviations cost little, large ones cost a lot.
             </p>
           </section>
 
@@ -1202,7 +1140,7 @@ NET {
 
             <h3 style={h3Style}>Auth</h3>
             <p style={pStyle}>
-              Auth is via AWS Cognito OIDC. A single environment variable gates the entire auth system: if <code style={inlineCode}>NEXT_PUBLIC_COGNITO_CLIENT_ID</code> is empty, the frontend skips Cognito entirely and treats all requests as authenticated. The same pattern exists on the API side with <code style={inlineCode}>JWT_ISSUER</code>. Local development requires zero AWS setup.
+              Auth is via AWS Cognito (OIDC + JWT). Production builds validate every request against Cognito; the GovCloud edition additionally enforces multi-factor authentication and US-person provisioning. A separate local development mode, excluded from production builds, lets engineers run the full stack without an AWS account.
             </p>
           </section>
 
@@ -1223,16 +1161,12 @@ NET {
                 body: 'A 14-layer board produces board.json and violations.json blobs in the multi-MB range. Storing them as JSONB columns blew up row size, hurt replica replication, and forced the API to drag megabytes through every read. The worker now writes both blobs to results/{jobId}/ in S3 and the database keeps only the S3 keys plus the score. The API responds to GET /jobs/:id/board with {url: presigned} and the browser fetches directly — the API process never sees the bytes. Inline JSONB is kept as a fallback for jobs predating the migration.',
               },
               {
-                title: 'Epsilon tolerance (geomEps = 1e-6)',
-                body: 'Floating-point arithmetic on board coordinates causes features exactly at rule limits to register as violations. The epsilon guard eliminates this class of false positive without introducing meaningful measurement error — 1 nanometre at PCB scale.',
+                title: 'Numerical tolerance at rule boundaries',
+                body: 'Floating-point arithmetic on board coordinates can make features sitting exactly on a rule limit register as violations. A small tolerance eliminates this class of false positive without any meaningful measurement error at PCB scale.',
               },
               {
-                title: 'Per-rule score caps sum to 100',
-                body: 'Each rule\'s maximum contribution to the penalty is calibrated so all 22 caps sum exactly to 100. This prevents a single dense-board violation type (e.g. 10,000 clearance hits) from auto-failing the score. A board where only clearance is maximally violated still scores 87 — grade B, still fixable. Adding a rule means rebalancing the existing caps to hold the sum at 100.',
-              },
-              {
-                title: 'Spatial deduplication post-collection',
-                body: 'The clearance rule collects all violations first, then deduplicates spatially. The alternative — preventing duplicates upfront — would require a spatial index during collection, complicating the hot loop. Collecting then deduplicating is simpler, and the 500-violation cap bounds memory.',
+                title: 'Bounded, normalised scoring',
+                body: 'The manufacturability score is normalised so that no single rule class can dominate or auto-fail the result. A board with many hits of one rule type still receives a fair, actionable grade rather than a misleading zero.',
               },
               {
                 title: 'Panel-level copper filtering',
@@ -1430,22 +1364,5 @@ function Arrow({ label, dir = 'right' }: { label: string; dir?: 'right' | 'left'
       <div style={{ fontSize: '10px', color: '#475569', fontFamily: 'ui-monospace, monospace', whiteSpace: 'nowrap' }}>{label}</div>
       <div style={{ color: '#334155', fontSize: '16px' }}>{dir === 'right' ? '→' : '←'}</div>
     </div>
-  )
-}
-
-function FormulaBox({ label, color }: { label: string; color: string }) {
-  return (
-    <span style={{
-      display: 'inline-block',
-      background: `${color}12`,
-      border: `1px solid ${color}30`,
-      color,
-      padding: '4px 10px',
-      borderRadius: '6px',
-      fontSize: '13px',
-      fontFamily: 'ui-monospace, monospace',
-    }}>
-      {label}
-    </span>
   )
 }
