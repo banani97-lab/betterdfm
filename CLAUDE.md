@@ -107,6 +107,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 - **ODB++ parser**: `parser_odb.py` (custom archive extraction and feature parsing).
 - **Package-type classification**: the parser reads `eda/data` `PKG` records (pin grid + pad shapes) and sets `Component.packageType` (`discrete`/`leaded`/`bga`/`through_hole`) via mount type → IPC name token → geometric BGA detection → leaded residual. Consumed by the per-class `component-spacing` rule.
 - **All coordinates output in millimeters** — unit conversion happens in parsers.
+- **Net provenance**: traces, pads, and polygons carry `netSource` ("attr" = `.net=` on the record, "netlist" = cadnet netlist point at the feature, "inferred" = BFS propagation / majority vote). The engine's short detection only trusts attr/netlist labels.
 - **Custom-symbol pads are exact polygons**: `_scan_custom_symbol` emits a `POLYGON` shape with the largest boundary ring as `contour` (decimated to 64 points, symbol-relative); the P-record handler applies the full ODB++ orient transform (mirror + arbitrary-angle clockwise rotation) and emits board-space contour points. `w`/`h`/`x`/`y` stay the placed contour's bbox. The engine (`geom.go`) and viewer (`boardPainter.ts`) consume the contour for exact clearance/rendering, falling back to bbox when absent.
 - **Fallback mock data** if S3 is unavailable (dev mode).
 
@@ -119,7 +120,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | Rule | Severity | What it checks |
 |------|----------|---------------|
 | trace-width | ERROR | Trace width >= minTraceWidthMM |
-| clearance | ERROR | Trace/pad spacing >= minClearanceMM |
+| clearance | ERROR | Trace-trace, trace-pad, and pad-pad spacing >= minClearanceMM on each copper layer. Different-net copper in contact is flagged as a probable short (MeasuredMM 0) when both net labels are high-confidence (`netSource` attr/netlist) and the geometry is credible: trace crossings (not endpoint-chained junctions), traces passing through a pad (not terminating in it), partial pad overlap (not concentric containment) |
 | drill-size | ERROR | Drill diameter within min/max bounds |
 | annular-ring | ERROR | Copper ring around vias >= minAnnularRingMM |
 | drill-to-drill | ERROR | Hole-to-hole spacing >= minDrillToDrillMM |

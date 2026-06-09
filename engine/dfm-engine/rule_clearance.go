@@ -139,13 +139,14 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 					continue
 				}
 				t := Trace{
-					Layer:   poly.Layer,
-					WidthMM: 0,
-					StartX:  a.X,
-					StartY:  a.Y,
-					EndX:    b.X,
-					EndY:    b.Y,
-					NetName: poly.NetName,
+					Layer:     poly.Layer,
+					WidthMM:   0,
+					StartX:    a.X,
+					StartY:    a.Y,
+					EndX:      b.X,
+					EndY:      b.Y,
+					NetName:   poly.NetName,
+					NetSource: poly.NetSource,
 				}
 				tracesByLayer[poly.Layer] = append(tracesByLayer[poly.Layer], newTraceBB(t))
 			}
@@ -166,11 +167,29 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		return net == "$NONE$"
 	}
 
+	// isConfidentNet gates overlap-as-short detection: only labels read
+	// directly from the file (.net= attr) or matched against a netlist point
+	// are trustworthy enough to call touching copper a short. Inferred labels
+	// (BFS propagation, majority vote) routinely disagree across a junction
+	// and would surface as false shorts.
+	isConfidentNet := func(source string) bool {
+		return source == "attr" || source == "netlist"
+	}
+
 	// Iterate layers in sorted order for determinism. Combined with the
 	// per-layer cap below, this guarantees identical output across runs on
 	// identical input — the v1↔v2 diff feature relies on it.
-	layerNames := make([]string, 0, len(tracesByLayer))
+	// Union of trace and pad layers: the pad-to-pad sweep must also cover
+	// layers that have pads but no traces.
+	layerSet := map[string]bool{}
 	for name := range tracesByLayer {
+		layerSet[name] = true
+	}
+	for name := range padsByLayer {
+		layerSet[name] = true
+	}
+	layerNames := make([]string, 0, len(layerSet))
+	for name := range layerSet {
 		layerNames = append(layerNames, name)
 	}
 	sort.Strings(layerNames)
@@ -245,7 +264,41 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						)
 						clearance := dist - (a.t.WidthMM+b.t.WidthMM)/2
 						if clearance <= 0 {
-							continue // touching/overlapping copper is connected, not a clearance issue
+							// Both nets are known and different (same-net and
+							// unknown-net pairs were skipped above). Only a
+							// proper segment crossing is a short with high
+							// confidence: endpoint-chained or T-junction
+							// contact is connected routing where one side of
+							// the junction carries a stale/conflicting net
+							// label (netlist vs attr namespaces, propagation
+							// seeds), not a fab defect.
+							if !segsIntersect(
+								a.t.StartX, a.t.StartY, a.t.EndX, a.t.EndY,
+								b.t.StartX, b.t.StartY, b.t.EndX, b.t.EndY,
+							) {
+								continue
+							}
+							if !isConfidentNet(a.t.NetSource) || !isConfidentNet(b.t.NetSource) {
+								continue
+							}
+							msg, sug := msgClearanceShort("trace", a.t.NetName, b.t.NetName)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          (a.t.StartX + a.t.EndX) / 2,
+								Y:          (a.t.StartY + a.t.EndY) / 2,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: 0,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    a.t.NetName,
+								X2:         (b.t.StartX + b.t.EndX) / 2,
+								Y2:         (b.t.StartY + b.t.EndY) / 2,
+							})
+							layerViolations++
+							continue
 						}
 						if clearance < minC-geomEps {
 							msg, sug := msgClearanceTraceTooClose(clearance, minC)
@@ -316,7 +369,37 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				cpX, cpY := closestPointOnSeg(p.X, p.Y, t.StartX, t.StartY, t.EndX, t.EndY)
 				clearance := padEdgeDist(cpX, cpY, p) - t.WidthMM/2
 				if clearance <= 0 {
-					continue // touching/overlapping copper is connected, not a clearance issue
+					// A trace endpoint terminating inside the pad is the
+					// intended connection (the net labels merely disagree —
+					// netlist vs attr namespaces). Only a trace passing
+					// through the pad with both ends outside is a probable
+					// short.
+					if padEdgeDist(t.StartX, t.StartY, p) <= t.WidthMM/2+geomEps ||
+						padEdgeDist(t.EndX, t.EndY, p) <= t.WidthMM/2+geomEps {
+						continue
+					}
+					if !isConfidentNet(t.NetSource) || !isConfidentNet(p.NetSource) {
+						continue
+					}
+					msg, sug := msgClearanceShort("trace-pad", t.NetName, p.NetName)
+					violations = append(violations, Violation{
+						RuleID:     r.ID(),
+						Severity:   "ERROR",
+						Layer:      layer,
+						X:          p.X,
+						Y:          p.Y,
+						Message:    msg,
+						Suggestion: sug,
+						MeasuredMM: 0,
+						LimitMM:    minC,
+						Unit:       "mm",
+						NetName:    t.NetName,
+						RefDes:     p.RefDes,
+						X2:         p.X,
+						Y2:         p.Y,
+					})
+					layerViolations++
+					continue
 				}
 				if clearance < minC-geomEps {
 					msg, sug := msgClearancePadTooClose(clearance, minC)
@@ -334,6 +417,97 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						NetName:    t.NetName,
 						X2:         p.X,
 						Y2:         p.Y,
+					})
+					layerViolations++
+				}
+			}
+		}
+
+		// P2: pad-to-pad clearance and overlap-as-short. Same sorted-X window
+		// pattern as the trace-to-pad sweep; pads are already sorted by X.
+		// Same skip policy as the other sweeps: same-net, $NONE$, and
+		// unknown-net pairs are not checkable electrical pairs.
+		maxPadRadius := 0.0
+		for _, p := range pads {
+			if r := math.Max(p.WidthMM, p.HeightMM) / 2; r > maxPadRadius {
+				maxPadRadius = r
+			}
+		}
+		for i := range pads {
+			if layerViolations >= maxClearanceViolations {
+				break
+			}
+			a := pads[i]
+			if a.NetName == "" || isNonElectrical(a.NetName) {
+				continue
+			}
+			aRadius := math.Max(a.WidthMM, a.HeightMM) / 2
+			for j := i + 1; j < len(pads); j++ {
+				if layerViolations >= maxClearanceViolations {
+					break
+				}
+				b := pads[j]
+				if b.X-a.X > minC+aRadius+maxPadRadius {
+					break
+				}
+				if b.NetName == a.NetName || b.NetName == "" || isNonElectrical(b.NetName) {
+					continue
+				}
+				bRadius := math.Max(b.WidthMM, b.HeightMM) / 2
+				// Quick Y rejection.
+				if math.Abs(b.Y-a.Y) > minC+aRadius+bRadius {
+					continue
+				}
+				gap := padToPadGap(a, b)
+				if gap <= 0 {
+					if !isConfidentNet(a.NetSource) || !isConfidentNet(b.NetSource) {
+						continue
+					}
+					// Full containment (either pad's center inside the other's
+					// copper) is concentric/stacked design — dome-switch rings,
+					// shield contacts — or a netlist-vs-geometry label conflict,
+					// not a misplacement. Only partial edge overlap is a
+					// credible short.
+					if padEdgeDist(a.X, a.Y, b) <= geomEps || padEdgeDist(b.X, b.Y, a) <= geomEps {
+						continue
+					}
+					msg, sug := msgClearanceShort("pad", a.NetName, b.NetName)
+					violations = append(violations, Violation{
+						RuleID:     r.ID(),
+						Severity:   "ERROR",
+						Layer:      layer,
+						X:          a.X,
+						Y:          a.Y,
+						Message:    msg,
+						Suggestion: sug,
+						MeasuredMM: 0,
+						LimitMM:    minC,
+						Unit:       "mm",
+						NetName:    a.NetName,
+						RefDes:     a.RefDes,
+						X2:         b.X,
+						Y2:         b.Y,
+					})
+					layerViolations++
+					continue
+				}
+				if gap < minC-geomEps {
+					msg, sug := msgClearancePadPairTooClose(gap, minC)
+					violations = append(violations, Violation{
+						RuleID:     r.ID(),
+						Severity:   "ERROR",
+						Layer:      layer,
+						X:          a.X,
+						Y:          a.Y,
+						Message:    msg,
+						Suggestion: sug,
+						MeasuredMM: gap,
+						LimitMM:    minC,
+						Unit:       "mm",
+						NetName:    a.NetName,
+						RefDes:     a.RefDes,
+						X2:         b.X,
+						Y2:         b.Y,
 					})
 					layerViolations++
 				}

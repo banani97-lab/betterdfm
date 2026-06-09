@@ -879,6 +879,7 @@ def _build_features(
                     layer=layer_name,
                     points=[Point(x=x, y=y) for x, y in surface_pts],
                     netName=surface_net,
+                    netSource="attr" if surface_net else "",
                 )
             elif ltype == "SOLDER_MASK":
                 xs = [p[0] for p in surface_pts]
@@ -1026,10 +1027,14 @@ def _build_features(
                     continue
                 mid_x = (x1 + x2) / 2
                 mid_y = (y1 + y2) / 2
-                net = _attr_net(raw) or (net_index.lookup(mid_x, mid_y) if net_index else "")
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(mid_x, mid_y)
+                    net_src = "netlist" if net else ""
                 traces.append(Trace(layer=layer_name, widthMM=max(0.01, trace_w),
                                     startX=x1, startY=y1, endX=x2, endY=y2,
-                                    netName=net))
+                                    netName=net, netSource=net_src))
             except (ValueError, IndexError):
                 pass
 
@@ -1061,7 +1066,11 @@ def _build_features(
                         pass
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
-                net = _attr_net(raw) or (net_index.lookup(x, y) if net_index else "")
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(x, y)
+                    net_src = "netlist" if net else ""
                 ref, pkg_class = refdes_index.lookup(x, y, layer_side) if refdes_index else ("", "")
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
@@ -1117,7 +1126,7 @@ def _build_features(
                                    heightMM=max(0.01, outer),
                                    shape="DONUT",
                                    holeMM=max(0.0, inner),
-                                   netName=net, refDes=ref,
+                                   netName=net, netSource=net_src, refDes=ref,
                                    packageClass=pkg_class,
                                    isViaCatchPad=True))
                     # Populate padstack_outer_mm so the matching drill record
@@ -1180,7 +1189,7 @@ def _build_features(
                                    heightMM=max(0.01, ph),
                                    shape=sym["shape"],
                                    contour=contour_pts,
-                                   netName=net, refDes=ref,
+                                   netName=net, netSource=net_src, refDes=ref,
                                    packageClass=pkg_class,
                                    isFiducial=is_fid))
                     # Capture padstack_id → min outer diameter seen across
@@ -1231,10 +1240,19 @@ def _build_features(
                 if ltype in ("COPPER", "POWER_GROUND") and trace_w < 0.05:
                     continue
                 w = max(0.01, trace_w)
-                net = _attr_net(raw) or (net_index.lookup(xc, yc) if net_index else "")
+                # Net lookup at the arc START point — a point on the copper
+                # path. The circle center (xc, yc) is off the trace entirely
+                # and can sit on another net's copper (e.g. an arc curving
+                # around a GND via), which mislabeled whole arc chains and
+                # surfaced as false different-net overlaps downstream.
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(x1, y1)
+                    net_src = "netlist" if net else ""
                 segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw)
                 for sx1, sy1, sx2, sy2 in segs:
-                    traces.append(Trace(layer=layer_name, widthMM=w,
+                    traces.append(Trace(layer=layer_name, widthMM=w, netSource=net_src,
                                         startX=sx1, startY=sy1,
                                         endX=sx2, endY=sy2, netName=net))
             except (ValueError, IndexError):
@@ -1580,6 +1598,7 @@ def _infer_polygon_nets(
             tally[p.netName] = tally.get(p.netName, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            poly.netSource = "inferred"
             inferred["pads"] += 1
             continue
 
@@ -1596,6 +1615,7 @@ def _infer_polygon_nets(
             tally[t.netName] = tally.get(t.netName, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            poly.netSource = "inferred"
             inferred["traces"] += 1
             continue
 
@@ -1613,6 +1633,10 @@ def _infer_polygon_nets(
             tally[nname] = tally.get(nname, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            # Raw netlist points physically inside the pour are direct
+            # evidence, not a vote over other features' (possibly inferred)
+            # labels.
+            poly.netSource = "netlist"
             inferred["netlist"] += 1
             continue
 
@@ -1634,6 +1658,7 @@ def _infer_polygon_nets(
                 best_v_net = v.netName
         if best_v_net:
             poly.netName = best_v_net
+            poly.netSource = "inferred"
             inferred["nearest_via"] += 1
 
     total = sum(inferred.values())
@@ -1806,6 +1831,7 @@ def _propagate_trace_nets(
         for i, net in assigned.items():
             if not traces[i].netName:
                 traces[i].netName = net
+                traces[i].netSource = "inferred"
 
     total = total_seeded + total_propagated
     if total and warnings is not None:
