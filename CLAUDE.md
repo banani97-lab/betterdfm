@@ -71,6 +71,14 @@ cd apps/web && pnpm test:run      # single run
 
 # DFM engine (Go)
 cd engine/dfm-engine && go test ./...
+# Golden boards: testdata/golden/<board>/ holds real parsed boards
+# (board.json.gz) + pinned expectations. Any rule-semantics change shows up
+# as a per-rule diff; rebaseline intentional changes with:
+#   go test -run TestGoldenBoards -update ./...
+# Regenerate board data after parser changes:
+#   cd sidecar/gerbonara && uv run python scripts/gen_golden.py <name>=<src> ...
+# Perf benchmarks over the pour-heavy golden:
+#   go test -bench BenchmarkGolden -run '^$' ./...
 
 # Sidecar (pytest)
 cd sidecar/gerbonara && pytest
