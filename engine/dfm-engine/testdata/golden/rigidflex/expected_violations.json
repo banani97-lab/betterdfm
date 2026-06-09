@@ -2,7 +2,7 @@
   "ruleCounts": {
     "annular-ring": 500,
     "aspect-ratio": 16168,
-    "clearance": 381,
+    "clearance": 916,
     "component-height": 1,
     "component-spacing": 500,
     "copper-sliver": 179,
@@ -18,7 +18,7 @@
     "trace-width": 500,
     "via-in-pad": 500
   },
-  "total": 19593,
+  "total": 20128,
   "score": 34,
   "grade": "F",
   "anchors": [
@@ -88,19 +88,19 @@
     {
       "ruleId": "clearance",
       "severity": "ERROR",
-      "layer": "SIGNAL_2",
-      "x": 18.389,
-      "y": 24.752,
-      "measuredMM": 0.1398,
+      "layer": "SIGNAL_3",
+      "x": 52.078,
+      "y": 33.884,
+      "measuredMM": 0.0944,
       "limitMM": 0.15
     },
     {
       "ruleId": "clearance",
       "severity": "ERROR",
       "layer": "SIGNAL_9",
-      "x": 72.64,
-      "y": 18.717,
-      "measuredMM": 0.0971,
+      "x": 72.438,
+      "y": 18.8,
+      "measuredMM": 0.1008,
       "limitMM": 0.15
     },
     {

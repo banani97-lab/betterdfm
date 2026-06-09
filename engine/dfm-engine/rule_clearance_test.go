@@ -225,8 +225,8 @@ func padPairNetBoard(gapMM float64, netA, netB string) BoardData {
 	return BoardData{
 		Layers: []Layer{{Name: "top_copper", Type: "COPPER"}},
 		Pads: []Pad{
-			{Layer: "top_copper", X: x1, Y: 20, WidthMM: 1, HeightMM: 1, Shape: "CIRCLE", NetName: netA, NetSource: "netlist"},
-			{Layer: "top_copper", X: x2, Y: 20, WidthMM: 1, HeightMM: 1, Shape: "CIRCLE", NetName: netB, NetSource: "netlist"},
+			{Layer: "top_copper", X: x1, Y: 20, WidthMM: 1, HeightMM: 1, Shape: "CIRCLE", NetName: netA, NetSource: "attr"},
+			{Layer: "top_copper", X: x2, Y: 20, WidthMM: 1, HeightMM: 1, Shape: "CIRCLE", NetName: netB, NetSource: "attr"},
 		},
 		Outline: rectOutline(60, 40),
 	}

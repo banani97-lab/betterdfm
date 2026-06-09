@@ -120,7 +120,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | Rule | Severity | What it checks |
 |------|----------|---------------|
 | trace-width | ERROR | Trace width >= minTraceWidthMM |
-| clearance | ERROR | Trace-trace, trace-pad, and pad-pad spacing >= minClearanceMM on each copper layer. Different-net copper in contact is flagged as a probable short (MeasuredMM 0) when both net labels are high-confidence (`netSource` attr/netlist) and the geometry is credible: trace crossings (not endpoint-chained junctions), traces passing through a pad (not terminating in it), partial pad overlap (not concentric containment) |
+| clearance | ERROR | Trace-trace, trace-pad, pad-pad, and copper-pour (fill-aware: trace/pad/pour vs pour, holes subtracted) spacing >= minClearanceMM on each copper layer. Different-net copper in contact is flagged as a probable short (MeasuredMM 0) with evidence-proportional gating: trace crossings and traces passing through pads accept attr/netlist `netSource` labels; plain overlap/containment (pad-pad, pour containment, pour-pour) needs `.net=` attrs on both sides because real boards put intentional net-ties and dome fingers there. Inferred labels never short. |
 | drill-size | ERROR | Drill diameter within min/max bounds |
 | annular-ring | ERROR | Copper ring around vias >= minAnnularRingMM |
 | drill-to-drill | ERROR | Hole-to-hole spacing >= minDrillToDrillMM |

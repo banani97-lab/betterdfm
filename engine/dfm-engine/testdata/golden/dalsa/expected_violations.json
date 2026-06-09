@@ -1,7 +1,7 @@
 {
   "ruleCounts": {
     "annular-ring": 500,
-    "clearance": 27,
+    "clearance": 51,
     "component-height": 298,
     "component-spacing": 500,
     "drill-size": 500,
@@ -13,9 +13,9 @@
     "trace-width": 500,
     "via-in-pad": 500
   },
-  "total": 3162,
-  "score": 45,
-  "grade": "D",
+  "total": 3186,
+  "score": 37,
+  "grade": "F",
   "anchors": [
     {
       "ruleId": "annular-ring",
@@ -48,27 +48,27 @@
       "ruleId": "clearance",
       "severity": "ERROR",
       "layer": "ART01",
-      "x": 82.7,
-      "y": -187.67,
-      "measuredMM": 0.133,
+      "x": 62.7,
+      "y": -181.904,
+      "measuredMM": 0.0635,
       "limitMM": 0.15
     },
     {
       "ruleId": "clearance",
       "severity": "ERROR",
       "layer": "ART14",
-      "x": 177.55,
-      "y": -66.65,
-      "measuredMM": 0.146,
+      "x": 175.65,
+      "y": -289.575,
+      "measuredMM": 0.1208,
       "limitMM": 0.15
     },
     {
       "ruleId": "clearance",
       "severity": "ERROR",
       "layer": "ART14",
-      "x": 309.85,
-      "y": -41.8,
-      "measuredMM": 0.146,
+      "x": 323.175,
+      "y": -46.45,
+      "measuredMM": 0.1181,
       "limitMM": 0.15
     },
     {

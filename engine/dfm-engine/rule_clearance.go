@@ -117,44 +117,22 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		padsByLayer[p.Layer] = append(padsByLayer[p.Layer], p)
 	}
 
-	// P3.2: Add copper polygon edges as zero-width pseudo-traces so they
-	// participate in the clearance sweep. Pour-to-trace and pour-to-pad
-	// clearance violations are detected automatically by the existing sweep.
-	for _, poly := range board.Polygons {
+	// P3: group copper pours by layer for the fill-aware pour pass below.
+	// (Earlier versions injected pour edges as zero-width pseudo-traces into
+	// the trace sweep; the dedicated pass knows about the filled interior, so
+	// it can also detect features buried inside a different net's pour.)
+	polysByLayer := map[string][]*Polygon{}
+	for i := range board.Polygons {
+		poly := &board.Polygons[i]
 		if !isCopperLayer(poly.Layer) {
 			continue
 		}
-		// Helper to add all edges of a point ring as pseudo-traces.
-		addRing := func(pts []Point) {
-			n := len(pts)
-			if n < 2 {
-				return
-			}
-			for i := 0; i < n; i++ {
-				a := pts[i]
-				b := pts[(i+1)%n]
-				mx := (a.X + b.X) / 2
-				my := (a.Y + b.Y) / 2
-				if !inBoard(mx, my) {
-					continue
-				}
-				t := Trace{
-					Layer:     poly.Layer,
-					WidthMM:   0,
-					StartX:    a.X,
-					StartY:    a.Y,
-					EndX:      b.X,
-					EndY:      b.Y,
-					NetName:   poly.NetName,
-					NetSource: poly.NetSource,
-				}
-				tracesByLayer[poly.Layer] = append(tracesByLayer[poly.Layer], newTraceBB(t))
-			}
+		// Pours without a usable net are not checkable electrical features
+		// (matches the trace/pad skip policy).
+		if poly.NetName == "" || poly.NetName == "$NONE$" {
+			continue
 		}
-		addRing(poly.Points)
-		for _, hole := range poly.Holes {
-			addRing(hole)
-		}
+		polysByLayer[poly.Layer] = append(polysByLayer[poly.Layer], poly)
 	}
 
 	minC := profile.MinClearanceMM
@@ -167,25 +145,36 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 		return net == "$NONE$"
 	}
 
-	// isConfidentNet gates overlap-as-short detection: only labels read
-	// directly from the file (.net= attr) or matched against a netlist point
-	// are trustworthy enough to call touching copper a short. Inferred labels
-	// (BFS propagation, majority vote) routinely disagree across a junction
-	// and would surface as false shorts.
+	// Short detection trusts net labels in proportion to the geometric
+	// evidence. Inferred labels (BFS propagation, majority vote) are never
+	// enough — they routinely disagree across a junction. Positionally
+	// matched netlist labels are enough only when the geometry independently
+	// corroborates a defect (a proper trace crossing, a trace passing
+	// through a pad). Plain overlap/containment — pad-pad, pour containment,
+	// pour-pour — needs authoritative .net= attrs on both sides: on real
+	// boards those overlaps are dominated by intentional structures whose
+	// netlist labels legitimately disagree (net-tie joins like
+	// VBACKUP/VBACKUP-CON, keypad dome fingers).
 	isConfidentNet := func(source string) bool {
 		return source == "attr" || source == "netlist"
+	}
+	isAttrNet := func(source string) bool {
+		return source == "attr"
 	}
 
 	// Iterate layers in sorted order for determinism. Combined with the
 	// per-layer cap below, this guarantees identical output across runs on
 	// identical input — the v1↔v2 diff feature relies on it.
-	// Union of trace and pad layers: the pad-to-pad sweep must also cover
-	// layers that have pads but no traces.
+	// Union of trace, pad, and pour layers: the pad-to-pad and pour sweeps
+	// must also cover layers without traces.
 	layerSet := map[string]bool{}
 	for name := range tracesByLayer {
 		layerSet[name] = true
 	}
 	for name := range padsByLayer {
+		layerSet[name] = true
+	}
+	for name := range polysByLayer {
 		layerSet[name] = true
 	}
 	layerNames := make([]string, 0, len(layerSet))
@@ -326,9 +315,6 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 
 		// Trace-to-pad clearance.
 		pads := padsByLayer[layer]
-		if len(pads) == 0 {
-			continue
-		}
 
 		// Sort pads by X so we can binary-search into the window per trace.
 		sort.Slice(pads, func(i, j int) bool { return pads[i].X < pads[j].X })
@@ -460,7 +446,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 				}
 				gap := padToPadGap(a, b)
 				if gap <= 0 {
-					if !isConfidentNet(a.NetSource) || !isConfidentNet(b.NetSource) {
+					if !isAttrNet(a.NetSource) || !isAttrNet(b.NetSource) {
 						continue
 					}
 					// Full containment (either pad's center inside the other's
@@ -510,6 +496,244 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 						Y2:         b.Y,
 					})
 					layerViolations++
+				}
+			}
+		}
+
+		// P3: fill-aware pour pass. Each labeled copper pour is indexed once
+		// (edge grid + hole bboxes), then checked against different-net
+		// traces, pads, and other pours on the layer. Containment in the
+		// filled region is a probable short (confidence-gated, like the
+		// other short checks); boundary proximity below minC is a clearance
+		// violation.
+		polys := polysByLayer[layer]
+		if len(polys) > 0 && layerViolations < maxClearanceViolations {
+			indexes := make([]*indexedPolygon, len(polys))
+			for pi, poly := range polys {
+				indexes[pi] = newIndexedPolygon(poly, math.Max(0.5, minC*2))
+			}
+			for pi, ip := range indexes {
+				if ip == nil {
+					break
+				}
+				if layerViolations >= maxClearanceViolations {
+					break
+				}
+				poly := polys[pi]
+				pourConfident := isAttrNet(poly.NetSource)
+
+				// Trace vs pour.
+				for _, tb := range traces {
+					if layerViolations >= maxClearanceViolations {
+						break
+					}
+					t := tb.t
+					if t.NetName == "" || isNonElectrical(t.NetName) || t.NetName == poly.NetName {
+						continue
+					}
+					if tb.maxX < ip.minX-minC || tb.minX > ip.maxX+minC ||
+						tb.maxY < ip.minY-minC || tb.minY > ip.maxY+minC {
+						continue
+					}
+					mx, my := (t.StartX+t.EndX)/2, (t.StartY+t.EndY)/2
+					if pourConfident && isAttrNet(t.NetSource) {
+						sx, sy, hit := 0.0, 0.0, false
+						switch {
+						case ip.contains(t.StartX, t.StartY):
+							sx, sy, hit = t.StartX, t.StartY, true
+						case ip.contains(t.EndX, t.EndY):
+							sx, sy, hit = t.EndX, t.EndY, true
+						case ip.contains(mx, my):
+							sx, sy, hit = mx, my, true
+						}
+						if hit {
+							msg, sug := msgClearanceShort("trace-pour", t.NetName, poly.NetName)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          sx,
+								Y:          sy,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: 0,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    t.NetName,
+							})
+							layerViolations++
+							continue
+						}
+					}
+					if d, ok := ip.segDistWithin(t.StartX, t.StartY, t.EndX, t.EndY, minC+t.WidthMM/2); ok {
+						clearance := d - t.WidthMM/2
+						if clearance > 0 && clearance < minC-geomEps {
+							msg, sug := msgClearancePourTooClose("trace", clearance, minC)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          mx,
+								Y:          my,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: clearance,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    t.NetName,
+							})
+							layerViolations++
+						}
+					}
+				}
+
+				// Pad vs pour.
+				for _, p := range pads {
+					if layerViolations >= maxClearanceViolations {
+						break
+					}
+					if p.NetName == "" || isNonElectrical(p.NetName) || p.NetName == poly.NetName {
+						continue
+					}
+					padRadius := math.Max(p.WidthMM, p.HeightMM) / 2
+					if p.X < ip.minX-minC-padRadius || p.X > ip.maxX+minC+padRadius ||
+						p.Y < ip.minY-minC-padRadius || p.Y > ip.maxY+minC+padRadius {
+						continue
+					}
+					if pourConfident && isAttrNet(p.NetSource) && ip.contains(p.X, p.Y) {
+						msg, sug := msgClearanceShort("pad-pour", p.NetName, poly.NetName)
+						violations = append(violations, Violation{
+							RuleID:     r.ID(),
+							Severity:   "ERROR",
+							Layer:      layer,
+							X:          p.X,
+							Y:          p.Y,
+							Message:    msg,
+							Suggestion: sug,
+							MeasuredMM: 0,
+							LimitMM:    minC,
+							Unit:       "mm",
+							NetName:    p.NetName,
+							RefDes:     p.RefDes,
+						})
+						layerViolations++
+						continue
+					}
+					if d, nx, ny, ok := ip.nearestEdgeWithin(p.X, p.Y, minC+padRadius); ok {
+						// Approximation: pad extent toward the pour via the
+						// support function. Exact for convex pads.
+						clearance := d - padProjection(p, nx-p.X, ny-p.Y)
+						if clearance > 0 && clearance < minC-geomEps {
+							msg, sug := msgClearancePourTooClose("pad", clearance, minC)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          p.X,
+								Y:          p.Y,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: clearance,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    p.NetName,
+								RefDes:     p.RefDes,
+								X2:         nx,
+								Y2:         ny,
+							})
+							layerViolations++
+						}
+					}
+				}
+
+				// Pour vs pour (different nets), each pair once.
+				for pj := pi + 1; pj < len(indexes); pj++ {
+					if layerViolations >= maxClearanceViolations {
+						break
+					}
+					jp := indexes[pj]
+					if jp == nil {
+						continue
+					}
+					polyJ := polys[pj]
+					if polyJ.NetName == poly.NetName {
+						continue
+					}
+					if jp.maxX < ip.minX-minC || jp.minX > ip.maxX+minC ||
+						jp.maxY < ip.minY-minC || jp.minY > ip.maxY+minC {
+						continue
+					}
+					// Overlap → short: any vertex of one fill inside the other.
+					if pourConfident && isAttrNet(polyJ.NetSource) {
+						sx, sy, hit := 0.0, 0.0, false
+						for _, v := range polyJ.Points {
+							if ip.contains(v.X, v.Y) {
+								sx, sy, hit = v.X, v.Y, true
+								break
+							}
+						}
+						if !hit {
+							for _, v := range poly.Points {
+								if jp.contains(v.X, v.Y) {
+									sx, sy, hit = v.X, v.Y, true
+									break
+								}
+							}
+						}
+						if hit {
+							msg, sug := msgClearanceShort("pour", poly.NetName, polyJ.NetName)
+							violations = append(violations, Violation{
+								RuleID:     r.ID(),
+								Severity:   "ERROR",
+								Layer:      layer,
+								X:          sx,
+								Y:          sy,
+								Message:    msg,
+								Suggestion: sug,
+								MeasuredMM: 0,
+								LimitMM:    minC,
+								Unit:       "mm",
+								NetName:    poly.NetName,
+							})
+							layerViolations++
+							continue
+						}
+					}
+					// Boundary distance: scan J's rings against I's edge grid.
+					best := math.MaxFloat64
+					bx, by := 0.0, 0.0
+					scanRing := func(ring []Point) {
+						n := len(ring)
+						for k := 0; k < n; k++ {
+							a := ring[k]
+							b := ring[(k+1)%n]
+							if d, ok := ip.segDistWithin(a.X, a.Y, b.X, b.Y, minC); ok && d < best {
+								best = d
+								bx, by = (a.X+b.X)/2, (a.Y+b.Y)/2
+							}
+						}
+					}
+					scanRing(polyJ.Points)
+					for _, hole := range polyJ.Holes {
+						scanRing(hole)
+					}
+					if best > 0 && best < minC-geomEps {
+						msg, sug := msgClearancePourTooClose("pour", best, minC)
+						violations = append(violations, Violation{
+							RuleID:     r.ID(),
+							Severity:   "ERROR",
+							Layer:      layer,
+							X:          bx,
+							Y:          by,
+							Message:    msg,
+							Suggestion: sug,
+							MeasuredMM: best,
+							LimitMM:    minC,
+							Unit:       "mm",
+							NetName:    poly.NetName,
+						})
+						layerViolations++
+					}
 				}
 			}
 		}

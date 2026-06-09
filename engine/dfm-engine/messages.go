@@ -26,6 +26,13 @@ func msgClearancePadPairTooClose(measured, limit float64) (string, string) {
 		fmt.Sprintf("Increase spacing between the pads to at least %.4f mm.", limit)
 }
 
+// msgClearancePourTooClose covers copper-pour proximity findings. kind names
+// the other feature ("trace", "pad", "pour").
+func msgClearancePourTooClose(kind string, measured, limit float64) (string, string) {
+	return fmt.Sprintf("Copper pour to %s clearance %.4f mm between different nets is below minimum %.4f mm", kind, measured, limit),
+		fmt.Sprintf("Increase the pour clearance (thermal-relief / pour standoff) to at least %.4f mm.", limit)
+}
+
 // msgClearanceShort reports different-net copper that touches or overlaps -
 // a probable short, not a spacing issue.
 func msgClearanceShort(kind, netA, netB string) (string, string) {
