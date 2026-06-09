@@ -164,6 +164,29 @@ func TestPour_PourPourOverlapIsShort(t *testing.T) {
 	}
 }
 
+func TestPour_DegeneratePolygonDoesNotAbortPass(t *testing.T) {
+	// Regression: a degenerate pour (<3 points → nil index) sorted ahead of a
+	// real pour used to `break` out of the whole pour pass, silently skipping
+	// every valid pour on the layer.
+	board := pourBoard()
+	board.Polygons = append([]Polygon{{
+		Layer:     "top_copper",
+		Points:    []Point{{X: 0, Y: 0}, {X: 1, Y: 0}},
+		NetName:   "VCC",
+		NetSource: "attr",
+	}}, board.Polygons...)
+	board.Traces = []Trace{
+		{Layer: "top_copper", WidthMM: 0.1, StartX: 12, StartY: 12, EndX: 15, EndY: 12, NetName: "SIG", NetSource: "attr"},
+	}
+	viols := runPour(t, board)
+	if len(viols) != 1 {
+		t.Fatalf("expected 1 short from the valid pour, got %d", len(viols))
+	}
+	if !containsStr(viols[0].Message, "probable short") {
+		t.Errorf("unexpected: %+v", viols[0])
+	}
+}
+
 func TestPour_PourPourGapFlagged(t *testing.T) {
 	// Second pour 0.05mm right of the first: boundary clearance finding.
 	board := pourBoard()

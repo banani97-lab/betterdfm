@@ -514,7 +514,7 @@ func (r *ClearanceRule) Run(board BoardData, profile ProfileRules) []Violation {
 			}
 			for pi, ip := range indexes {
 				if ip == nil {
-					break
+					continue // degenerate pour (<3 points) — skip it, not the whole pass
 				}
 				if layerViolations >= maxClearanceViolations {
 					break

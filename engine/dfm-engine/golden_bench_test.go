@@ -10,12 +10,8 @@ import "testing"
 
 func benchGoldenBoard(b *testing.B) (BoardData, ProfileRules) {
 	b.Helper()
-	t := &testing.T{}
-	bd := loadGoldenBoard(t, "pour-heavy")
-	profile := goldenProfile(t)
-	if t.Failed() {
-		b.Fatal("failed to load pour-heavy golden fixture")
-	}
+	bd := loadGoldenBoard(b, "pour-heavy")
+	profile := goldenProfile(b)
 	return bd, profile
 }
 

@@ -19,9 +19,12 @@ import (
 // Each directory under testdata/golden/<board>/ holds:
 //   - board.json.gz            — BoardData parsed from a real ODB++ board by the
 //     production sidecar parser (regenerate with
-//     sidecar/gerbonara/scripts/gen_golden.py)
+//     sidecar/gerbonara/scripts/gen_golden.py). NOT committed to git — fetched
+//     from s3://betterdfm-testdata/golden/ (CI does this automatically; locally
+//     run `aws s3 sync s3://betterdfm-testdata/golden/ engine/dfm-engine/testdata/golden/`).
+//     Tests skip per-board when the fixture is absent.
 //   - expected_violations.json — per-rule violation counts, score, and a set of
-//     anchor violations that must match exactly
+//     anchor violations that must match exactly (committed; this is the contract)
 //
 // The committed JSON is the contract: any engine change that shifts violation
 // semantics on real boards shows up here as a per-rule diff. To accept a new
@@ -80,7 +83,7 @@ func goldenBoardDirs(t *testing.T) []string {
 	return dirs
 }
 
-func loadGoldenBoard(t *testing.T, board string) BoardData {
+func loadGoldenBoard(t testing.TB, board string) BoardData {
 	t.Helper()
 	dir := filepath.Join("testdata", "golden", board)
 	var raw []byte
@@ -98,7 +101,11 @@ func loadGoldenBoard(t *testing.T, board string) BoardData {
 	} else {
 		raw, err = os.ReadFile(filepath.Join(dir, "board.json"))
 		if err != nil {
-			t.Fatalf("%s: no board.json(.gz) fixture: %v", board, err)
+			// Board fixtures are large binaries kept out of git (only the
+			// expected_violations.json contract is committed). CI fetches
+			// them from S3 before running; locally, fetch once with:
+			//   aws s3 sync s3://betterdfm-testdata/golden/ engine/dfm-engine/testdata/golden/
+			t.Skipf("%s: board fixture not present — fetch with `aws s3 sync s3://betterdfm-testdata/golden/ engine/dfm-engine/testdata/golden/`", board)
 		}
 	}
 	var bd BoardData
@@ -108,7 +115,7 @@ func loadGoldenBoard(t *testing.T, board string) BoardData {
 	return bd
 }
 
-func goldenProfile(t *testing.T) ProfileRules {
+func goldenProfile(t testing.TB) ProfileRules {
 	t.Helper()
 	var p ProfileRules
 	if err := json.Unmarshal([]byte(goldenProfileJSON), &p); err != nil {
