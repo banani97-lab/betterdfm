@@ -1,0 +1,309 @@
+{
+  "ruleCounts": {
+    "annular-ring": 500,
+    "clearance": 27,
+    "component-height": 298,
+    "component-spacing": 500,
+    "drill-size": 500,
+    "drill-to-copper": 178,
+    "edge-clearance": 64,
+    "pad-size-for-package": 1,
+    "through-hole-on-bottom": 1,
+    "trace-imbalance": 93,
+    "trace-width": 500,
+    "via-in-pad": 500
+  },
+  "total": 3162,
+  "score": 45,
+  "grade": "D",
+  "anchors": [
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 61.25,
+      "y": -331,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 171.7,
+      "y": -299.55,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 338.85,
+      "y": -328.05,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 82.7,
+      "y": -187.67,
+      "measuredMM": 0.133,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "ART14",
+      "x": 177.55,
+      "y": -66.65,
+      "measuredMM": 0.146,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "ART14",
+      "x": 309.85,
+      "y": -41.8,
+      "measuredMM": 0.146,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "ERROR",
+      "layer": "PRIMARY_SOLDERMASK",
+      "x": 28.6,
+      "y": -130.75,
+      "measuredMM": 12,
+      "limitMM": 10
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "ERROR",
+      "layer": "SECONDARY_SOLDERMASK",
+      "x": 147.4,
+      "y": -39.6,
+      "measuredMM": 5.5,
+      "limitMM": 5
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "ERROR",
+      "layer": "SECONDARY_SOLDERMASK",
+      "x": 336.9,
+      "y": -38.15,
+      "measuredMM": 5.5,
+      "limitMM": 5
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "ART01",
+      "x": 10.95,
+      "y": -54.3,
+      "measuredMM": 0.525,
+      "limitMM": 3.175
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "ART14",
+      "x": 54.95,
+      "y": -98.85,
+      "measuredMM": 1.8,
+      "limitMM": 3.175
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "ART14",
+      "x": 123.2,
+      "y": -135.85,
+      "measuredMM": 1.48,
+      "limitMM": 3.175
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 19.25,
+      "y": -73.65,
+      "measuredMM": 0.254,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 181.55,
+      "y": -198.3,
+      "measuredMM": 0.254,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 359.094,
+      "y": -263.516,
+      "measuredMM": 0.254,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 61.45,
+      "y": -178.87,
+      "measuredMM": 0.1266,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "ART14",
+      "x": 122,
+      "y": -278.05,
+      "measuredMM": 0.123,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "ART14",
+      "x": 311.7,
+      "y": -103.05,
+      "measuredMM": 0.123,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 5.968,
+      "y": -315,
+      "measuredMM": -0.508,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 205.968,
+      "y": 0,
+      "measuredMM": -0.508,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 362.032,
+      "y": -7,
+      "measuredMM": -0.508,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "through-hole-on-bottom",
+      "severity": "WARNING",
+      "layer": "SECONDARY_SOLDERMASK",
+      "x": 333,
+      "y": -185,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 60.65,
+      "y": -180.84,
+      "measuredMM": 328.084,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "ART03",
+      "x": 350.75,
+      "y": -149,
+      "measuredMM": 410.105,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "ART14",
+      "x": 314.55,
+      "y": -23.6,
+      "measuredMM": 12.8205,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 10.95,
+      "y": -53.8,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 125.05,
+      "y": -85.1,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "ART01",
+      "x": 359.25,
+      "y": -248.2,
+      "measuredMM": 0.149,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "ART01",
+      "x": 4.15,
+      "y": -11.95,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "ART01",
+      "x": 255.12,
+      "y": -62.2,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "ART01",
+      "x": 360.034,
+      "y": -263.516,
+      "measuredMM": 0,
+      "limitMM": 0
+    }
+  ]
+}

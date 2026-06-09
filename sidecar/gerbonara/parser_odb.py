@@ -2270,6 +2270,9 @@ def parse_odb(file_path: str) -> BoardData:
     outline_holes: list[list[Point]] = []
     warnings: list[str] = []
     polygons: list[Polygon] = []
+    # Declared before the try so the post-except materialization below can't
+    # hit UnboundLocalError when parsing aborts early (e.g. no steps dir).
+    components: list = []
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2304,7 +2307,6 @@ def parse_odb(file_path: str) -> BoardData:
                 eda_pkgs = _parse_eda_packages(eda_data_path, units)
                 logger.info("ODB++ eda/data: %d packages", len(eda_pkgs))
 
-            components: list = []
             # ODB++ components can be at steps/<step>/components/{top,bot}
             # or steps/<step>/layers/comp_+_{top,bot}/components
             comp_search_paths = [
