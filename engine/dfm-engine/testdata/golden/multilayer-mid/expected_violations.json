@@ -4,6 +4,7 @@
     "clearance": 53,
     "component-height": 3,
     "component-spacing": 147,
+    "copper-sliver": 98,
     "drill-size": 500,
     "drill-to-copper": 207,
     "mounting-hole-keepout": 22,
@@ -13,8 +14,8 @@
     "trace-width": 500,
     "via-in-pad": 500
   },
-  "total": 2258,
-  "score": 38,
+  "total": 2356,
+  "score": 36,
   "grade": "F",
   "anchors": [
     {
@@ -124,6 +125,33 @@
       "y": 60.812,
       "measuredMM": 0.5868,
       "limitMM": 1.27
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "L01_TOP",
+      "x": 0.534,
+      "y": 107.276,
+      "measuredMM": 0.0687,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "L01_TOP",
+      "x": 28.557,
+      "y": 39.732,
+      "measuredMM": 0.0577,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "L01_TOP",
+      "x": 162.847,
+      "y": 11.832,
+      "measuredMM": 0.0277,
+      "limitMM": 0.1
     },
     {
       "ruleId": "drill-size",

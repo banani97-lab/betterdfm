@@ -128,7 +128,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | aspect-ratio | ERROR | Board thickness / drill diameter <= maxAspectRatio |
 | solder-mask-dam | WARNING | Solder mask bridge between pads >= minSolderMaskDamMM |
 | edge-clearance | ERROR | Copper distance from board outline >= minEdgeClearanceMM |
-| copper-sliver | WARNING | Copper feature width >= minCopperSliverMM |
+| copper-sliver | WARNING | Un-netted trace width >= minCopperSliverMM, plus pour-boundary self-proximity: two boundary segments of the same polygon (outer ring or holes) closer than the limit with copper between them (midpoint-in-fill test) — webs between clearance voids and fold-back necks. Same-ring pairs within 2x the limit of boundary arc length are adjacency, not necks; approaches under 20µm are encoding artifacts and ignored |
 | mounting-hole-keepout | WARNING | Copper keepout around non-plated mounting holes (>=2mm) >= `profile.MinMountingHoleKeepoutMM` (off when 0). IPC-2221B |
 | silkscreen-on-pad | ERROR | Silkscreen does not overlap pads |
 

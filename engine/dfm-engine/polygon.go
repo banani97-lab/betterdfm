@@ -171,6 +171,30 @@ func (ip *indexedPolygon) segDistWithin(x1, y1, x2, y2, r float64) (float64, boo
 	return best, true
 }
 
+// segClosestPoints returns the closest pair of points between non-intersecting
+// segments AB and CD (one point on each). For intersecting segments it returns
+// one of the endpoint projections, which callers guard against by checking
+// distance > 0 first.
+func segClosestPoints(ax, ay, bx, by, cx, cy, dx, dy float64) (px, py, qx, qy float64) {
+	best := math.MaxFloat64
+	try := func(sx, sy, tx, ty float64) {
+		d := (sx-tx)*(sx-tx) + (sy-ty)*(sy-ty)
+		if d < best {
+			best = d
+			px, py, qx, qy = sx, sy, tx, ty
+		}
+	}
+	x, y := closestPointOnSeg(ax, ay, cx, cy, dx, dy)
+	try(ax, ay, x, y)
+	x, y = closestPointOnSeg(bx, by, cx, cy, dx, dy)
+	try(bx, by, x, y)
+	x, y = closestPointOnSeg(cx, cy, ax, ay, bx, by)
+	try(x, y, cx, cy)
+	x, y = closestPointOnSeg(dx, dy, ax, ay, bx, by)
+	try(x, y, dx, dy)
+	return
+}
+
 // polygonContainsWithHoles reports whether (x, y) is inside poly's outer ring
 // and outside all of its holes. Un-indexed convenience form for single-shot
 // queries; rules doing repeated queries should use newIndexedPolygon.
