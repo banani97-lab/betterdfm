@@ -111,7 +111,16 @@ export function buildPaintList(
       if (!ok(cx) || !ok(cy)) continue
       const w = Math.max(1, p.widthMM * s)
       const h = Math.max(1, p.heightMM * s)
-      if (p.shape === 'RECT') {
+      if (p.shape === 'POLYGON' && p.contour && p.contour.length >= 3) {
+        const pts = p.contour.filter(c => ok(c.x) && ok(c.y)).map(c => ({ x: tx(c.x), y: ty(c.y) }))
+        if (pts.length >= 3) {
+          out.push({ type: 'drawPolygon', points: pts, fillStyle: '#e8c050', close: true })
+          continue
+        }
+        // Degenerate contour: fall through to the bbox rendering below.
+        out.push({ type: 'fillRect', x: cx - w / 2, y: cy - h / 2, w, h, fillStyle: '#e8c050' })
+      } else if (p.shape === 'RECT' || p.shape === 'POLYGON') {
+        // POLYGON without contour (older parser output): bbox fallback.
         out.push({ type: 'fillRect', x: cx - w / 2, y: cy - h / 2, w, h, fillStyle: '#e8c050' })
       } else if (p.shape === 'OVAL' && Math.abs(w - h) > 1) {
         out.push({ type: 'drawEllipse', cx, cy, rx: Math.max(1, w / 2), ry: Math.max(1, h / 2), fillStyle: '#e8c050' })
@@ -199,7 +208,14 @@ export function buildPaintList(
         if (!ok(cx) || !ok(cy)) continue
         const w = Math.max(1, p.widthMM * s)
         const h = Math.max(1, p.heightMM * s)
-        if (p.shape === 'RECT') {
+        if (p.shape === 'POLYGON' && p.contour && p.contour.length >= 3) {
+          const pts = p.contour.filter(c => ok(c.x) && ok(c.y)).map(c => ({ x: tx(c.x), y: ty(c.y) }))
+          if (pts.length >= 3) {
+            out.push({ type: 'drawPolygon', points: pts, fillStyle: '#e8c050', close: true })
+            continue
+          }
+          out.push({ type: 'fillRect', x: cx - w / 2, y: cy - h / 2, w, h, fillStyle: '#e8c050', alpha: 0.9 })
+        } else if (p.shape === 'RECT' || p.shape === 'POLYGON') {
           out.push({ type: 'fillRect', x: cx - w / 2, y: cy - h / 2, w, h, fillStyle: '#e8c050', alpha: 0.9 })
         } else if (p.shape === 'OVAL' && Math.abs(w - h) > 1) {
           out.push({ type: 'drawEllipse', cx, cy, rx: Math.max(1, w / 2), ry: Math.max(1, h / 2), fillStyle: '#e8c050', alpha: 0.9 })

@@ -94,7 +94,7 @@ export interface Violation {
 
 export interface BoardLayer { name: string; type: string; startLayer?: string; endLayer?: string }
 export interface BoardTrace { layer: string; widthMM: number; startX: number; startY: number; endX: number; endY: number; netName: string }
-export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL' | 'DONUT'; holeMM?: number; netName: string; refDes: string; packageClass?: string }
+export interface BoardPad { layer: string; x: number; y: number; widthMM: number; heightMM: number; shape: 'RECT' | 'CIRCLE' | 'OVAL' | 'DONUT' | 'POLYGON'; holeMM?: number; contour?: Array<{ x: number; y: number }>; netName: string; refDes: string; packageClass?: string }
 export interface BoardVia { x: number; y: number; outerDiamMM: number; drillDiamMM: number; layer?: string; netName?: string }
 export interface BoardDrill { x: number; y: number; diamMM: number; plated: boolean; layer?: string }
 export interface BoardPolygon { layer: string; points: Array<{ x: number; y: number }>; holes?: Array<Array<{ x: number; y: number }>>; netName: string }

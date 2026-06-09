@@ -5,21 +5,21 @@
     "clearance": 381,
     "component-height": 1,
     "component-spacing": 500,
-    "copper-sliver": 184,
+    "copper-sliver": 179,
     "drill-size": 500,
     "drill-to-copper": 171,
     "drill-to-drill": 88,
     "edge-clearance": 10,
     "fiducial-placement": 1,
     "pad-size-for-package": 1,
-    "solder-mask-dam": 10,
+    "solder-mask-dam": 2,
     "through-hole-on-bottom": 1,
     "trace-imbalance": 90,
     "trace-width": 500,
     "via-in-pad": 500
   },
-  "total": 19606,
-  "score": 32,
+  "total": 19593,
+  "score": 34,
   "grade": "F",
   "anchors": [
     {
@@ -125,9 +125,9 @@
       "ruleId": "component-spacing",
       "severity": "WARNING",
       "layer": "SIGNAL_1",
-      "x": 41.035,
-      "y": 22.812,
-      "measuredMM": 0.7333,
+      "x": 41.03,
+      "y": 3.3,
+      "measuredMM": 0.2,
       "limitMM": 1.27
     },
     {
@@ -152,8 +152,8 @@
       "ruleId": "copper-sliver",
       "severity": "WARNING",
       "layer": "SIGNAL_3",
-      "x": 38.927,
-      "y": 21.415,
+      "x": 39.169,
+      "y": 29.896,
       "measuredMM": 0.1,
       "limitMM": 0.1
     },
@@ -296,18 +296,9 @@
       "ruleId": "solder-mask-dam",
       "severity": "WARNING",
       "layer": "SIGNAL_1",
-      "x": 40.944,
-      "y": 10.824,
-      "measuredMM": 0.074,
-      "limitMM": 0.1
-    },
-    {
-      "ruleId": "solder-mask-dam",
-      "severity": "WARNING",
-      "layer": "SIGNAL_1",
-      "x": 48.417,
-      "y": 21.06,
-      "measuredMM": 0.0355,
+      "x": 41.9,
+      "y": 21.193,
+      "measuredMM": 0,
       "limitMM": 0.1
     },
     {

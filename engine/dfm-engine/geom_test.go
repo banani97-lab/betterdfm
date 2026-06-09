@@ -236,3 +236,79 @@ func TestClosestPointOnSeg(t *testing.T) {
 		}
 	}
 }
+
+// ── POLYGON contour geometry (contour pads, P1) ──────────────────────────────
+
+// lShapePad returns an L-shaped POLYGON pad: outer corner at (0,0), arms 4 wide
+// x 1 tall and 1 wide x 3 tall. Bbox 4x3, center at (2, 1.5).
+func lShapePad() Pad {
+	return Pad{
+		X: 2, Y: 1.5, WidthMM: 4, HeightMM: 3, Shape: "POLYGON",
+		Contour: []Point{{0, 0}, {4, 0}, {4, 1}, {1, 1}, {1, 3}, {0, 3}},
+	}
+}
+
+func TestPadClosestPoint_Polygon(t *testing.T) {
+	pad := lShapePad()
+	cases := []struct {
+		px, py float64
+		wx, wy float64
+		desc   string
+	}{
+		{0.5, 0.5, 0.5, 0.5, "inside → the point itself"},
+		{5, 0.5, 4, 0.5, "right of the lower arm → on its edge"},
+		{3, 3, 3, 1, "in the bbox notch → lower-arm top edge (inside bbox, outside contour)"},
+		{-1, -1, 0, 0, "outside corner → contour vertex"},
+	}
+	for _, c := range cases {
+		gx, gy := padClosestPoint(pad, c.px, c.py)
+		if math.Abs(gx-c.wx) > 1e-9 || math.Abs(gy-c.wy) > 1e-9 {
+			t.Errorf("%s: padClosestPoint(%.1f,%.1f) = (%f,%f), want (%f,%f)",
+				c.desc, c.px, c.py, gx, gy, c.wx, c.wy)
+		}
+	}
+}
+
+func TestPadClosestPoint_Polygon_NoContourFallback(t *testing.T) {
+	pad := Pad{X: 0, Y: 0, WidthMM: 2, HeightMM: 2, Shape: "POLYGON"}
+	gx, gy := padClosestPoint(pad, 3, 0)
+	if math.Abs(gx-1) > 1e-9 || math.Abs(gy) > 1e-9 {
+		t.Errorf("fallback circle: got (%f,%f), want (1,0)", gx, gy)
+	}
+}
+
+func TestPadProjection_Polygon(t *testing.T) {
+	pad := lShapePad()
+	// Along +X from the center at (2,1.5): farthest vertices are x=0 and x=4,
+	// both 2 away from center.
+	if got := padProjection(pad, 1, 0); math.Abs(got-2) > 1e-9 {
+		t.Errorf("projection on x = %f, want 2", got)
+	}
+	// Along +Y: farthest vertex is y=3 (or y=0), 1.5 from center.
+	if got := padProjection(pad, 0, 1); math.Abs(got-1.5) > 1e-9 {
+		t.Errorf("projection on y = %f, want 1.5", got)
+	}
+}
+
+func TestPadToPadGap_PolygonRect(t *testing.T) {
+	l := lShapePad()
+	// RECT to the right of the lower arm: left edge at x=5 → 1mm gap to x=4.
+	r := Pad{X: 5.5, Y: 0.5, WidthMM: 1, HeightMM: 1, Shape: "RECT"}
+	if got := padToPadGap(l, r); math.Abs(got-1) > 1e-9 {
+		t.Errorf("polygon-rect gap = %f, want 1", got)
+	}
+}
+
+func TestPadToPadGap_PolygonContourBeatsBbox(t *testing.T) {
+	// A pad sitting in the L's notch: bbox (4x3 centered at 2,1.5) overlaps
+	// it, but the true contour is 1mm away. The bbox approximation would
+	// false-positive a clearance violation here.
+	l := lShapePad()
+	p := Pad{X: 3, Y: 2.5, WidthMM: 1, HeightMM: 1, Shape: "RECT"}
+	got := padToPadGap(l, p)
+	// Nearest contour edge is the vertical x=1 arm edge... actually the
+	// horizontal y=1 edge of the lower arm: rect bottom at y=2, edge at y=1.
+	if math.Abs(got-1) > 1e-6 {
+		t.Errorf("notch gap = %f, want 1 (bbox would give 0)", got)
+	}
+}

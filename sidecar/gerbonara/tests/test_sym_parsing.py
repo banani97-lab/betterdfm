@@ -141,17 +141,23 @@ def test_parse_symbol_table_mm(tmp_path):
 
 # ── Custom (special_*) symbol geometry ────────────────────────────────────────
 
-def test_scan_custom_symbol_uses_bbox():
-    """A custom symbol's features file → RECT with the union bbox of its surfaces.
+def test_scan_custom_symbol_emits_polygon_with_bbox_dims():
+    """A custom symbol's features file → POLYGON contour + union-bbox w/h.
 
     Without this fallback, names like `special_*_domekey_outer_*` lose their
-    encoded geometry and shrink to a 0.1mm circle in the renderer.
+    encoded geometry and shrink to a 0.1mm circle in the renderer. w/h stay
+    the bbox because every existing consumer (renderer fallback, sweep
+    windows, padstack OD capture) keys off them.
     """
     shape = _scan_custom_symbol(FIXTURES / "custom_symbol_features.txt", "MM")
     assert shape is not None
-    assert shape["shape"] == "RECT"
+    assert shape["shape"] == "POLYGON"
     assert shape["w"] == pytest.approx(5.0, abs=0.01)
     assert shape["h"] == pytest.approx(3.0, abs=0.01)
+    assert {(round(x, 3), round(y, 3)) for x, y in shape["contour"]} == {
+        (0.0, 0.0), (5.0, 0.0), (5.0, 3.0), (0.0, 3.0)
+    }
+    assert shape["multi_ring"] is False
 
 
 def test_load_custom_symbols_returns_empty_for_missing_dir(tmp_path):
@@ -186,6 +192,6 @@ def test_load_custom_symbols_scans_dir_and_lowercases(tmp_path):
     out = _load_custom_symbols(tmp_path, "MM")
     assert "MyWidget" in out
     assert "mywidget" in out  # lowercased so _parse_sym's lower() lookup succeeds
-    assert out["MyWidget"]["shape"] == "RECT"
+    assert out["MyWidget"]["shape"] == "POLYGON"
     assert out["MyWidget"]["w"] == pytest.approx(4.0)
     assert out["MyWidget"]["h"] == pytest.approx(2.0)
