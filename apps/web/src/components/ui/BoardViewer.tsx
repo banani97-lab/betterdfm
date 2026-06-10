@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useState, useCallback, useMemo, useEffect } from 'react'
-import { ZoomIn, ZoomOut, Home, Layers, Grid3X3, RotateCw } from 'lucide-react'
+import { AlertTriangle, ZoomIn, ZoomOut, Home, Layers, Grid3X3, RotateCw } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { Violation, BoardData } from '@/lib/api'
 
@@ -35,6 +35,8 @@ interface BoardViewerProps {
 interface Bounds {
   minX: number; minY: number; maxX: number; maxY: number
   scale: number; offX: number; offY: number
+  /** True when the board data carried no usable geometry (degenerate fallback bounds). */
+  empty?: boolean
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -90,11 +92,12 @@ function getLayerColor(layerName: string): string {
 
 // ── Bounds computation ────────────────────────────────────────────────────────
 
-function computeBounds(boardData: BoardData): Bounds {
+function computeBounds(boardData: BoardData | null | undefined): Bounds | null {
+  if (!boardData) return null
   const xs: number[] = []
   const ys: number[] = []
 
-  if (boardData.outline?.length > 0) {
+  if (boardData.outline && boardData.outline.length > 0) {
     for (const pt of boardData.outline) {
       if (ok(pt.x) && ok(pt.y)) { xs.push(pt.x); ys.push(pt.y) }
     }
@@ -108,7 +111,9 @@ function computeBounds(boardData: BoardData): Bounds {
     for (const d of boardData.drills ?? []) { if (ok(d.x) && ok(d.y)) { xs.push(d.x); ys.push(d.y) } }
   }
 
-  if (xs.length === 0) return { minX: 0, minY: 0, maxX: 100, maxY: 70, scale: 5, offX: 50, offY: 50 }
+  // Degenerate: parsed board has no usable geometry. Callers should render an
+  // explicit empty-board state rather than the blank fallback rectangle.
+  if (xs.length === 0) return { minX: 0, minY: 0, maxX: 100, maxY: 70, scale: 5, offX: 50, offY: 50, empty: true }
 
   const minX = Math.min(...xs)
   const minY = Math.min(...ys)
@@ -127,12 +132,12 @@ function computeBounds(boardData: BoardData): Bounds {
 // ── Canvas drawing helpers ────────────────────────────────────────────────────
 
 /** Builds the board outline path (polygon from outline pts or fallback rect). */
-function boardOutlinePath(ctx: CanvasRenderingContext2D, boardData: BoardData, b: Bounds) {
+function boardOutlinePath(ctx: CanvasRenderingContext2D, boardData: BoardData | null | undefined, b: Bounds) {
   const { minX, minY, maxX, maxY, scale: s, offX, offY } = b
   const tx = (x: number) => (x - minX) * s + offX
   const ty = (y: number) => (maxY - y) * s + offY   // flip Y: ODB++ Y-up → canvas Y-down
   ctx.beginPath()
-  if (boardData.outline?.length > 1) {
+  if (boardData?.outline && boardData.outline.length > 1) {
     const pts = boardData.outline.filter(p => ok(p.x) && ok(p.y))
     if (pts.length > 1) {
       ctx.moveTo(tx(pts[0].x), ty(pts[0].y))
@@ -145,7 +150,7 @@ function boardOutlinePath(ctx: CanvasRenderingContext2D, boardData: BoardData, b
 }
 
 /** Step 2: FR4 substrate fill. */
-function drawBoardFill(ctx: CanvasRenderingContext2D, boardData: BoardData, b: Bounds) {
+function drawBoardFill(ctx: CanvasRenderingContext2D, boardData: BoardData | null | undefined, b: Bounds) {
   boardOutlinePath(ctx, boardData, b)
   ctx.fillStyle = '#1a2e1a'
   ctx.fill()
@@ -374,11 +379,12 @@ function drawRouting(
  *  Pad openings (exposed copper) are rendered as gold spots from the mask-layer pads. */
 function drawSoldermask(
   ctx: CanvasRenderingContext2D,
-  boardData: BoardData,
+  boardData: BoardData | null | undefined,
   b: Bounds,
   padsByLayer: Record<string, NonNullable<BoardData['pads']>>,
   hiddenLayers: Set<string>,
 ) {
+  if (!boardData) return
   const hasMaskVisible = boardData.layers?.some(
     l => isMaskLayer(l.name.toLowerCase()) && !hiddenLayers.has(l.name)
   ) ?? false
@@ -454,7 +460,7 @@ function drawSilkscreen(
 }
 
 /** Step 9: board edge outline with green glow. */
-function drawBoardEdge(ctx: CanvasRenderingContext2D, boardData: BoardData, b: Bounds) {
+function drawBoardEdge(ctx: CanvasRenderingContext2D, boardData: BoardData | null | undefined, b: Bounds) {
   ctx.save()
   ctx.shadowColor = '#50ff80'
   ctx.shadowBlur = 8
@@ -727,7 +733,11 @@ export function BoardViewer({
 
   // ── Derived data ────────────────────────────────────────────────────────────
 
-  const bounds = useMemo(() => boardData ? computeBounds(boardData) : null, [boardData])
+  const bounds = useMemo(() => computeBounds(boardData), [boardData])
+  // Board data arrived but contained no drawable geometry (no outline, no
+  // traces/pads/vias/drills). Rendered as an explicit message instead of a
+  // blank board rectangle so it isn't mistaken for a healthy empty board.
+  const boardEmpty = !!boardData && !!bounds?.empty
   const layers = useMemo(() => boardData?.layers ?? [], [boardData])
 
   const tracesByLayer = useMemo(() => {
@@ -778,7 +788,7 @@ export function BoardViewer({
       ctx.translate(-600, -400)
     }
 
-    if (bounds && boardData) {
+    if (bounds && boardData && !bounds.empty) {
       drawBoardFill(ctx, boardData, bounds)                               // 2: FR4
       drawCopper(ctx, bounds, tracesByLayer, padsByLayer, boardData, hiddenLayers, polygonsByLayer,
         rotationRef.current === 0 ? zoomRef.current : 0,  // disable viewport culling when rotated
@@ -789,13 +799,14 @@ export function BoardViewer({
       drawBoardEdge(ctx, boardData, bounds)                               // 9: edge glow
     }
 
-    if (gridEnabled && bounds) drawGrid(ctx, bounds, zoomRef.current)    // 10: grid
+    const usableBounds = bounds && !bounds.empty ? bounds : null
+    if (gridEnabled && usableBounds) drawGrid(ctx, usableBounds, zoomRef.current) // 10: grid
 
     const selectedViolation = violations.find(v => v.id === selectedViolationId)
     const focusMode = !!selectedViolation
-    drawViolations(ctx, bounds, violations, selectedViolationId, focusMode) // 11: markers
-    if (selectedViolation && bounds) {
-      drawComponentHighlight(ctx, bounds, boardData?.pads ?? [], selectedViolation) // 11b: component
+    drawViolations(ctx, usableBounds, violations, selectedViolationId, focusMode) // 11: markers
+    if (selectedViolation && usableBounds) {
+      drawComponentHighlight(ctx, usableBounds, boardData?.pads ?? [], selectedViolation) // 11b: component
     }
 
     ctx.restore()
@@ -1115,8 +1126,8 @@ export function BoardViewer({
       draw()
     }
 
-    // Coordinate readout in board mm
-    if (bounds && canvasRef.current) {
+    // Coordinate readout in board mm (suppressed for degenerate empty bounds)
+    if (bounds && !bounds.empty && canvasRef.current) {
       const rect = canvasRef.current.getBoundingClientRect()
       const sx = e.clientX - rect.left
       const sy = e.clientY - rect.top
@@ -1342,6 +1353,17 @@ export function BoardViewer({
           <span className="text-xs font-medium" style={{ color: '#44aaff' }}>INFO</span>
         </div>
       </div>
+
+      {/* Empty board — parsed data carried no drawable geometry */}
+      {boardEmpty && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 pointer-events-none">
+          <AlertTriangle className="h-8 w-8 text-yellow-500" />
+          <p className="text-sm font-medium text-gray-200">Board appears empty</p>
+          <p className="text-xs text-gray-400 text-center px-6 max-w-sm">
+            No outline, traces, or pads were found — the file may not have parsed correctly.
+          </p>
+        </div>
+      )}
 
       {/* Coordinate readout */}
       {mouseCoords && (

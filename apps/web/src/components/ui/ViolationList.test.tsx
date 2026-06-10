@@ -120,6 +120,35 @@ describe('ViolationList', () => {
     }
   })
 
+  it('shows a positive clean-board state when there are no violations at all', () => {
+    render(
+      <ViolationList
+        violations={[]}
+        allViolations={[]}
+        {...defaultProps}
+      />
+    )
+    expect(screen.getByText('No issues found')).toBeInTheDocument()
+    expect(screen.getByText('This board passed all DFM checks.')).toBeInTheDocument()
+    expect(screen.queryByText(/No violations match this filter/i)).not.toBeInTheDocument()
+  })
+
+  it('shows the empty-filter state when violations exist but none match the active tab', () => {
+    const allViols = [
+      makeViolation({ id: 'v1', severity: 'WARNING', message: 'Warning msg' }),
+    ]
+    render(
+      <ViolationList
+        violations={[]} // ERROR tab active, but only WARNINGs exist
+        allViolations={allViols}
+        filter="ERROR"
+        onFilterChange={vi.fn()}
+      />
+    )
+    expect(screen.getByText('No violations match this filter')).toBeInTheDocument()
+    expect(screen.queryByText('No issues found')).not.toBeInTheDocument()
+  })
+
   it('hides rule chips with no violations in the active severity', () => {
     const allViols = [
       makeViolation({ id: 'v1', ruleId: 'trace-width', severity: 'ERROR', message: 'TW error' }),
