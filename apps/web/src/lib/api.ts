@@ -189,6 +189,21 @@ export interface UsageSummary {
 
 // ── Fetch helper ─────────────────────────────────────────────────────────────
 
+/**
+ * Typed error thrown by apiFetch/shareFetch for any non-2xx response. Callers
+ * should branch on `status` (`e instanceof ApiError && e.status === 404`)
+ * instead of string-matching the message.
+ */
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const token = getStoredToken()
   const res = await fetch(`${API_URL}${path}`, {
@@ -202,15 +217,17 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   if (res.status === 401) {
     clearToken()
     window.location.replace('/login')
-    return undefined as T
+    // Throw so callers never proceed with undefined data while the redirect
+    // is in flight.
+    throw new ApiError(`API ${path}: 401 Unauthorized`, 401)
   }
   if (res.status === 403) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(text || `API ${path}: 403 Forbidden`)
+    throw new ApiError(text || `API ${path}: 403 Forbidden`, 403)
   }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${path}: ${res.status} ${text}`)
+    throw new ApiError(`API ${path}: ${res.status} ${text}`, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -259,6 +276,7 @@ export function uploadToS3(
     }
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', presignedUrl)
+    xhr.timeout = 120_000
     if (onProgress) {
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
@@ -266,8 +284,13 @@ export function uploadToS3(
     }
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`S3 upload failed: ${xhr.status}`))
+      else if (xhr.status === 307 || xhr.status === 308) {
+        reject(new Error('Upload link expired — please try again.'))
+      } else reject(new Error(`S3 upload failed: ${xhr.status}`))
     })
+    xhr.addEventListener('timeout', () =>
+      reject(new Error('Upload timed out. Check your connection and try again.'))
+    )
     xhr.addEventListener('error', () => reject(new Error('S3 upload network error')))
     xhr.send(file)
   })
@@ -573,7 +596,7 @@ async function shareFetch<T>(token: string, path: string, init?: RequestInit): P
   })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Share API ${path}: ${res.status} ${text}`)
+    throw new ApiError(`Share API ${path}: ${res.status} ${text}`, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json()
