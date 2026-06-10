@@ -11,6 +11,15 @@
  * keeps the code simple and fast.
  */
 
+/**
+ * Hard cap on total folder content. Everything is buffered in memory before
+ * upload, and the upload path itself rejects payloads this large anyway.
+ */
+export const MAX_FOLDER_BYTES = 500 * 1024 * 1024 // 500 MB
+
+export const FOLDER_TOO_LARGE_MSG =
+  'Folder exceeds 500 MB — compress it and upload as an archive instead.'
+
 interface TarEntry {
   /** Relative path inside the archive (e.g. "my-board/steps/pcb/layers/..."). */
   path: string
@@ -33,20 +42,40 @@ function encodeOctal(value: number, len: number): Uint8Array<ArrayBuffer> {
   return encodeString(str, len)
 }
 
+/**
+ * Validate a path and split it into the ustar name (<=99 chars) and prefix
+ * (<=154 chars) fields. Throws a clear error instead of silently truncating
+ * paths that don't fit, and rejects null bytes (which would corrupt the
+ * null-terminated header fields).
+ *
+ * Exported for tests.
+ */
+export function splitTarPath(path: string): { name: string; prefix: string } {
+  if (path.includes('\0')) {
+    throw new Error(`Invalid file path in folder (contains a null byte): "${path.replace(/\0/g, '\\0')}"`)
+  }
+  // encodeString reserves one byte for the null terminator, so the usable
+  // capacity is name <= 99 and prefix <= 154.
+  if (path.length <= 99) return { name: path, prefix: '' }
+  const split = path.lastIndexOf('/', 154)
+  if (split > 0) {
+    const prefix = path.slice(0, split)
+    const name = path.slice(split + 1)
+    if (name.length <= 99) return { name, prefix }
+  }
+  throw new Error(
+    `File path is too long to archive: "${path}". ` +
+      'Shorten the folder or file names, or compress the folder yourself and upload the archive instead.',
+  )
+}
+
 /** Build a 512-byte ustar header for a single file entry. */
 function buildHeader(entry: TarEntry): Uint8Array<ArrayBuffer> {
   const header = new Uint8Array(512) as Uint8Array<ArrayBuffer>
 
-  // For paths > 100 chars, split into prefix (155) + name (100).
-  let name = entry.path
-  let prefix = ''
-  if (name.length > 100) {
-    const split = name.lastIndexOf('/', 155)
-    if (split > 0) {
-      prefix = name.slice(0, split)
-      name = name.slice(split + 1)
-    }
-  }
+  // For paths > 99 chars, split into prefix (154) + name (99). Throws on
+  // paths that don't fit rather than silently truncating.
+  const { name, prefix } = splitTarPath(entry.path)
 
   header.set(encodeString(name, 100), 0)          // name
   header.set(encodeOctal(0o644, 8), 100)           // mode
@@ -105,10 +134,14 @@ export function createTar(entries: TarEntry[]): Blob {
  * Recursively read all files from a `FileSystemDirectoryEntry` (drag-and-drop API).
  * Returns a flat list of `{ path, file }` where `path` is the relative path
  * from the drop root (e.g. "my-board/steps/pcb/layers/l01_top/features").
+ *
+ * Aborts with a clear error as soon as the accumulated file size exceeds
+ * MAX_FOLDER_BYTES, before everything gets buffered into memory.
  */
 export async function readDirectoryEntry(
   dirEntry: FileSystemDirectoryEntry,
   basePath = '',
+  totals: { bytes: number } = { bytes: 0 },
 ): Promise<{ path: string; file: File }[]> {
   const results: { path: string; file: File }[] = []
   const prefix = basePath ? `${basePath}/${dirEntry.name}` : dirEntry.name
@@ -119,19 +152,35 @@ export async function readDirectoryEntry(
   let batch: FileSystemEntry[] = []
   do {
     batch = await new Promise<FileSystemEntry[]>((resolve, reject) =>
-      reader.readEntries(resolve, reject),
+      reader.readEntries(resolve, (err) =>
+        reject(
+          new Error(
+            `Could not read folder "${prefix}" — the browser was denied access. ` +
+              `Check the folder's permissions, or compress it and upload the archive instead. (${err?.name ?? 'unknown error'})`,
+          ),
+        ),
+      ),
     )
     for (const entry of batch) {
       if (entry.isFile) {
         const fileEntry = entry as FileSystemFileEntry
         const file = await new Promise<File>((resolve, reject) =>
-          fileEntry.file(resolve, reject),
+          fileEntry.file(resolve, (err) =>
+            reject(
+              new Error(
+                `Could not read file "${prefix}/${entry.name}" — it may be locked by another program or you may not have permission to access it. (${err?.name ?? 'unknown error'})`,
+              ),
+            ),
+          ),
         )
+        totals.bytes += file.size
+        if (totals.bytes > MAX_FOLDER_BYTES) throw new Error(FOLDER_TOO_LARGE_MSG)
         results.push({ path: `${prefix}/${entry.name}`, file })
       } else if (entry.isDirectory) {
         const subResults = await readDirectoryEntry(
           entry as FileSystemDirectoryEntry,
           prefix,
+          totals,
         )
         results.push(...subResults)
       }
@@ -147,6 +196,9 @@ export async function readDirectoryEntry(
  * Accepts either:
  * - The output of `readDirectoryEntry` (drag-and-drop)
  * - A `FileList` from an `<input webkitdirectory>` element (uses `webkitRelativePath`)
+ *
+ * Validates total size and every path BEFORE buffering file contents, so
+ * oversized folders and unarchivable paths fail fast with a clear message.
  */
 export async function packageFilesAsTar(
   files: { path: string; file: File }[] | FileList,
@@ -162,10 +214,20 @@ export async function packageFilesAsTar(
     entries = files
   }
 
+  const totalBytes = entries.reduce((sum, e) => sum + e.file.size, 0)
+  if (totalBytes > MAX_FOLDER_BYTES) throw new Error(FOLDER_TOO_LARGE_MSG)
+
+  // Validate every path up front so we fail before reading file contents.
+  for (const { path } of entries) splitTarPath(path)
+
   const tarEntries: TarEntry[] = await Promise.all(
     entries.map(async ({ path, file }) => ({
       path,
-      data: await file.arrayBuffer(),
+      data: await file.arrayBuffer().catch(() => {
+        throw new Error(
+          `Could not read file "${path}" — it may have been moved, locked by another program, or you may not have permission to access it.`,
+        )
+      }),
     })),
   )
 
