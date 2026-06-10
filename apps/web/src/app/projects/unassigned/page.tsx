@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { Inbox } from 'lucide-react'
+import { Inbox, Loader2, XCircle } from 'lucide-react'
 import { getSubmissions, getProjects, moveSubmissionToProject, type Submission, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -120,6 +120,14 @@ export default function UnassignedSubmissionsPage() {
                       {s.mfgScore}
                       <span className="ml-1 opacity-85">{s.mfgGrade}</span>
                     </div>
+                  ) : s.status === 'ANALYZING' ? (
+                    <Badge variant="info" className="text-sm px-3 py-1.5">
+                      <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Analyzing
+                    </Badge>
+                  ) : s.status === 'FAILED' ? (
+                    <Badge variant="destructive" className="text-sm px-3 py-1.5">
+                      <XCircle className="h-3.5 w-3.5 mr-1.5" /> Failed
+                    </Badge>
                   ) : (
                     <Badge variant="info" className="text-sm px-3 py-1.5">{s.status}</Badge>
                   )}

@@ -5,6 +5,7 @@ import {
   NotAuthorizedException,
   UserNotFoundException,
 } from '@aws-sdk/client-cognito-identity-provider'
+import { setRefreshCookie } from '../refresh-cookie'
 
 const REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-1'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
@@ -39,7 +40,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })
     }
 
-    return NextResponse.json({ token })
+    // Keep the refresh token out of the JSON body — it lives only in an
+    // httpOnly cookie, consumed by /api/auth/refresh.
+    const response = NextResponse.json({ token })
+    const refresh = res.AuthenticationResult?.RefreshToken
+    if (refresh) setRefreshCookie(response, refresh)
+    return response
   } catch (err) {
     if (err instanceof NotAuthorizedException || err instanceof UserNotFoundException) {
       return NextResponse.json({ error: 'Incorrect email or password' }, { status: 401 })

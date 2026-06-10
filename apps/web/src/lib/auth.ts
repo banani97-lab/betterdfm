@@ -22,6 +22,10 @@ export function isDevMode(): boolean {
 
 // ── Token storage ─────────────────────────────────────────────────────────────
 
+function decodeJwtPayload(token: string): Record<string, unknown> {
+  return JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+}
+
 export function getStoredToken(): string | null {
   return getStoredValue(TOKEN_STORAGE_KEY, LEGACY_TOKEN_STORAGE_KEY)
 }
@@ -35,12 +39,26 @@ export function clearToken(): void {
   analyticsReset()
 }
 
+/**
+ * User-initiated sign out: clears the local token and (best-effort) the
+ * httpOnly refresh cookie. The localStorage clear never depends on the
+ * server call succeeding.
+ */
+export function signOut(): void {
+  if (!isDevMode()) {
+    fetch('/api/auth/signout', { method: 'POST' }).catch(() => {
+      // Fire-and-forget — the cookie expires on its own after 30 days.
+    })
+  }
+  clearToken()
+}
+
 export function isTokenValid(): boolean {
   if (isDevMode()) return true
   const token = getStoredToken()
   if (!token) return false
   try {
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const payload = decodeJwtPayload(token)
     return typeof payload.exp === 'number' && payload.exp * 1000 > Date.now()
   } catch {
     return false
@@ -58,7 +76,7 @@ export function getUserRole(): 'ADMIN' | 'ANALYST' | 'VIEWER' {
   const token = getStoredToken()
   if (!token) return 'VIEWER'
   try {
-    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const payload = decodeJwtPayload(token)
     const role = payload['custom:role']
     if (role === 'ADMIN' || role === 'ANALYST' || role === 'VIEWER') return role
     return 'ANALYST' // default matches backend
@@ -71,6 +89,57 @@ export function getUserRole(): 'ADMIN' | 'ANALYST' | 'VIEWER' {
 export function canWrite(): boolean {
   const role = getUserRole()
   return role === 'ADMIN' || role === 'ANALYST'
+}
+
+// ── Silent token refresh ──────────────────────────────────────────────────────
+// The Cognito refresh token lives in an httpOnly cookie scoped to /api/auth;
+// POST /api/auth/refresh exchanges it for a fresh ID token. In dev mode
+// (no client id) there is no real token to refresh, so everything no-ops.
+
+const TOKEN_EXPIRY_SKEW_MS = 2 * 60 * 1000
+
+/** True when the stored token expires within ~2 minutes (or already has). */
+export function isTokenExpiringSoon(): boolean {
+  if (isDevMode()) return false
+  const token = getStoredToken()
+  if (!token) return false
+  try {
+    const payload = decodeJwtPayload(token)
+    return (
+      typeof payload.exp === 'number' && payload.exp * 1000 - Date.now() < TOKEN_EXPIRY_SKEW_MS
+    )
+  } catch {
+    return false
+  }
+}
+
+let refreshInFlight: Promise<string | null> | null = null
+
+/**
+ * Exchange the httpOnly refresh cookie for a new ID token. Stores and returns
+ * the new token on success; returns null on any failure (no cookie, revoked
+ * refresh token, network error). Single-flight: concurrent callers share one
+ * in-flight request so parallel 401s trigger exactly one refresh.
+ */
+export function refreshToken(): Promise<string | null> {
+  if (isDevMode()) return Promise.resolve(null)
+  if (refreshInFlight) return refreshInFlight
+  refreshInFlight = (async () => {
+    try {
+      const res = await fetch('/api/auth/refresh', { method: 'POST' })
+      if (!res.ok) return null
+      const data = await res.json().catch(() => null)
+      const token = data?.token
+      if (typeof token !== 'string' || !token) return null
+      setStoredToken(token)
+      return token
+    } catch {
+      return null
+    } finally {
+      refreshInFlight = null
+    }
+  })()
+  return refreshInFlight
 }
 
 // ── Sign in via server-side proxy ─────────────────────────────────────────────

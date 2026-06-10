@@ -1,4 +1,4 @@
-import { getStoredToken, clearToken } from './auth'
+import { getStoredToken, clearToken, isDevMode, isTokenExpiringSoon, refreshToken } from './auth'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -189,28 +189,65 @@ export interface UsageSummary {
 
 // ── Fetch helper ─────────────────────────────────────────────────────────────
 
+/**
+ * Typed error thrown by apiFetch/shareFetch for any non-2xx response. Callers
+ * should branch on `status` (`e instanceof ApiError && e.status === 404`)
+ * instead of string-matching the message.
+ */
+export class ApiError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getStoredToken()
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  })
+  // Request bodies here are always JSON strings (never streams), so the same
+  // init can safely be sent twice for the post-refresh retry below.
+  const doFetch = (token: string | null) =>
+    fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    })
+
+  let token = getStoredToken()
+  // Proactive refresh: when the token is within ~2 min of expiry, renew it
+  // first so the request doesn't burn a round-trip on a guaranteed 401.
+  if (!isDevMode() && token && isTokenExpiringSoon()) {
+    token = (await refreshToken()) ?? token
+  }
+
+  let res = await doFetch(token)
+
+  if (res.status === 401 && !isDevMode()) {
+    // The ID token likely just expired — silently refresh via the httpOnly
+    // cookie and retry the original request once.
+    const newToken = await refreshToken()
+    if (newToken) res = await doFetch(newToken)
+  }
+
   if (res.status === 401) {
+    // Refresh failed (or the retry also came back 401) — give up the session.
     clearToken()
     window.location.replace('/login')
-    return undefined as T
+    // Throw so callers never proceed with undefined data while the redirect
+    // is in flight.
+    throw new ApiError(`API ${path}: 401 Unauthorized`, 401)
   }
   if (res.status === 403) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(text || `API ${path}: 403 Forbidden`)
+    throw new ApiError(text || `API ${path}: 403 Forbidden`, 403)
   }
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`API ${path}: ${res.status} ${text}`)
+    throw new ApiError(`API ${path}: ${res.status} ${text}`, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json()
@@ -221,6 +258,10 @@ async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
 export async function getSubmissions(opts?: { unassigned?: boolean }): Promise<Submission[]> {
   const qs = opts?.unassigned ? '?unassigned=true' : ''
   return apiFetch<Submission[]>(`/submissions${qs}`)
+}
+
+export async function getSubmission(id: string): Promise<Submission> {
+  return apiFetch<Submission>(`/submissions/${id}`)
 }
 
 export async function createSubmission(
@@ -265,6 +306,7 @@ export function uploadToS3(
     }
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', presignedUrl)
+    xhr.timeout = 120_000
     if (onProgress) {
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))
@@ -272,8 +314,13 @@ export function uploadToS3(
     }
     xhr.addEventListener('load', () => {
       if (xhr.status >= 200 && xhr.status < 300) resolve()
-      else reject(new Error(`S3 upload failed: ${xhr.status}`))
+      else if (xhr.status === 307 || xhr.status === 308) {
+        reject(new Error('Upload link expired — please try again.'))
+      } else reject(new Error(`S3 upload failed: ${xhr.status}`))
     })
+    xhr.addEventListener('timeout', () =>
+      reject(new Error('Upload timed out. Check your connection and try again.'))
+    )
     xhr.addEventListener('error', () => reject(new Error('S3 upload network error')))
     xhr.send(file)
   })
@@ -580,7 +627,7 @@ async function shareFetch<T>(token: string, path: string, init?: RequestInit): P
   })
   if (!res.ok) {
     const text = await res.text().catch(() => res.statusText)
-    throw new Error(`Share API ${path}: ${res.status} ${text}`)
+    throw new ApiError(`Share API ${path}: ${res.status} ${text}`, res.status)
   }
   if (res.status === 204) return undefined as T
   return res.json()

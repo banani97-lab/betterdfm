@@ -1,6 +1,8 @@
 import type { Metadata } from 'next'
+import { AuthSync } from '@/components/ui/AuthSync'
 import { ThemeInit } from '@/components/ui/ThemeInit'
 import { AnalyticsPageView } from '@/components/ui/AnalyticsPageView'
+import { Toaster } from '@/components/ui/Toaster'
 import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
 import lightFavicon from '@/app/dashboard/RapidDFM Light Mode Favicon.png'
 import {
@@ -68,8 +70,10 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-background font-sans antialiased">
         <ThemeInit />
+        <AuthSync />
         <AnalyticsPageView />
         {children}
+        <Toaster />
       </body>
     </html>
   )

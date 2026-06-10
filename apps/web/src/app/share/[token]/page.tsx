@@ -14,6 +14,7 @@ import {
   sharedUpload,
   sharedAnalyze,
   uploadToS3,
+  ApiError,
   type ShareInfo,
   type AnalysisJob,
   type Violation,
@@ -107,9 +108,9 @@ export default function SharedPage() {
           setSubmissions(subs ?? [])
         }
       } catch (e: unknown) {
-        if (e instanceof Error && e.message.includes('410')) {
+        if (e instanceof ApiError && e.status === 410) {
           setError('This share link has expired.')
-        } else if (e instanceof Error && e.message.includes('404')) {
+        } else if (e instanceof ApiError && e.status === 404) {
           setError('This share link is not valid or has been deactivated.')
         } else {
           setError(e instanceof Error ? e.message : 'Failed to load shared content')

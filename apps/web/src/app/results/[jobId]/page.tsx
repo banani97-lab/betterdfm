@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Download, AlertCircle, AlertTriangle, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, GitCompareArrows, Info, ListFilter } from 'lucide-react'
-import { API_URL, getJob, getViolations, getBoardData, fetchBoardFromUrl, fetchViolationsFromUrl, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
+import { API_URL, ApiError, getJob, getViolations, getBoardData, fetchBoardFromUrl, fetchViolationsFromUrl, getSubmissions, getProjectSubmissions, patchViolation, ignoreLayerViolations, type AnalysisJob, type Submission, type Violation, type BoardData } from '@/lib/api'
 import { isLoggedIn, canWrite, getStoredToken } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
@@ -15,12 +15,23 @@ import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
+import { toast } from '@/lib/toast'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
   if (n >= 75) return '#ca8a04'
   if (n >= 60) return '#ea580c'
   return '#dc2626'
+}
+
+const JOB_POLL_MS = 4000
+
+function describeLoadError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 404) return "This analysis doesn't exist or was deleted."
+    if (e.status === 403) return "You don't have permission to view this analysis."
+  }
+  return e instanceof Error ? `Failed to load results: ${e.message}` : 'Failed to load results'
 }
 
 export default function ResultsPage() {
@@ -32,6 +43,7 @@ export default function ResultsPage() {
   const [selectedId, setSelectedId] = useState<string | undefined>()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [boardError, setBoardError] = useState(false)
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set())
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ERROR')
   const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
@@ -51,27 +63,32 @@ export default function ResultsPage() {
   }
 
   const handleIgnore = useCallback(async (v: Violation, ignored: boolean) => {
+    // Optimistic update — reverted below if the API call fails.
+    setViolations((prev) => prev.map((x) => x.id === v.id ? { ...x, ignored } : x))
     try {
       const result = await patchViolation(v.id, { ignored })
-      setViolations((prev) => prev.map((x) => x.id === v.id ? { ...x, ignored } : x))
       setJob((prev) => prev ? { ...prev, mfgScore: result.mfgScore, mfgGrade: result.mfgGrade } : prev)
     } catch {
-      // ignore network errors silently — violation state stays unchanged
+      setViolations((prev) => prev.map((x) => x.id === v.id ? { ...x, ignored: v.ignored } : x))
+      toast.error("Couldn't update violation — the change was not saved")
     }
   }, [])
 
   const handleIgnoreLayer = useCallback(async (layer: string, ignored: boolean, severity?: string) => {
     if (!job) return
+    const affects = (x: Violation) => x.layer === layer && (!severity || x.severity === severity)
+    // Snapshot pre-change ignored flags so a failure can restore mixed states.
+    const previous = new Map(violations.filter(affects).map((x) => [x.id, x.ignored]))
+    // Optimistic update — reverted below if the API call fails.
+    setViolations((prev) => prev.map((x) => affects(x) ? { ...x, ignored } : x))
     try {
       const result = await ignoreLayerViolations(job.id, layer, ignored, severity)
-      setViolations((prev) => prev.map((x) =>
-        x.layer === layer && (!severity || x.severity === severity) ? { ...x, ignored } : x
-      ))
       setJob((prev) => prev ? { ...prev, mfgScore: result.mfgScore, mfgGrade: result.mfgGrade } : prev)
     } catch {
-      // ignore network errors silently
+      setViolations((prev) => prev.map((x) => previous.has(x.id) ? { ...x, ignored: previous.get(x.id)! } : x))
+      toast.error(`Couldn't update violations on layer "${layer}" — the change was not saved`)
     }
-  }, [job])
+  }, [job, violations])
 
   const allIgnoredLayers = useMemo(() => {
     const counts = new Map<string, { total: number; ignored: number }>()
@@ -123,10 +140,12 @@ export default function ResultsPage() {
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
-    const load = async () => {
+    let cancelled = false
+    let pollTimer: ReturnType<typeof setInterval> | undefined
+
+    // Full results load — only runs once the job is DONE.
+    const loadResults = async (jobData: AnalysisJob) => {
       try {
-        const jobData = await getJob(jobId)
-        setJob(jobData)
         track('Analysis Viewed', { jobId, score: jobData.mfgScore, grade: jobData.mfgGrade })
         track('BoardViewer Started', { jobId })
         const boardStart = Date.now()
@@ -138,27 +157,72 @@ export default function ResultsPage() {
           ? fetchBoardFromUrl(jobData.boardUrl)
           : getBoardData(jobId)
         boardP.then((bd) => {
+          if (cancelled) return
           setBoardData(bd)
+          setBoardError(false)
           track('BoardViewer Loaded', { jobId, durationMs: Date.now() - boardStart })
         }).catch(() => {
+          if (cancelled) return
+          // Board preview failure shouldn't block violations/scores — render a
+          // placeholder in the viewer area instead of an infinite spinner.
+          setBoardError(true)
           track('BoardViewer Failed', { jobId, durationMs: Date.now() - boardStart })
         })
         const violationsData = await (jobData.violationsUrl
           ? fetchViolationsFromUrl(jobData.violationsUrl)
           : getViolations(jobId))
+        if (cancelled) return
         setViolations(violationsData ?? [])
-        // Find the current submission's projectId for compare scoping
+      } catch (e: unknown) {
+        if (!cancelled) setError(describeLoadError(e))
+      }
+    }
+
+    const startPolling = () => {
+      pollTimer = setInterval(async () => {
+        try {
+          const j = await getJob(jobId)
+          if (cancelled) return
+          setJob(j)
+          if (j.status === 'DONE' || j.status === 'FAILED') {
+            if (pollTimer) { clearInterval(pollTimer); pollTimer = undefined }
+            if (j.status === 'DONE') loadResults(j)
+          }
+        } catch {
+          // Transient poll error — keep polling; the next tick may succeed.
+        }
+      }, JOB_POLL_MS)
+    }
+
+    const load = async () => {
+      try {
+        const jobData = await getJob(jobId)
+        if (cancelled) return
+        setJob(jobData)
+        // Find the current submission's projectId for compare scoping / back link
         getSubmissions().then(subs => {
+          if (cancelled) return
           const current = subs?.find(s => s.id === jobData.submissionId)
           if (current?.projectId) setCurrentProjectId(current.projectId)
         }).catch(() => {})
+
+        if (jobData.status === 'DONE') {
+          await loadResults(jobData)
+        } else if (jobData.status !== 'FAILED') {
+          // PENDING / PROCESSING — poll until the job reaches a terminal state.
+          startPolling()
+        }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Failed to load results')
+        if (!cancelled) setError(describeLoadError(e))
       } finally {
-        setLoading(false)
+        if (!cancelled) setLoading(false)
       }
     }
     load()
+    return () => {
+      cancelled = true
+      if (pollTimer) clearInterval(pollTimer)
+    }
   }, [jobId, router])
 
   // Load project submissions for compare dropdown
@@ -258,6 +322,38 @@ export default function ResultsPage() {
     )
   }
 
+  if (job?.status === 'FAILED') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
+        <AlertCircle className="h-12 w-12 text-red-400" />
+        <h1 className="text-lg font-semibold text-foreground">Analysis failed</h1>
+        {job.errorMsg ? (
+          <p className="text-sm text-muted-foreground max-w-md text-center font-mono break-words">{job.errorMsg}</p>
+        ) : (
+          <p className="text-sm text-muted-foreground max-w-md text-center">
+            Something went wrong while analyzing this design. Try re-running the analysis from the dashboard.
+          </p>
+        )}
+        <AppBackButton href={backHref} label={backLabel} />
+      </div>
+    )
+  }
+
+  if (job && job.status !== 'DONE') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-4 px-4">
+        <div className="animate-spin h-8 w-8 border-4 border-blue-600 border-t-transparent rounded-full" />
+        <div className="text-center">
+          <h1 className="text-lg font-semibold text-foreground">Analysis in progress</h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            This page will update automatically when the analysis completes.
+          </p>
+        </div>
+        <AppBackButton href={backHref} label={backLabel} />
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col min-h-screen h-[100dvh] md:h-screen bg-background">
       {/* Header */}
@@ -341,7 +437,15 @@ export default function ResultsPage() {
       {/* Body: board + collapsible issues panel */}
       <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>
         <div className={cn('order-1 flex-1 min-h-0 min-w-0 overflow-hidden', collapseToBottom ? 'p-2 sm:p-3' : 'p-2 sm:p-3 md:p-4')}>
-          {!boardData ? (
+          {boardError && !boardData ? (
+            <div className="flex flex-col items-center justify-center h-full gap-2 bg-gray-900 rounded-lg">
+              <AlertTriangle className="h-8 w-8 text-yellow-500" />
+              <p className="text-sm font-medium text-gray-200">Board preview unavailable</p>
+              <p className="text-xs text-gray-400 text-center px-6">
+                The board visualization couldn&apos;t be loaded. Violations and scores are still available.
+              </p>
+            </div>
+          ) : !boardData ? (
             <div className="flex flex-col items-center justify-center h-full gap-3">
               <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
               <p className="text-sm text-muted-foreground">Loading Board Visualizer</p>

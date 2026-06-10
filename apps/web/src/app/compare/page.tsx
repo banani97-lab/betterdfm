@@ -4,6 +4,7 @@ import { Suspense, useEffect, useState, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { AlertCircle, AlertTriangle, ArrowRight, ArrowUp, ArrowDown, Check, Info, Plus, Minus } from 'lucide-react'
 import {
+  ApiError,
   compareJobs,
   getBoardData,
   type ComparisonResult,
@@ -60,6 +61,23 @@ function ViolationCard({ v }: { v: Violation }) {
   )
 }
 
+// ── Board placeholder (per-side fetch failure) ──────────────────────────────
+
+function BoardUnavailable({ label }: { label: string }) {
+  return (
+    <div className="relative flex flex-col items-center justify-center h-full gap-2 bg-gray-900 rounded-lg overflow-hidden">
+      <div className="absolute top-2 left-2 px-2 py-1 bg-black/60 rounded text-xs text-white font-medium select-none">
+        {label}
+      </div>
+      <AlertTriangle className="h-8 w-8 text-yellow-500" />
+      <p className="text-sm font-medium text-gray-200">Board preview unavailable</p>
+      <p className="text-xs text-gray-400 text-center px-6">
+        The board data for this analysis couldn&apos;t be loaded.
+      </p>
+    </div>
+  )
+}
+
 // ── Main page ────────────────────────────────────────────────────────────────
 
 type Tab = 'fixed' | 'new' | 'unchanged'
@@ -90,9 +108,12 @@ function ComparePageInner() {
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<Tab>('fixed')
 
-  // Board data for dual viewer
+  // Board data for dual viewer. Error flags distinguish "failed to load"
+  // from "still loading" so each side can show an explicit placeholder.
   const [boardDataA, setBoardDataA] = useState<BoardData | null>(null)
   const [boardDataB, setBoardDataB] = useState<BoardData | null>(null)
+  const [boardErrorA, setBoardErrorA] = useState(false)
+  const [boardErrorB, setBoardErrorB] = useState(false)
 
   // Synchronized transform for dual board viewers
   const [syncTransform, setSyncTransform] = useState<BoardViewerTransform | undefined>(undefined)
@@ -137,13 +158,18 @@ function ComparePageInner() {
       setLoading(false)
       return
     }
+    if (jobAId === jobBId) {
+      setError('Cannot compare an analysis with itself — pick two different analyses.')
+      setLoading(false)
+      return
+    }
 
     const load = async () => {
       try {
         const [comparisonData] = await Promise.all([
           compareJobs(jobAId, jobBId),
-          getBoardData(jobAId).then(setBoardDataA).catch(() => {}),
-          getBoardData(jobBId).then(setBoardDataB).catch(() => {}),
+          getBoardData(jobAId).then(setBoardDataA).catch(() => setBoardErrorA(true)),
+          getBoardData(jobBId).then(setBoardDataB).catch(() => setBoardErrorB(true)),
         ])
         setResult(comparisonData)
         track('Comparison Viewed', { jobAId, jobBId, scoreDelta: comparisonData.scoreDelta })
@@ -154,7 +180,13 @@ function ComparePageInner() {
           setActiveTab('fixed')
         }
       } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : 'Failed to load comparison')
+        if (e instanceof ApiError && e.status === 404) {
+          setError("One of these analyses doesn't exist or was deleted.")
+        } else if (e instanceof ApiError && e.status === 403) {
+          setError("You don't have permission to view one of these analyses.")
+        } else {
+          setError(e instanceof Error ? `Failed to load comparison: ${e.message}` : 'Failed to load comparison')
+        }
       } finally {
         setLoading(false)
       }
@@ -287,27 +319,35 @@ function ComparePageInner() {
         {/* Dual Board Viewer */}
         <div className="flex-1 flex min-h-0 min-w-0">
           <div className="flex-1 min-h-0 min-w-0 p-2">
-            <BoardViewer
-              violations={violationsA}
-              boardData={boardDataA}
-              hiddenLayers={hiddenLayers}
-              onToggleLayer={toggleLayer}
-              externalTransform={syncTransform}
-              onTransformChange={handleTransformChange}
-              label="Rev A (Before)"
-            />
+            {boardErrorA || !boardDataA ? (
+              <BoardUnavailable label="Rev A (Before)" />
+            ) : (
+              <BoardViewer
+                violations={violationsA}
+                boardData={boardDataA}
+                hiddenLayers={hiddenLayers}
+                onToggleLayer={toggleLayer}
+                externalTransform={syncTransform}
+                onTransformChange={handleTransformChange}
+                label="Rev A (Before)"
+              />
+            )}
           </div>
           <div className="w-px bg-border" />
           <div className="flex-1 min-h-0 min-w-0 p-2">
-            <BoardViewer
-              violations={violationsB}
-              boardData={boardDataB}
-              hiddenLayers={hiddenLayers}
-              onToggleLayer={toggleLayer}
-              externalTransform={syncTransform}
-              onTransformChange={handleTransformChange}
-              label="Rev B (After)"
-            />
+            {boardErrorB || !boardDataB ? (
+              <BoardUnavailable label="Rev B (After)" />
+            ) : (
+              <BoardViewer
+                violations={violationsB}
+                boardData={boardDataB}
+                hiddenLayers={hiddenLayers}
+                onToggleLayer={toggleLayer}
+                externalTransform={syncTransform}
+                onTransformChange={handleTransformChange}
+                label="Rev B (After)"
+              />
+            )}
           </div>
         </div>
 

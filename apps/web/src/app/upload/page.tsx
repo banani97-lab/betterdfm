@@ -1,20 +1,24 @@
 'use client'
 
-import { Suspense, useEffect, useState } from 'react'
+import { Suspense, useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { CheckCircle, XCircle, Upload, File, X, FolderOpen } from 'lucide-react'
+import { CheckCircle, XCircle, Upload, File, X, FolderOpen, Clock, AlertTriangle } from 'lucide-react'
 import {
   createSubmission,
+  getSubmission,
   uploadToS3,
   startAnalysis,
   getProfiles,
   createBatch,
   analyzeBatch,
+  ApiError,
   type CapabilityProfile,
   type AnalysisJob,
+  type BatchDetail,
+  type Submission,
 } from '@/lib/api'
-import { pollJobUntilDone, pollBatchUntilDone } from '@/lib/poll'
+import { pollJobUntilDone, pollBatchUntilDone, PollTimeoutError } from '@/lib/poll'
 import { isLoggedIn, canWrite } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
@@ -25,9 +29,23 @@ import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
 import { readDirectoryEntry, packageFilesAsTar } from '@/lib/tarball'
 
-type Step = 'select' | 'packaging' | 'uploading' | 'analyzing' | 'done' | 'error'
+type Step = 'select' | 'resume' | 'packaging' | 'uploading' | 'analyzing' | 'partial' | 'timeout' | 'done' | 'error'
 
 const STEPS = ['select', 'uploading', 'analyzing', 'done']
+
+/** Client-side cap on uploads — matches the folder-packaging cap in tarball.ts. */
+const MAX_UPLOAD_BYTES = 500 * 1024 * 1024 // 500 MB
+
+const formatMB = (bytes: number) => `${(bytes / (1024 * 1024)).toFixed(0)} MB`
+
+/** Map quota/rate-limit API errors to friendly copy instead of the raw message. */
+function friendlyError(e: unknown): string {
+  if (e instanceof ApiError) {
+    if (e.status === 402) return 'Your analysis limit has been reached — upgrade your plan to continue.'
+    if (e.status === 429) return 'Too many requests — wait a moment and try again.'
+  }
+  return e instanceof Error ? e.message : String(e)
+}
 
 interface FileEntry {
   file: File
@@ -49,6 +67,9 @@ function UploadPageInner() {
   const searchParams = useSearchParams()
   const { usage } = useUsage()
   const projectId = searchParams.get('projectId') || undefined
+  // The dashboard's "Analyze" button links here with ?submissionId=… — the
+  // file is already in S3, so we resume at the analyze step, never re-upload.
+  const resumeId = searchParams.get('submissionId')
   const backHref = projectId ? `/projects/${projectId}` : '/dashboard'
   const backLabel = projectId ? 'Project' : 'Dashboard'
   // Single-file state (existing flow)
@@ -68,6 +89,20 @@ function UploadPageInner() {
   // Non-CUI alpha guardrail: uploads are blocked until the user affirms the
   // design is not ITAR-controlled or CUI / export-controlled technical data.
   const [nonCuiAck, setNonCuiAck] = useState(false)
+  // Inline messages on the select step (size rejections, batch-cap truncation).
+  const [selectError, setSelectError] = useState<string>('')
+  const [capWarning, setCapWarning] = useState<string>('')
+  // Submission that uploaded successfully but whose analysis didn't finish —
+  // lets the error screen offer "Retry analysis" without re-uploading.
+  const [uploadedSubmissionId, setUploadedSubmissionId] = useState<string | null>(null)
+  // Already-uploaded submission being resumed via ?submissionId= (the 'resume' step).
+  const [resumeSubmission, setResumeSubmission] = useState<Submission | null>(null)
+  // Filenames that failed to upload in a batch (drives the 'partial' step).
+  const [failedUploads, setFailedUploads] = useState<string[]>([])
+  // Final batch state so the done screen can report partial results honestly.
+  const [finalBatch, setFinalBatch] = useState<BatchDetail | null>(null)
+  const [submitting, setSubmitting] = useState(false)
+  const inFlightRef = useRef(false)
 
   useEffect(() => {
     if (!isLoggedIn()) { router.replace('/login'); return }
@@ -79,23 +114,85 @@ function UploadPageInner() {
     }).catch(() => {})
   }, [router])
 
+  // Resume an existing submission (?submissionId=…): the file is already in
+  // S3, so jump straight to the analyze step instead of the file picker.
+  useEffect(() => {
+    if (!resumeId) return
+    setStep('resume')
+    getSubmission(resumeId)
+      .then((sub) => {
+        if (sub.status === 'ANALYZING' || sub.status === 'DONE') {
+          // Already running or finished — the results page shows progress.
+          router.replace(sub.latestJobId ? `/results/${sub.latestJobId}` : '/dashboard')
+          return
+        }
+        // UPLOADED or FAILED: offer to (re-)run analysis without re-uploading.
+        setResumeSubmission(sub)
+        setUploadedSubmissionId(sub.id)
+      })
+      .catch((e: unknown) => {
+        setSelectError(
+          e instanceof ApiError && e.status === 404
+            ? "Couldn't find that submission — it may have been deleted. Upload the file again to analyze it."
+            : `Couldn't load the submission — ${friendlyError(e)}`
+        )
+        setStep('select')
+      })
+  }, [resumeId, router])
+
+  // Warn before closing the tab while an upload/analysis is in flight.
+  useEffect(() => {
+    if (step !== 'packaging' && step !== 'uploading' && step !== 'analyzing') return
+    const handler = (e: BeforeUnloadEvent) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    window.addEventListener('beforeunload', handler)
+    return () => window.removeEventListener('beforeunload', handler)
+  }, [step])
+
   const batchAllowed = usage?.features.batchUpload !== false
   const maxBatchFiles = usage?.features.maxBatchFiles ?? 50
 
-  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files
-    if (!selected || selected.length === 0) return
+  /** Re-entry guard shared by every submit-ish action (double-click protection). */
+  const guard = async (fn: () => Promise<void>) => {
+    if (inFlightRef.current) return
+    inFlightRef.current = true
+    setSubmitting(true)
+    try {
+      await fn()
+    } finally {
+      inFlightRef.current = false
+      setSubmitting(false)
+    }
+  }
+
+  /** Shared selection logic for the file input and drag-and-drop (size + cap checks). */
+  const applySelection = (selected: File[]) => {
+    setSelectError('')
+    setCapWarning('')
 
     if (selected.length === 1 || !batchAllowed) {
-      // Single file -- use existing flow (or batch not allowed)
-      setFile(selected[0])
+      const f = selected[0]
+      if (f.size > MAX_UPLOAD_BYTES) {
+        setSelectError(`"${f.name}" is ${formatMB(f.size)} — the maximum upload size is 500 MB. Compress the archive or remove unneeded data and try again.`)
+        return
+      }
+      setFile(f)
       setFiles([])
       return
     }
 
-    // Multiple files -- batch flow, capped by maxBatchFiles
     setFile(null)
-    const capped = Array.from(selected).slice(0, maxBatchFiles)
+    const capped = selected.slice(0, maxBatchFiles)
+    const totalBytes = capped.reduce((sum, f) => sum + f.size, 0)
+    if (totalBytes > MAX_UPLOAD_BYTES) {
+      setSelectError(`Selected files total ${formatMB(totalBytes)} — the maximum per batch is 500 MB. Remove some files and try again.`)
+      return
+    }
+    if (selected.length > maxBatchFiles) {
+      setCapWarning(`Selected ${selected.length} files; only ${maxBatchFiles} allowed per batch — proceeding with the first ${maxBatchFiles}.`)
+    }
     const entries: FileEntry[] = capped.map((f) => ({
       file: f,
       fileType: 'ODB_PLUS_PLUS' as const,
@@ -105,6 +202,12 @@ function UploadPageInner() {
     setFiles(entries)
   }
 
+  const handleFilesSelected = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const selected = e.target.files
+    if (!selected || selected.length === 0) return
+    applySelection(Array.from(selected))
+  }
+
   const removeFile = (index: number) => {
     setFiles((prev) => prev.filter((_, i) => i !== index))
   }
@@ -112,6 +215,8 @@ function UploadPageInner() {
   const clearAllFiles = () => {
     setFile(null)
     setFiles([])
+    setSelectError('')
+    setCapWarning('')
   }
 
   const [dragOver, setDragOver] = useState(false)
@@ -126,46 +231,39 @@ function UploadPageInner() {
       const firstEntry = items[0].webkitGetAsEntry?.()
       if (firstEntry?.isDirectory) {
         // Package the dropped folder into a tar archive.
+        setSelectError('')
+        setCapWarning('')
         setStep('packaging')
         try {
           const fileList = await readDirectoryEntry(firstEntry as FileSystemDirectoryEntry)
           const tarBlob = await packageFilesAsTar(fileList)
           const tarFile = new window.File([tarBlob], `${firstEntry.name}.tar`, { type: 'application/x-tar' })
+          if (tarFile.size > MAX_UPLOAD_BYTES) {
+            throw new Error('Folder exceeds 500 MB — compress it and upload as an archive instead.')
+          }
           setFile(tarFile)
           setFiles([])
-          setStep('select')
         } catch (err) {
-          setErrorMsg(err instanceof Error ? err.message : 'Failed to package folder')
-          setStep('error')
+          // Packaging problems (too big, unreadable, bad paths) are selection
+          // problems — surface them inline and let the user pick again.
+          setSelectError(err instanceof Error ? err.message : 'Failed to package folder')
         }
+        setStep('select')
         return
       }
     }
 
     const dropped = e.dataTransfer.files
     if (!dropped || dropped.length === 0) return
-
-    if (dropped.length === 1 || !batchAllowed) {
-      setFile(dropped[0])
-      setFiles([])
-      return
-    }
-
-    setFile(null)
-    const capped = Array.from(dropped).slice(0, maxBatchFiles)
-    const entries: FileEntry[] = capped.map((f) => ({
-      file: f,
-      fileType: 'ODB_PLUS_PLUS' as const,
-      status: 'pending' as const,
-      progress: 0,
-    }))
-    setFiles(entries)
+    applySelection(Array.from(dropped))
   }
 
   // Handle folder selection via <input webkitdirectory>
   const handleFolderSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const selected = e.target.files
     if (!selected || selected.length === 0) return
+    setSelectError('')
+    setCapWarning('')
     setStep('packaging')
     try {
       const tarBlob = await packageFilesAsTar(selected)
@@ -173,39 +271,86 @@ function UploadPageInner() {
       const firstPath = (selected[0] as File & { webkitRelativePath?: string }).webkitRelativePath || ''
       const folderName = firstPath.split('/')[0] || 'upload'
       const tarFile = new window.File([tarBlob], `${folderName}.tar`, { type: 'application/x-tar' })
+      if (tarFile.size > MAX_UPLOAD_BYTES) {
+        throw new Error('Folder exceeds 500 MB — compress it and upload as an archive instead.')
+      }
       setFile(tarFile)
       setFiles([])
-      setStep('select')
     } catch (err) {
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to package folder')
-      setStep('error')
+      setSelectError(err instanceof Error ? err.message : 'Failed to package folder')
+    }
+    setStep('select')
+  }
+
+  /** Kick off analysis for a submission and poll it to a terminal state. */
+  const runAnalysis = async (submissionId: string) => {
+    const newJob = await startAnalysis(submissionId, profileId || undefined)
+    track('Analysis Requested', { submissionId, profileId })
+    setJob(newJob)
+
+    const jobData = await pollJobUntilDone(newJob.id, { onUpdate: setJob })
+    if (jobData.status === 'DONE') {
+      setStep('done')
+    } else {
+      throw new Error(jobData.errorMsg || 'Analysis failed')
     }
   }
 
   // Single-file upload (existing flow)
   const handleSingleUpload = async () => {
     if (!file) return
+    if (file.size > MAX_UPLOAD_BYTES) {
+      setSelectError(`"${file.name}" is ${formatMB(file.size)} — the maximum upload size is 500 MB.`)
+      return
+    }
     setStep('uploading')
     setErrorMsg('')
+    setProgress(0)
+    setUploadedSubmissionId(null)
     try {
       const { submissionId, presignedUrl } = await createSubmission(file.name, fileType, projectId, nonCuiAck)
       await uploadToS3(presignedUrl, file, setProgress)
+      // The file is in S3 now — remember the submission so an analysis
+      // failure can be retried without re-uploading.
+      setUploadedSubmissionId(submissionId)
       track('Submission Created', { fileType, projectId })
       setStep('analyzing')
-      const newJob = await startAnalysis(submissionId, profileId || undefined)
-      track('Analysis Requested', { submissionId, profileId })
-      setJob(newJob)
-
-      const jobData = await pollJobUntilDone(newJob.id, { onUpdate: setJob })
-      if (jobData.status === 'DONE') {
-        setStep('done')
-      } else {
-        throw new Error(jobData.errorMsg || 'Analysis failed')
-      }
+      await runAnalysis(submissionId)
     } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : String(e))
+      if (e instanceof PollTimeoutError) {
+        // Not a failure — the job is still running in the background.
+        setStep('timeout')
+        return
+      }
+      setErrorMsg(friendlyError(e))
       setStep('error')
     }
+  }
+
+  /** Retry analysis on the already-uploaded submission (no re-upload). */
+  const handleRetryAnalysis = async () => {
+    if (!uploadedSubmissionId) return
+    setStep('analyzing')
+    setErrorMsg('')
+    try {
+      await runAnalysis(uploadedSubmissionId)
+    } catch (e: unknown) {
+      if (e instanceof PollTimeoutError) {
+        setStep('timeout')
+        return
+      }
+      setErrorMsg(friendlyError(e))
+      setStep('error')
+    }
+  }
+
+  /** Start batch analysis and poll it to a terminal state. */
+  const runBatchAnalysis = async (id: string) => {
+    setStep('analyzing')
+    await analyzeBatch(id, profileId || undefined)
+    const finalData = await pollBatchUntilDone(id)
+    setFinalBatch(finalData)
+    setStep('done')
   }
 
   // Batch upload
@@ -213,6 +358,8 @@ function UploadPageInner() {
     if (files.length === 0) return
     setStep('uploading')
     setErrorMsg('')
+    setFailedUploads([])
+    setFinalBatch(null)
     track('Batch Started', { fileCount: files.length, projectId })
     try {
       // 1. Create batch and get presigned URLs
@@ -223,7 +370,8 @@ function UploadPageInner() {
       const batchResp = await createBatch(batchFiles, undefined, profileId || undefined, nonCuiAck)
       setBatchId(batchResp.batchId)
 
-      // 2. Upload all files in parallel
+      // 2. Upload all files in parallel, collecting failures
+      const failures: string[] = []
       const uploadPromises = batchResp.submissions.map((sub, index) => {
         const fileEntry = files[index]
         setFiles((prev) =>
@@ -240,6 +388,7 @@ function UploadPageInner() {
             )
           })
           .catch(() => {
+            failures.push(fileEntry.file.name)
             setFiles((prev) =>
               prev.map((f, i) => (i === index ? { ...f, status: 'failed' } : f))
             )
@@ -251,30 +400,76 @@ function UploadPageInner() {
       // Update overall progress
       setProgress(100)
 
-      // 3. Start batch analysis
-      setStep('analyzing')
-      await analyzeBatch(batchResp.batchId, profileId || undefined)
+      // 3. Don't proceed silently past upload failures — let the user decide.
+      if (failures.length >= files.length) {
+        throw new Error(`None of the ${files.length} files could be uploaded. Check your connection and try again.`)
+      }
+      if (failures.length > 0) {
+        setFailedUploads(failures)
+        setStep('partial')
+        return
+      }
 
-      // 4. Poll batch status until terminal (with timeout)
-      await pollBatchUntilDone(batchResp.batchId)
-
-      setStep('done')
+      // 4. Start batch analysis and poll until terminal (with timeout)
+      await runBatchAnalysis(batchResp.batchId)
     } catch (e: unknown) {
-      setErrorMsg(e instanceof Error ? e.message : String(e))
+      if (e instanceof PollTimeoutError) {
+        setStep('timeout')
+        return
+      }
+      setErrorMsg(friendlyError(e))
       setStep('error')
     }
   }
 
-  const handleUpload = () => {
-    if (isBatch) {
-      handleBatchUpload()
-    } else {
-      handleSingleUpload()
+  /** Proceed with the successfully uploaded files after a partial batch failure. */
+  const continueBatchAfterPartial = async () => {
+    if (!batchId) return
+    try {
+      await runBatchAnalysis(batchId)
+    } catch (e: unknown) {
+      if (e instanceof PollTimeoutError) {
+        setStep('timeout')
+        return
+      }
+      setErrorMsg(friendlyError(e))
+      setStep('error')
     }
   }
 
-  const stepIndex = STEPS.indexOf(step === 'error' ? 'done' : step)
+  /** Cancel out of a partial batch: back to selection with statuses reset. */
+  const cancelPartialBatch = () => {
+    setFiles((prev) => prev.map((f) => ({ ...f, status: 'pending' as const, progress: 0 })))
+    setFailedUploads([])
+    setBatchId(null)
+    setStep('select')
+  }
+
+  const resetToSelect = () => {
+    clearAllFiles()
+    setErrorMsg('')
+    setJob(null)
+    setBatchId(null)
+    setUploadedSubmissionId(null)
+    setResumeSubmission(null)
+    setFailedUploads([])
+    setFinalBatch(null)
+    setStep('select')
+  }
+
+  const handleUpload = () => {
+    guard(isBatch ? handleBatchUpload : handleSingleUpload)
+  }
+
+  const stepForIndicator =
+    step === 'error' ? 'done' :
+    step === 'timeout' ? 'analyzing' :
+    step === 'partial' ? 'uploading' :
+    step === 'resume' ? 'select' :
+    step
+  const stepIndex = STEPS.indexOf(stepForIndicator)
   const hasFiles = file !== null || files.length > 0
+  const uploadedCount = files.length - failedUploads.length
 
   // Compute aggregate upload progress for batch
   const batchProgress = files.length > 0
@@ -304,7 +499,7 @@ function UploadPageInner() {
                 i === stepIndex ? 'bg-blue-600 border-blue-600 text-white' :
                 'bg-card border-border text-muted-foreground'
               )}>
-                {i < stepIndex ? '\u2713' : i + 1}
+                {i < stepIndex ? '✓' : i + 1}
               </div>
               <span className={cn(
                 'ml-2 text-xs font-medium',
@@ -314,6 +509,52 @@ function UploadPageInner() {
             </div>
           ))}
         </div>
+
+        {/* Step: resume an already-uploaded submission (no re-upload) */}
+        {step === 'resume' && (
+          !resumeSubmission ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+              <p className="text-sm font-medium text-foreground">Loading submission...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 px-4 py-4 border border-border rounded-lg bg-muted/40">
+                <File className="h-8 w-8 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{resumeSubmission.filename}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {resumeSubmission.status === 'FAILED'
+                      ? 'Previous analysis failed — you can run it again.'
+                      : 'Already uploaded — ready to analyze.'}
+                  </p>
+                </div>
+                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Capability Profile</label>
+                <select
+                  value={profileId}
+                  onChange={(e) => setProfileId(e.target.value)}
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Default</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.isDefault ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Button onClick={() => guard(handleRetryAnalysis)} disabled={submitting} className="w-full">
+                {resumeSubmission.status === 'FAILED' ? 'Re-run Analysis' : 'Start Analysis'}
+              </Button>
+              <Button onClick={resetToSelect} variant="ghost" className="w-full">
+                Upload a different file instead
+              </Button>
+            </div>
+          )
+        )}
 
         {/* Step: packaging folder into tar */}
         {step === 'packaging' && (
@@ -372,6 +613,20 @@ function UploadPageInner() {
                 </div>
               )}
             </div>
+
+            {/* Inline selection errors / warnings */}
+            {selectError && (
+              <div className="p-3 rounded-lg border border-red-500/30 bg-red-500/10 flex items-start gap-2">
+                <XCircle className="h-4 w-4 text-red-500 mt-0.5 shrink-0" />
+                <p className="text-xs font-medium text-red-700 dark:text-red-400">{selectError}</p>
+              </div>
+            )}
+            {capWarning && (
+              <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-400 mt-0.5 shrink-0" />
+                <p className="text-xs font-medium text-yellow-700 dark:text-yellow-400">{capWarning}</p>
+              </div>
+            )}
 
             {/* Batch file list */}
             {isBatch && (
@@ -442,7 +697,7 @@ function UploadPageInner() {
               </label>
             </div>
 
-            <Button onClick={handleUpload} disabled={!hasFiles || !nonCuiAck} className="w-full">
+            <Button onClick={handleUpload} disabled={!hasFiles || !nonCuiAck || submitting} className="w-full">
               {isBatch ? `Upload & Analyze ${files.length} Files` : 'Upload & Analyze'}
             </Button>
 
@@ -485,7 +740,7 @@ function UploadPageInner() {
                       />
                     </div>
                     <span className="text-xs text-muted-foreground w-8 text-right">
-                      {entry.status === 'uploaded' ? '\u2713' : entry.status === 'failed' ? '\u2717' : `${entry.progress}%`}
+                      {entry.status === 'uploaded' ? '✓' : entry.status === 'failed' ? '✗' : `${entry.progress}%`}
                     </span>
                   </div>
                 ))}
@@ -518,6 +773,50 @@ function UploadPageInner() {
           </div>
         )}
 
+        {/* Step: partial batch upload failure — let the user decide */}
+        {step === 'partial' && (
+          <div className="text-center space-y-4">
+            <AlertTriangle className="h-14 w-14 text-yellow-500 mx-auto" />
+            <h2 className="text-xl font-bold text-foreground">Some files failed to upload</h2>
+            <p className="text-sm text-muted-foreground">
+              {uploadedCount} of {files.length} files uploaded successfully. These did not:
+            </p>
+            <ul className="text-sm text-left border border-border rounded-lg divide-y divide-border max-h-40 overflow-y-auto">
+              {failedUploads.map((name, i) => (
+                <li key={`${name}-${i}`} className="flex items-center gap-2 px-4 py-2">
+                  <XCircle className="h-4 w-4 text-red-500 shrink-0" />
+                  <span className="truncate text-foreground">{name}</span>
+                </li>
+              ))}
+            </ul>
+            <Button onClick={() => guard(continueBatchAfterPartial)} disabled={submitting} className="w-full">
+              Analyze the {uploadedCount} uploaded {uploadedCount === 1 ? 'file' : 'files'}
+            </Button>
+            <Button onClick={cancelPartialBatch} variant="outline" className="w-full">
+              Cancel and go back
+            </Button>
+          </div>
+        )}
+
+        {/* Step: poll timed out — the job is still running, not failed */}
+        {step === 'timeout' && (
+          <div className="text-center space-y-4">
+            <Clock className="h-14 w-14 text-blue-500 mx-auto" />
+            <h2 className="text-xl font-bold text-foreground">Analysis is taking longer than expected</h2>
+            <p className="text-sm text-muted-foreground">
+              It&apos;s still running in the background &mdash; you can safely leave this page and check its progress from the dashboard.
+            </p>
+            <Button onClick={() => router.push('/dashboard')} className="w-full">
+              Go to Dashboard
+            </Button>
+            {isBatch && batchId && (
+              <Button onClick={() => router.push(`/batches/${batchId}`)} variant="outline" className="w-full">
+                View Batch Progress
+              </Button>
+            )}
+          </div>
+        )}
+
         {/* Step: done */}
         {step === 'done' && (
           <div className="text-center space-y-4">
@@ -525,7 +824,11 @@ function UploadPageInner() {
             <h2 className="text-xl font-bold text-foreground">Analysis Complete</h2>
             <p className="text-muted-foreground">
               {isBatch
-                ? `All ${files.length} boards have been analyzed.`
+                ? finalBatch && finalBatch.batch.failed > 0
+                  ? `${finalBatch.batch.completed} of ${finalBatch.batch.total} boards analyzed successfully — ${finalBatch.batch.failed} failed. See the batch page for details.`
+                  : failedUploads.length > 0
+                    ? `${uploadedCount} of ${files.length} boards have been analyzed (${failedUploads.length} failed to upload).`
+                    : `All ${files.length} boards have been analyzed.`
                 : 'Your board has been analyzed successfully.'}
             </p>
             {isBatch && batchId ? (
@@ -549,7 +852,17 @@ function UploadPageInner() {
             <XCircle className="h-14 w-14 text-red-500 mx-auto" />
             <h2 className="text-xl font-bold text-foreground">Something went wrong</h2>
             <p className="text-sm text-muted-foreground">{errorMsg}</p>
-            <Button onClick={() => { setStep('select'); clearAllFiles() }} variant="outline" className="w-full">Try again</Button>
+            {uploadedSubmissionId && !isBatch && (
+              <>
+                <Button onClick={() => guard(handleRetryAnalysis)} disabled={submitting} className="w-full">
+                  Retry analysis
+                </Button>
+                <p className="text-xs text-muted-foreground">
+                  Your file was uploaded successfully &mdash; retrying only re-runs the analysis.
+                </p>
+              </>
+            )}
+            <Button onClick={resetToSelect} variant="outline" className="w-full">Try again</Button>
           </div>
         )}
       </main>

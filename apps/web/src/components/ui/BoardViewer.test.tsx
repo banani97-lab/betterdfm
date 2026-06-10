@@ -104,6 +104,37 @@ describe('BoardViewer', () => {
     expect(container.querySelector('canvas')).toBeInTheDocument()
   })
 
+  it('renders an explicit empty-board state when board data has no geometry', () => {
+    const emptyBoard: BoardData = {
+      layers: [],
+      traces: [],
+      pads: [],
+      vias: [],
+      drills: [],
+      outline: [],
+      boardThicknessMM: 1.6,
+    }
+    const { getByText } = render(
+      <BoardViewer boardData={emptyBoard} {...defaultProps} />
+    )
+    expect(getByText('Board appears empty')).toBeInTheDocument()
+    expect(getByText(/may not have parsed correctly/i)).toBeInTheDocument()
+  })
+
+  it('does not show the empty-board state for a board with geometry', () => {
+    const { queryByText } = render(
+      <BoardViewer boardData={syntheticBoardData()} {...defaultProps} />
+    )
+    expect(queryByText('Board appears empty')).not.toBeInTheDocument()
+  })
+
+  it('does not show the empty-board state when board data is null (still loading)', () => {
+    const { queryByText } = render(
+      <BoardViewer boardData={null} {...defaultProps} />
+    )
+    expect(queryByText('Board appears empty')).not.toBeInTheDocument()
+  })
+
   it('accepts onViolationClick prop without throwing', () => {
     const onViolationClick = vi.fn()
     expect(() =>
