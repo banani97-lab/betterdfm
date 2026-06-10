@@ -12,6 +12,8 @@ import {
   type ProfileRules,
 } from '@/lib/api'
 import { isLoggedIn } from '@/lib/auth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import { useUsage } from '@/lib/useUsage'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
@@ -154,7 +156,6 @@ export default function AdminProfilePage() {
   const [isDefault, setIsDefault] = useState(false)
   const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [newName, setNewName] = useState('')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const toggleGroup = (title: string) => setCollapsed((c) => ({ ...c, [title]: !c[title] }))
@@ -172,7 +173,7 @@ export default function AdminProfilePage() {
       setProfiles(ps ?? [])
       if (!selected && ps?.length > 0) selectProfile(ps[0])
     } catch (e: unknown) {
-      if (e instanceof Error) setMessage({ type: 'error', text: e.message })
+      toast.error(`Couldn't load profiles — ${friendlyReason(e)}`)
     }
   }
 
@@ -186,14 +187,13 @@ export default function AdminProfilePage() {
   const handleSave = async () => {
     if (!selected) return
     setSaving(true)
-    setMessage(null)
     try {
       const updated = await updateProfile(selected.id, { name, isDefault, rules })
       setSelected(updated)
       await loadProfiles()
-      setMessage({ type: 'success', text: 'Profile saved successfully.' })
+      toast.success('Profile saved')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't save profile — ${friendlyReason(e)}`)
     } finally {
       setSaving(false)
     }
@@ -207,9 +207,9 @@ export default function AdminProfilePage() {
       await loadProfiles()
       selectProfile(p)
       setNewName('')
-      setMessage({ type: 'success', text: 'Profile created.' })
+      toast.success('Profile created')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't create profile — ${friendlyReason(e)}`)
     } finally {
       setCreating(false)
     }
@@ -225,8 +225,9 @@ export default function AdminProfilePage() {
         if (remaining.length > 0) selectProfile(remaining[0])
         else setSelected(null)
       }
+      toast.success('Profile deleted')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't delete profile — ${friendlyReason(e)}`)
     }
   }
 
@@ -459,12 +460,6 @@ export default function AdminProfilePage() {
                   )
                 })}
               </div>
-
-              {message && (
-                <div className={`mt-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
-                  {message.text}
-                </div>
-              )}
 
               <div className="mt-6 flex justify-end">
                 <Button onClick={handleSave} disabled={saving}>

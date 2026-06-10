@@ -107,6 +107,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 - **No state management library** — React hooks + localStorage only.
 - **API client**: `apiFetch<T>(path, init)` in `src/lib/api.ts`. All types co-located there.
 - **Styling**: Tailwind CSS with CSS variables (HSL). `cn()` utility (clsx + tailwind-merge). CVA for button variants.
+- **Toasts**: hand-rolled — `toast.success/error/info()` emitter in `src/lib/toast.ts` (no React), rendered by `src/components/ui/Toaster.tsx` (mounted once in `app/layout.tsx`). Toasts are for transient action results only; page-load failures stay as page state/error panels. Copy: success `<Object> <verbed>` ("Project created"); error `Couldn't <verb> <object> — <reason>` with the reason from `friendlyReason()` in `src/lib/errors.ts` — never raw `ApiError` messages.
 - **Canvas rendering**: separated into pure `boardPainter.ts` (testable) and impure `canvasRenderer.ts`.
 - **Largest component**: `BoardViewer.tsx` (~1165 lines) — handles canvas visualization and interaction.
 

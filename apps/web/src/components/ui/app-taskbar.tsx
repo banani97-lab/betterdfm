@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Cog, FolderOpen, LogOut, Plus, X } from 'lucide-react'
-import { clearToken, canWrite } from '@/lib/auth'
+import { signOut, canWrite } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { ThemeToggle } from '@/components/ui/theme-toggle'
 import { useUiSettings, type BackgroundStyle, type TableDensity } from '@/lib/useUiSettings'
@@ -36,7 +36,7 @@ export function AppTaskbar({ className, expandOnHover = true }: { className?: st
   const { settings, update } = useUiSettings()
 
   const handleLogout = () => {
-    clearToken()
+    signOut()
     router.replace('/login')
   }
 

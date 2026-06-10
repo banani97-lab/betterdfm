@@ -10,6 +10,8 @@ import {
   type ShareLink,
 } from '@/lib/api'
 import { track } from '@/lib/analytics'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 
 interface ShareLinkModalProps {
   /** If provided, creates project-scoped share links */
@@ -81,8 +83,8 @@ export function ShareLinkModal({ projectId, jobId, open, onClose }: ShareLinkMod
       setExpiresIn('7')
       setAllowUpload(false)
       await loadLinks()
-    } catch {
-      // ignore
+    } catch (e: unknown) {
+      toast.error(`Couldn't create share link — ${friendlyReason(e)}`)
     } finally {
       setCreating(false)
     }
@@ -92,13 +94,15 @@ export function ShareLinkModal({ projectId, jobId, open, onClose }: ShareLinkMod
     try {
       await deactivateShareLink(id)
       setLinks((prev) => prev.filter((l) => l.id !== id))
-    } catch {
-      // ignore
+      toast.success('Share link revoked')
+    } catch (e: unknown) {
+      toast.error(`Couldn't revoke share link — ${friendlyReason(e)}`)
     }
   }
 
   const handleCopy = (text: string, id: string) => {
     navigator.clipboard.writeText(text)
+    toast.success('Link copied')
     setCopiedId(id)
     setTimeout(() => setCopiedId(null), 2000)
   }

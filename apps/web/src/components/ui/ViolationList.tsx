@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, useMemo } from 'react'
-import { AlertCircle, AlertTriangle, Info } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle, Info } from 'lucide-react'
 import { Badge } from './badge'
 import { cn } from '@/lib/utils'
 import type { Violation } from '@/lib/api'
@@ -185,10 +185,19 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
             <p className="text-sm">Violations hidden</p>
           </div>
         ) : displayViolations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
-            <Info className="h-8 w-8 mb-2" />
-            <p className="text-sm">No violations found</p>
-          </div>
+          allViolations.length === 0 ? (
+            // Truly clean board — distinct positive state, not an empty filter result
+            <div className="flex flex-col items-center justify-center h-40">
+              <CheckCircle className="h-8 w-8 mb-2 text-green-600 dark:text-green-500" />
+              <p className="text-sm font-medium text-foreground">No issues found</p>
+              <p className="text-xs text-muted-foreground mt-1">This board passed all DFM checks.</p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+              <Info className="h-8 w-8 mb-2" />
+              <p className="text-sm">No violations match this filter</p>
+            </div>
+          )
         ) : (
           displayViolations.map((v) => (
             <button

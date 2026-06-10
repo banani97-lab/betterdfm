@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { Archive, ArchiveRestore, FolderOpen, Inbox, Plus, Search, X } from 'lucide-react'
 import { getProjects, createProject, archiveProject, restoreProject, getSubmissions, type Project } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppTaskbar } from '@/components/ui/app-taskbar'
@@ -79,12 +81,14 @@ export default function ProjectsPage() {
     try {
       if (archived) {
         await restoreProject(id)
+        toast.success('Project restored')
       } else {
         await archiveProject(id)
+        toast.success('Project archived')
       }
       fetchProjects(search || undefined, showArchived)
     } catch (err: unknown) {
-      if (err instanceof Error) setError(err.message)
+      toast.error(`Couldn't ${archived ? 'restore' : 'archive'} project — ${friendlyReason(err)}`)
     }
   }
 
@@ -98,13 +102,14 @@ export default function ProjectsPage() {
         customerRef: newRef.trim() || undefined,
       })
       track('Project Created', { projectName: newName.trim() })
+      toast.success('Project created')
       setShowCreate(false)
       setNewName('')
       setNewDesc('')
       setNewRef('')
       fetchProjects(search || undefined)
     } catch (e: unknown) {
-      if (e instanceof Error) setError(e.message)
+      toast.error(`Couldn't create project — ${friendlyReason(e)}`)
     } finally {
       setCreating(false)
     }

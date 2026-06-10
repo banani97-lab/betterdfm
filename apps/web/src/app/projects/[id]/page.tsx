@@ -3,16 +3,19 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { Check, Edit2, FolderMinus, Plus, Share2, Upload } from 'lucide-react'
+import { Check, Edit2, FolderMinus, Loader2, Plus, RefreshCw, Share2, Upload, XCircle } from 'lucide-react'
 import {
   getProject,
   getProjectSubmissions,
+  startAnalysis,
   updateProject,
   unassignSubmission,
   type Project,
   type Submission,
 } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppTaskbar } from '@/components/ui/app-taskbar'
@@ -49,6 +52,7 @@ export default function ProjectDetailPage() {
   const [submissions, setSubmissions] = useState<Submission[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retrying, setRetrying] = useState<Set<string>>(new Set())
 
   // Inline editing
   const [editingName, setEditingName] = useState(false)
@@ -91,6 +95,38 @@ export default function ProjectDetailPage() {
     if (!isLoggedIn()) { router.replace('/login'); return }
     fetchData()
   }, [router, fetchData])
+
+  // Auto-refresh when any submission is ANALYZING (same cadence as the dashboard)
+  useEffect(() => {
+    const hasAnalyzing = submissions.some((s) => s.status === 'ANALYZING')
+    if (!hasAnalyzing) return
+    const t = setInterval(fetchData, 5000)
+    return () => clearInterval(t)
+  }, [submissions, fetchData])
+
+  // Refetch on window focus so statuses are never stale when the user returns
+  useEffect(() => {
+    const onFocus = () => {
+      if (isLoggedIn()) fetchData()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [fetchData])
+
+  const handleRetry = async (submissionId: string) => {
+    setRetrying((prev) => new Set(prev).add(submissionId))
+    try {
+      await startAnalysis(submissionId)
+      toast.info('Re-analysis started')
+      await fetchData()
+    } catch (e: unknown) {
+      // Refresh first so the list shows the real status, then surface the failure.
+      await fetchData()
+      toast.error(`Couldn't restart analysis — ${friendlyReason(e)}`)
+    } finally {
+      setRetrying((prev) => { const n = new Set(prev); n.delete(submissionId); return n })
+    }
+  }
 
   const saveField = async (field: 'name' | 'description' | 'customerRef', value: string) => {
     if (!project) return
@@ -406,8 +442,33 @@ export default function ProjectDetailPage() {
                         <Button variant="outline" className="h-11 px-5 text-sm">View Results</Button>
                       </Link>
                     )}
-                    {s.status !== 'DONE' && (
-                      <Badge variant="info" className="text-sm px-3 py-1.5">{s.status}</Badge>
+                    {s.status === 'UPLOADED' && (
+                      <Badge variant="gray" className="text-sm px-3 py-1.5">Uploaded</Badge>
+                    )}
+                    {s.status === 'ANALYZING' && (
+                      <Badge variant="info" className="text-sm px-3 py-1.5">
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Analyzing
+                      </Badge>
+                    )}
+                    {s.status === 'FAILED' && (
+                      <>
+                        <Badge variant="destructive" className="text-sm px-3 py-1.5">
+                          <XCircle className="h-3.5 w-3.5 mr-1.5" /> Failed
+                        </Badge>
+                        {canWrite() && (
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-11 w-11"
+                            onClick={() => handleRetry(s.id)}
+                            disabled={retrying.has(s.id)}
+                            aria-label="Retry analysis"
+                            title="Retry failed analysis"
+                          >
+                            <RefreshCw className={cn('h-5 w-5', retrying.has(s.id) && 'animate-spin')} />
+                          </Button>
+                        )}
+                      </>
                     )}
                     {canWrite() && (
                       <Button
