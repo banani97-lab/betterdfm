@@ -3,6 +3,7 @@ import {
   CognitoIdentityProviderClient,
   RespondToAuthChallengeCommand,
 } from '@aws-sdk/client-cognito-identity-provider'
+import { setRefreshCookie } from '../refresh-cookie'
 
 const REGION = process.env.NEXT_PUBLIC_COGNITO_REGION || 'us-east-1'
 const CLIENT_ID = process.env.NEXT_PUBLIC_COGNITO_CLIENT_ID || ''
@@ -30,7 +31,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })
     }
 
-    return NextResponse.json({ token })
+    const response = NextResponse.json({ token })
+    const refresh = res.AuthenticationResult?.RefreshToken
+    if (refresh) setRefreshCookie(response, refresh)
+    return response
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Failed to set new password'
     console.error('[auth/new-password]', msg)

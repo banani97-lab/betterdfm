@@ -1,4 +1,4 @@
-import { getStoredToken, clearToken } from './auth'
+import { getStoredToken, clearToken, isDevMode, isTokenExpiringSoon, refreshToken } from './auth'
 
 export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
 
@@ -205,16 +205,36 @@ export class ApiError extends Error {
 }
 
 async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const token = getStoredToken()
-  const res = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  })
+  // Request bodies here are always JSON strings (never streams), so the same
+  // init can safely be sent twice for the post-refresh retry below.
+  const doFetch = (token: string | null) =>
+    fetch(`${API_URL}${path}`, {
+      ...init,
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    })
+
+  let token = getStoredToken()
+  // Proactive refresh: when the token is within ~2 min of expiry, renew it
+  // first so the request doesn't burn a round-trip on a guaranteed 401.
+  if (!isDevMode() && token && isTokenExpiringSoon()) {
+    token = (await refreshToken()) ?? token
+  }
+
+  let res = await doFetch(token)
+
+  if (res.status === 401 && !isDevMode()) {
+    // The ID token likely just expired — silently refresh via the httpOnly
+    // cookie and retry the original request once.
+    const newToken = await refreshToken()
+    if (newToken) res = await doFetch(newToken)
+  }
+
   if (res.status === 401) {
+    // Refresh failed (or the retry also came back 401) — give up the session.
     clearToken()
     window.location.replace('/login')
     // Throw so callers never proceed with undefined data while the redirect
