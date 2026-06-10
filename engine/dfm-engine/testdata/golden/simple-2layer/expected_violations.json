@@ -1,0 +1,131 @@
+{
+  "ruleCounts": {
+    "annular-ring": 24,
+    "drill-size": 28,
+    "drill-to-copper": 3,
+    "pad-size-for-package": 1,
+    "trace-width": 152
+  },
+  "total": 208,
+  "score": 76,
+  "grade": "B",
+  "anchors": [
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "BOTTOMSOLDER",
+      "x": 6.401,
+      "y": 35.712,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "TOPSOLDER",
+      "x": 6.401,
+      "y": 35.712,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "TOPSOLDER",
+      "x": 298.958,
+      "y": 113.436,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 6.401,
+      "y": 35.712,
+      "measuredMM": 6.477,
+      "limitMM": 6.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 98.755,
+      "y": 65.405,
+      "measuredMM": 6.477,
+      "limitMM": 6.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 298.958,
+      "y": 113.436,
+      "measuredMM": 6.477,
+      "limitMM": 6.3
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 235.839,
+      "y": 114.046,
+      "measuredMM": 0.1016,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 260.477,
+      "y": 114.3,
+      "measuredMM": 0.1614,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 306.959,
+      "y": 151.003,
+      "measuredMM": 0.1524,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 379.316,
+      "y": 34.82,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 394.781,
+      "y": 36.522,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 402.684,
+      "y": 37.733,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    }
+  ]
+}

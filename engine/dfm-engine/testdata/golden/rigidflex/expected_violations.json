@@ -1,0 +1,404 @@
+{
+  "ruleCounts": {
+    "annular-ring": 500,
+    "aspect-ratio": 16168,
+    "clearance": 916,
+    "component-height": 1,
+    "component-spacing": 500,
+    "copper-sliver": 179,
+    "drill-size": 500,
+    "drill-to-copper": 171,
+    "drill-to-drill": 88,
+    "edge-clearance": 10,
+    "fiducial-placement": 1,
+    "pad-size-for-package": 1,
+    "solder-mask-dam": 2,
+    "through-hole-on-bottom": 1,
+    "trace-imbalance": 90,
+    "trace-width": 500,
+    "via-in-pad": 500
+  },
+  "total": 20128,
+  "score": 34,
+  "grade": "F",
+  "anchors": [
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": -0.8,
+      "y": 4,
+      "measuredMM": 0.0375,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 38.258,
+      "y": 41.223,
+      "measuredMM": 0.0875,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 75.639,
+      "y": 10.422,
+      "measuredMM": 0.0875,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "aspect-ratio",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": -3.525,
+      "y": 22.45,
+      "measuredMM": 16,
+      "limitMM": 10
+    },
+    {
+      "ruleId": "aspect-ratio",
+      "severity": "ERROR",
+      "layer": "D_2_3",
+      "x": 28,
+      "y": 28.8,
+      "measuredMM": 16,
+      "limitMM": 10
+    },
+    {
+      "ruleId": "aspect-ratio",
+      "severity": "ERROR",
+      "layer": "D_9_10",
+      "x": 76.399,
+      "y": 29.57,
+      "measuredMM": 16,
+      "limitMM": 10
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "FLEX_6",
+      "x": -77.65,
+      "y": 10.441,
+      "measuredMM": 0.0849,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "SIGNAL_3",
+      "x": 52.078,
+      "y": 33.884,
+      "measuredMM": 0.0944,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "SIGNAL_9",
+      "x": 72.438,
+      "y": 18.8,
+      "measuredMM": 0.1008,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 0.1,
+      "y": 28.1,
+      "measuredMM": 0.77,
+      "limitMM": 1.27
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 41.03,
+      "y": 3.3,
+      "measuredMM": 0.2,
+      "limitMM": 1.27
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "SIGNAL_10",
+      "x": 39.975,
+      "y": 32.475,
+      "measuredMM": 2.15,
+      "limitMM": 3.175
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 25.967,
+      "y": 27.209,
+      "measuredMM": 0.1,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "SIGNAL_3",
+      "x": 39.169,
+      "y": 29.896,
+      "measuredMM": 0.1,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "SIGNAL_3",
+      "x": 71.753,
+      "y": 6.766,
+      "measuredMM": 0.1,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": -0.8,
+      "y": 4,
+      "measuredMM": 0.1,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": 38.258,
+      "y": 41.223,
+      "measuredMM": 0.1,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": 75.639,
+      "y": 10.422,
+      "measuredMM": 0.1,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "FLEX_5",
+      "x": 15,
+      "y": 37.8,
+      "measuredMM": 0.2125,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "SIGNAL_2",
+      "x": 62.95,
+      "y": 37,
+      "measuredMM": 0.0875,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "SIGNAL_9",
+      "x": 62.45,
+      "y": 35.5,
+      "measuredMM": 0.186,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-drill",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": -3.525,
+      "y": 22.45,
+      "measuredMM": 0.13,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-drill",
+      "severity": "ERROR",
+      "layer": "D_3_8",
+      "x": -0.775,
+      "y": 22.632,
+      "measuredMM": 0.032,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-drill",
+      "severity": "ERROR",
+      "layer": "D_9_10",
+      "x": 3.653,
+      "y": 21.393,
+      "measuredMM": 0.0267,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "D_1_2",
+      "x": 77,
+      "y": 9.6,
+      "measuredMM": 0.2995,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "D_8_9",
+      "x": -2.491,
+      "y": 20.937,
+      "measuredMM": 0.2872,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "edge-clearance",
+      "severity": "ERROR",
+      "layer": "D_9_10",
+      "x": -2.357,
+      "y": 26.258,
+      "measuredMM": 0.2919,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "fiducial-placement",
+      "severity": "WARNING",
+      "layer": "",
+      "x": 36.025,
+      "y": 18.3,
+      "measuredMM": 1.6296,
+      "limitMM": 8.0813
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "solder-mask-dam",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 41.9,
+      "y": 21.193,
+      "measuredMM": 0,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "solder-mask-dam",
+      "severity": "WARNING",
+      "layer": "SIGNAL_10",
+      "x": 67.605,
+      "y": 23.833,
+      "measuredMM": 0,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "through-hole-on-bottom",
+      "severity": "WARNING",
+      "layer": "SOLDERMASK_BOTTOM",
+      "x": -75.81,
+      "y": 6.27,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 2.864,
+      "y": 28.429,
+      "measuredMM": 124.6347,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "SIGNAL_3",
+      "x": 11.555,
+      "y": 3.345,
+      "measuredMM": 2.7501,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "SIGNAL_9",
+      "x": 64.502,
+      "y": 17.754,
+      "measuredMM": 430.0009,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 3.49,
+      "y": 2.435,
+      "measuredMM": 0.1,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 50.618,
+      "y": 17.747,
+      "measuredMM": 0.1,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "SIGNAL_1",
+      "x": 76.2,
+      "y": 20.575,
+      "measuredMM": 0.1,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": -1,
+      "y": 36.8,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 46.86,
+      "y": 6.03,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "WARNING",
+      "layer": "SIGNAL_1",
+      "x": 73.262,
+      "y": 33.055,
+      "measuredMM": 0,
+      "limitMM": 0
+    }
+  ]
+}

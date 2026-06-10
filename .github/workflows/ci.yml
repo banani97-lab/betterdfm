@@ -35,6 +35,7 @@ jobs:
       - name: Download test ODB++ fixtures
         run: |
           aws s3 cp s3://betterdfm-testdata/rigidflex.tgz testdata/odb/ || true
+          aws s3 sync s3://betterdfm-testdata/golden/ engine/dfm-engine/testdata/golden/ --exclude '*' --include '*/board.json.gz' || true
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.TEST_AWS_KEY }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.TEST_AWS_SECRET }}

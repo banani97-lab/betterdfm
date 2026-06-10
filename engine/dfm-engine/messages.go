@@ -17,6 +17,36 @@ func msgClearancePadTooClose(measured, limit float64) (string, string) {
 		fmt.Sprintf("Increase spacing between trace and pad to at least %.4f mm.", limit)
 }
 
+// msgClearancePadPairTooClose is the electrical pad-to-pad clearance message.
+// Deliberately distinct from solder-mask-dam: that rule flags small gaps
+// between any-net pads as a WARNING about the mask web between them; this is
+// an ERROR about different-net copper below the fab's electrical clearance.
+func msgClearancePadPairTooClose(measured, limit float64) (string, string) {
+	return fmt.Sprintf("Pad-to-pad clearance %.4f mm between different nets is below minimum %.4f mm", measured, limit),
+		fmt.Sprintf("Increase spacing between the pads to at least %.4f mm.", limit)
+}
+
+// msgClearancePourTooClose covers copper-pour proximity findings. kind names
+// the other feature ("trace", "pad", "pour").
+func msgClearancePourTooClose(kind string, measured, limit float64) (string, string) {
+	return fmt.Sprintf("Copper pour to %s clearance %.4f mm between different nets is below minimum %.4f mm", kind, measured, limit),
+		fmt.Sprintf("Increase the pour clearance (thermal-relief / pour standoff) to at least %.4f mm.", limit)
+}
+
+// msgClearanceShort reports different-net copper that touches or overlaps -
+// a probable short, not a spacing issue.
+func msgClearanceShort(kind, netA, netB string) (string, string) {
+	a, b := netA, netB
+	if a == "" {
+		a = "?"
+	}
+	if b == "" {
+		b = "?"
+	}
+	return fmt.Sprintf("Overlapping %s copper on different nets (%s, %s) - probable short", kind, a, b),
+		"Separate the copper features; nets in contact will short during fabrication."
+}
+
 func msgDrillSizeBelow(label string, measured, limit float64) (string, string) {
 	return fmt.Sprintf("%s diameter %.4f mm is below minimum %.4f mm", label, measured, limit),
 		fmt.Sprintf("Increase %s diameter to at least %.4f mm.", label, limit)

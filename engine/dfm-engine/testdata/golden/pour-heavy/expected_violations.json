@@ -1,0 +1,373 @@
+{
+  "ruleCounts": {
+    "annular-ring": 500,
+    "clearance": 1992,
+    "component-height": 21,
+    "component-spacing": 134,
+    "copper-sliver": 246,
+    "drill-size": 500,
+    "drill-to-copper": 146,
+    "pad-size-for-package": 80,
+    "silkscreen-on-pad": 42,
+    "through-hole-on-bottom": 6,
+    "trace-imbalance": 27,
+    "trace-width": 500,
+    "via-in-pad": 500
+  },
+  "total": 4694,
+  "score": 34,
+  "grade": "F",
+  "anchors": [
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 15.8,
+      "y": 77.3,
+      "measuredMM": 0.125,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 125.3,
+      "y": 172.1,
+      "measuredMM": 0.125,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "annular-ring",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 423.8,
+      "y": 115.7,
+      "measuredMM": 0.125,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 25.5,
+      "y": 34.35,
+      "measuredMM": 0.1468,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "LAYER4",
+      "x": 122.65,
+      "y": 92.6,
+      "measuredMM": 0.1261,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "clearance",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 205.25,
+      "y": 148.5,
+      "measuredMM": 0.1252,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "ERROR",
+      "layer": "SMB",
+      "x": 270.25,
+      "y": 178.75,
+      "measuredMM": 26.416,
+      "limitMM": 5
+    },
+    {
+      "ruleId": "component-height",
+      "severity": "ERROR",
+      "layer": "SMT",
+      "x": 20,
+      "y": 19,
+      "measuredMM": 17,
+      "limitMM": 10
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "BOTTOM",
+      "x": 26.314,
+      "y": 164.1,
+      "measuredMM": 0.5903,
+      "limitMM": 1.27
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "TOP",
+      "x": 63.65,
+      "y": 67.4,
+      "measuredMM": 0.9251,
+      "limitMM": 1.27
+    },
+    {
+      "ruleId": "component-spacing",
+      "severity": "WARNING",
+      "layer": "TOP",
+      "x": 205.5,
+      "y": 145.25,
+      "measuredMM": 1.2229,
+      "limitMM": 1.27
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "LAYER2-GND",
+      "x": 0.509,
+      "y": 4.651,
+      "measuredMM": 0.0578,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "TOP",
+      "x": 80.675,
+      "y": 100.225,
+      "measuredMM": 0.0707,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "copper-sliver",
+      "severity": "WARNING",
+      "layer": "TOP",
+      "x": 441.066,
+      "y": 219.06,
+      "measuredMM": 0.0532,
+      "limitMM": 0.1
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 12,
+      "y": 232.5,
+      "measuredMM": 0.25,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 123.5,
+      "y": 89,
+      "measuredMM": 0.25,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-size",
+      "severity": "ERROR",
+      "layer": "DRILL",
+      "x": 214.75,
+      "y": 128,
+      "measuredMM": 0.25,
+      "limitMM": 0.3
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 29.7,
+      "y": 154,
+      "measuredMM": 0.1979,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 36.5,
+      "y": 17.9,
+      "measuredMM": 0.0286,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "drill-to-copper",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 362.25,
+      "y": 211.5,
+      "measuredMM": 0.2251,
+      "limitMM": 0.25
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "INFO",
+      "layer": "",
+      "x": 0,
+      "y": 0,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 84.05,
+      "y": 72.3,
+      "measuredMM": 1.8999,
+      "limitMM": 2.6
+    },
+    {
+      "ruleId": "pad-size-for-package",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 414.35,
+      "y": 105.6,
+      "measuredMM": 1.8999,
+      "limitMM": 2.6
+    },
+    {
+      "ruleId": "silkscreen-on-pad",
+      "severity": "ERROR",
+      "layer": "SSB",
+      "x": 28.804,
+      "y": 154.907,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "silkscreen-on-pad",
+      "severity": "ERROR",
+      "layer": "SSB",
+      "x": 152.975,
+      "y": 122.65,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "silkscreen-on-pad",
+      "severity": "ERROR",
+      "layer": "SST",
+      "x": 363.704,
+      "y": 127.855,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "through-hole-on-bottom",
+      "severity": "WARNING",
+      "layer": "SMB",
+      "x": 147.8,
+      "y": 43.6,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "through-hole-on-bottom",
+      "severity": "WARNING",
+      "layer": "SMB",
+      "x": 199.25,
+      "y": 63.75,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "through-hole-on-bottom",
+      "severity": "WARNING",
+      "layer": "SMB",
+      "x": 339.902,
+      "y": 30.56,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "BOTTOM",
+      "x": 96.45,
+      "y": 78.4,
+      "measuredMM": 4.3333,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 131.69,
+      "y": 49.25,
+      "measuredMM": 6.68,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-imbalance",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 339.1,
+      "y": 20.4,
+      "measuredMM": 200,
+      "limitMM": 2
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 29.9,
+      "y": 167,
+      "measuredMM": 0.102,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 98.079,
+      "y": -59.204,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "trace-width",
+      "severity": "ERROR",
+      "layer": "TOP",
+      "x": 244.078,
+      "y": -47.85,
+      "measuredMM": 0.127,
+      "limitMM": 0.15
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "INFO",
+      "layer": "TOP",
+      "x": 12.5,
+      "y": 138,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "INFO",
+      "layer": "TOP",
+      "x": 69,
+      "y": 172,
+      "measuredMM": 0,
+      "limitMM": 0
+    },
+    {
+      "ruleId": "via-in-pad",
+      "severity": "INFO",
+      "layer": "TOP",
+      "x": 416.4,
+      "y": 105.6,
+      "measuredMM": 0,
+      "limitMM": 0
+    }
+  ]
+}

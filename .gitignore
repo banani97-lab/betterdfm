@@ -29,6 +29,18 @@ dist/
 # AWS
 .aws/
 
+# Terraform (local state, backend config, and variable values stay out of git)
+*.tfstate
+*.tfstate.*
+*.tfvars
+infra/terraform/backend.hcl
+.terraform/
+.terraform.lock.hcl
+
+# Golden board fixtures (large binaries; fetched from s3://betterdfm-testdata/golden/)
+engine/dfm-engine/testdata/golden/**/board.json.gz
+engine/dfm-engine/testdata/golden/**/board.json
+
 # IDE
 .vscode/
 .idea/

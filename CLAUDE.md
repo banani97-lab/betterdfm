@@ -71,6 +71,14 @@ cd apps/web && pnpm test:run      # single run
 
 # DFM engine (Go)
 cd engine/dfm-engine && go test ./...
+# Golden boards: testdata/golden/<board>/ holds real parsed boards
+# (board.json.gz) + pinned expectations. Any rule-semantics change shows up
+# as a per-rule diff; rebaseline intentional changes with:
+#   go test -run TestGoldenBoards -update ./...
+# Regenerate board data after parser changes:
+#   cd sidecar/gerbonara && uv run python scripts/gen_golden.py <name>=<src> ...
+# Perf benchmarks over the pour-heavy golden:
+#   go test -bench BenchmarkGolden -run '^$' ./...
 
 # Sidecar (pytest)
 cd sidecar/gerbonara && pytest
@@ -107,6 +115,8 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 - **ODB++ parser**: `parser_odb.py` (custom archive extraction and feature parsing).
 - **Package-type classification**: the parser reads `eda/data` `PKG` records (pin grid + pad shapes) and sets `Component.packageType` (`discrete`/`leaded`/`bga`/`through_hole`) via mount type → IPC name token → geometric BGA detection → leaded residual. Consumed by the per-class `component-spacing` rule.
 - **All coordinates output in millimeters** — unit conversion happens in parsers.
+- **Net provenance**: traces, pads, and polygons carry `netSource` ("attr" = `.net=` on the record, "netlist" = cadnet netlist point at the feature, "inferred" = BFS propagation / majority vote). The engine's short detection only trusts attr/netlist labels.
+- **Custom-symbol pads are exact polygons**: `_scan_custom_symbol` emits a `POLYGON` shape with the largest boundary ring as `contour` (decimated to 64 points, symbol-relative); the P-record handler applies the full ODB++ orient transform (mirror + arbitrary-angle clockwise rotation) and emits board-space contour points. `w`/`h`/`x`/`y` stay the placed contour's bbox. The engine (`geom.go`) and viewer (`boardPainter.ts`) consume the contour for exact clearance/rendering, falling back to bbox when absent.
 - **Fallback mock data** if S3 is unavailable (dev mode).
 
 ## DFM rules
@@ -118,7 +128,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | Rule | Severity | What it checks |
 |------|----------|---------------|
 | trace-width | ERROR | Trace width >= minTraceWidthMM |
-| clearance | ERROR | Trace/pad spacing >= minClearanceMM |
+| clearance | ERROR | Trace-trace, trace-pad, pad-pad, and copper-pour (fill-aware: trace/pad/pour vs pour, holes subtracted) spacing >= minClearanceMM on each copper layer. Different-net copper in contact is flagged as a probable short (MeasuredMM 0) with evidence-proportional gating: trace crossings and traces passing through pads accept attr/netlist `netSource` labels; plain overlap/containment (pad-pad, pour containment, pour-pour) needs `.net=` attrs on both sides because real boards put intentional net-ties and dome fingers there. Inferred labels never short. |
 | drill-size | ERROR | Drill diameter within min/max bounds |
 | annular-ring | ERROR | Copper ring around vias >= minAnnularRingMM |
 | drill-to-drill | ERROR | Hole-to-hole spacing >= minDrillToDrillMM |
@@ -126,7 +136,7 @@ Deploy (`.github/workflows/deploy.yml`): path-filtered — only rebuilds/deploys
 | aspect-ratio | ERROR | Board thickness / drill diameter <= maxAspectRatio |
 | solder-mask-dam | WARNING | Solder mask bridge between pads >= minSolderMaskDamMM |
 | edge-clearance | ERROR | Copper distance from board outline >= minEdgeClearanceMM |
-| copper-sliver | WARNING | Copper feature width >= minCopperSliverMM |
+| copper-sliver | WARNING | Un-netted trace width >= minCopperSliverMM, plus pour-boundary self-proximity: two boundary segments of the same polygon (outer ring or holes) closer than the limit with copper between them (midpoint-in-fill test) — webs between clearance voids and fold-back necks. Same-ring pairs within 2x the limit of boundary arc length are adjacency, not necks; approaches under 20µm are encoding artifacts and ignored |
 | mounting-hole-keepout | WARNING | Copper keepout around non-plated mounting holes (>=2mm) >= `profile.MinMountingHoleKeepoutMM` (off when 0). IPC-2221B |
 | silkscreen-on-pad | ERROR | Silkscreen does not overlap pads |
 

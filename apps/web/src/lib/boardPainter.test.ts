@@ -259,3 +259,45 @@ describe('buildPaintList', () => {
     expect(at10.length).toBeGreaterThan(0)
   })
 })
+
+describe('POLYGON contour pads', () => {
+  it('fills the contour as a drawPolygon', () => {
+    const board = makeBoard({
+      pads: [{
+        layer: 'top_copper', x: 2, y: 1.5, widthMM: 4, heightMM: 3,
+        shape: 'POLYGON',
+        contour: [
+          { x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 1 },
+          { x: 1, y: 1 }, { x: 1, y: 3 }, { x: 0, y: 3 },
+        ],
+        netName: '', refDes: '',
+      }],
+    })
+    const list = buildPaintList(board, makeBounds(), [], new Set(), undefined, false)
+    const polys = list.filter(
+      (i): i is DrawPolygon => i.type === 'drawPolygon' && i.fillStyle === '#e8c050'
+    )
+    expect(polys).toHaveLength(1)
+    expect(polys[0].points).toHaveLength(6)
+    // tx(4) = 4 * 10 + 50 = 90
+    expect(polys[0].points[1]).toEqual({ x: 90, y: 50 })
+  })
+
+  it('falls back to bbox fillRect when contour is absent', () => {
+    const board = makeBoard({
+      pads: [{
+        layer: 'top_copper', x: 10, y: 10, widthMM: 4, heightMM: 2,
+        shape: 'POLYGON', netName: '', refDes: '',
+      }],
+    })
+    const list = buildPaintList(board, makeBounds(), [], new Set(), undefined, false)
+    const polys = list.filter(i => i.type === 'drawPolygon' && i.fillStyle === '#e8c050')
+    expect(polys).toHaveLength(0)
+    const rects = list.filter(
+      (i): i is FillRect => i.type === 'fillRect' && i.fillStyle === '#e8c050'
+    )
+    expect(rects).toHaveLength(1)
+    expect(rects[0].w).toBe(40)
+    expect(rects[0].h).toBe(20)
+  })
+})

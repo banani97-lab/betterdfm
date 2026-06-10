@@ -33,6 +33,10 @@ class Trace(BaseModel):
     endX: float
     endY: float
     netName: str = ""
+    # Provenance of netName: "attr" (.net= on the record), "netlist" (cadnet
+    # netlist point at the feature), "inferred" (BFS propagation / majority
+    # vote), "" (no net). Short detection only trusts attr/netlist.
+    netSource: str = ""
 
 
 class Pad(BaseModel):
@@ -47,6 +51,7 @@ class Pad(BaseModel):
     packageClass: str = ""  # e.g. "0201", "0402", "0603", "0805", "1206"
     contour: list[Point] = []  # polygon contour when shape == "POLYGON"
     holeMM: float = 0.0       # inner diameter when shape == "DONUT" (via catch-pad ring)
+    netSource: str = ""       # "attr" | "netlist" | "inferred" | "" — see Trace.netSource
     isFiducial: bool = False
     isViaCatchPad: bool = False
 
@@ -75,6 +80,7 @@ class Polygon(BaseModel):
     points: list[Point]
     holes: list[list[Point]] = []
     netName: str = ""
+    netSource: str = ""  # "attr" | "netlist" | "inferred" | "" — see Trace.netSource
 
 
 class Component(BaseModel):

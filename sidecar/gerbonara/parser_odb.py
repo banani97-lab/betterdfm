@@ -452,15 +452,74 @@ def _parse_profile(profile_path: Path, units: str) -> tuple[list[Point], list[li
 
 # ── Custom symbol geometry ────────────────────────────────────────────────────
 
+# Custom-symbol contours are decimated to this many points before being
+# attached to every pad instance. Contours land in the board_data JSONB/S3
+# blob once per pad placement, so an un-capped 16-segments-per-arc surface
+# would balloon board JSON on connector-heavy boards.
+_MAX_CONTOUR_POINTS = 64
+
+
+def _ring_area(ring: list[tuple[float, float]]) -> float:
+    """Absolute shoelace area of a point ring."""
+    n = len(ring)
+    if n < 3:
+        return 0.0
+    s = 0.0
+    for i in range(n):
+        x1, y1 = ring[i]
+        x2, y2 = ring[(i + 1) % n]
+        s += x1 * y2 - x2 * y1
+    return abs(s) / 2.0
+
+
+def _perp_dist(p: tuple[float, float], a: tuple[float, float],
+               b: tuple[float, float]) -> float:
+    """Perpendicular distance from p to the line through a-b."""
+    ax, ay = a
+    bx, by = b
+    px, py = p
+    dx, dy = bx - ax, by - ay
+    seg_len = math.hypot(dx, dy)
+    if seg_len < 1e-12:
+        return math.hypot(px - ax, py - ay)
+    return abs(dx * (ay - py) - dy * (ax - px)) / seg_len
+
+
+def _decimate_ring(ring: list[tuple[float, float]], max_pts: int) -> list[tuple[float, float]]:
+    """Reduce a ring to at most max_pts vertices by repeatedly dropping the
+    vertex whose removal introduces the least perpendicular error (the
+    flattest corner). Preserves overall shape far better than uniform
+    subsampling on arc-tessellated boundaries."""
+    pts = list(ring)
+    while len(pts) > max_pts:
+        n = len(pts)
+        best_i = 0
+        best_d = float("inf")
+        for i in range(n):
+            d = _perp_dist(pts[i], pts[(i - 1) % n], pts[(i + 1) % n])
+            if d < best_d:
+                best_d = d
+                best_i = i
+        pts.pop(best_i)
+    return pts
+
+
 def _scan_custom_symbol(features_path: Path, units: str) -> dict | None:
-    """Compute a bounding-box shape from a `<job>/symbols/<name>/features` file.
+    """Compute a shape dict from a `<job>/symbols/<name>/features` file.
 
     ODB++ "special" symbols (`special_*`, vendor-specific named shapes, etc.)
     encode their geometry as one or more positive surfaces (S P 0 ... SE)
     rather than encoding it in the name. The heuristic in `_parse_sym` can't
     size them, so without this they fall back to a 0.1mm circle and render
-    as invisible specks. We pick the union bbox of all surface vertices and
-    return it as a RECT — coarse but vastly better than the 0.1mm fallback.
+    as invisible specks.
+
+    Returns a POLYGON shape: `w`/`h` stay the union bbox of all surface
+    vertices (every existing consumer — renderer fallback, sweep windows,
+    padstack OD capture — keys off them), and `contour` carries the outer
+    boundary ring in mm relative to the symbol origin so the engine can do
+    exact polygon geometry. Multi-island symbols keep the largest-area ring
+    as the contour (a convex hull would be wrong for L-shaped pads) and set
+    `multi_ring` so the parse can surface a warning with a real-board count.
     """
     try:
         text = features_path.read_text(errors="replace")
@@ -472,52 +531,115 @@ def _scan_custom_symbol(features_path: Path, units: str) -> dict | None:
         if unit is not None:
             file_units = unit
             break
+    # Collect boundary ("I") rings; holes ("H") only feed the bbox.
+    rings: list[list[tuple[float, float]]] = []
     xs: list[float] = []
     ys: list[float] = []
-    last: tuple[float, float] | None = None
+    current: list[tuple[float, float]] | None = None
+    current_is_island = False
+
+    def _flush() -> None:
+        nonlocal current
+        if current is not None and current_is_island and len(current) >= 3:
+            rings.append(current)
+        current = None
+
     for line in text.splitlines():
         s = line.strip()
         parts = s.split()
         if not parts:
             continue
-        if parts[0] in ("OB", "OS") and len(parts) >= 3:
+        rec = parts[0]
+        if rec == "OB" and len(parts) >= 3:
+            _flush()
             try:
                 x = _coord_to_mm(float(parts[1]), file_units)
                 y = _coord_to_mm(float(parts[2]), file_units)
-                xs.append(x); ys.append(y)
-                last = (x, y)
             except ValueError:
-                pass
-        elif parts[0] == "OC" and len(parts) >= 6 and last is not None:
+                continue
+            current_is_island = (parts[3].upper() != "H") if len(parts) >= 4 else True
+            current = [(x, y)]
+            xs.append(x); ys.append(y)
+        elif rec == "OS" and len(parts) >= 3:
+            try:
+                x = _coord_to_mm(float(parts[1]), file_units)
+                y = _coord_to_mm(float(parts[2]), file_units)
+            except ValueError:
+                continue
+            xs.append(x); ys.append(y)
+            if current is not None:
+                current.append((x, y))
+        elif rec == "OC" and len(parts) >= 6 and current:
             try:
                 xe = _coord_to_mm(float(parts[1]), file_units)
                 ye = _coord_to_mm(float(parts[2]), file_units)
                 xc = _coord_to_mm(float(parts[3]), file_units)
                 yc = _coord_to_mm(float(parts[4]), file_units)
                 cw = parts[5].upper() == "Y"
-                x1, y1 = last
-                # Tessellate so the bbox captures arc bulges, not just chords.
+                x1, y1 = current[-1]
+                # Tessellate so the contour captures arc bulges, not just chords.
                 for _sx, _sy, ex, ey in _arc_segments(x1, y1, xe, ye, xc, yc, cw, n=16):
                     xs.append(ex); ys.append(ey)
-                last = (xe, ye)
+                    current.append((ex, ey))
             except ValueError:
                 pass
+        elif rec == "OE":
+            _flush()
+    _flush()
+
     if not xs or not ys:
         return None
     w = max(xs) - min(xs)
     h = max(ys) - min(ys)
     if w <= 0 or h <= 0:
         return None
-    return {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+    shape: dict = {"shape": "RECT", "w": w, "h": h, "inner": 0.0}
+    if rings:
+        contour = max(rings, key=_ring_area)
+        if _ring_area(contour) > 0:
+            # Drop a closing point duplicating the first vertex, then decimate.
+            if len(contour) > 1 and math.hypot(contour[-1][0] - contour[0][0],
+                                               contour[-1][1] - contour[0][1]) < 1e-9:
+                contour = contour[:-1]
+            if len(contour) >= 3:
+                shape["shape"] = "POLYGON"
+                shape["contour"] = _decimate_ring(contour, _MAX_CONTOUR_POINTS)
+                shape["multi_ring"] = len(rings) > 1
+    return shape
 
 
-def _load_custom_symbols(symbols_root: Path, units: str) -> dict[str, dict]:
+def _place_contour(
+    contour: list[tuple[float, float]],
+    x: float, y: float,
+    mirrored: bool, rotation_deg: float,
+) -> list[tuple[float, float]]:
+    """Transform a symbol-relative contour to board coordinates.
+
+    ODB++ orient semantics: mirror about the symbol Y axis first (x → -x),
+    then rotate clockwise by rotation_deg, then translate to the insertion
+    point. The ring is reversed after a mirror so winding stays consistent.
+    """
+    th = math.radians(rotation_deg % 360.0)
+    c, s = math.cos(th), math.sin(th)
+    out: list[tuple[float, float]] = []
+    for px, py in contour:
+        if mirrored:
+            px = -px
+        out.append((x + px * c + py * s, y - px * s + py * c))
+    if mirrored:
+        out.reverse()
+    return out
+
+
+def _load_custom_symbols(symbols_root: Path, units: str,
+                         warnings: list[str] | None = None) -> dict[str, dict]:
     """Pre-scan `<job>/symbols/<name>/features` for all custom symbols.
 
     Returns a name → shape dict keyed by both the original case and the
     lowercased form, since `_parse_sym` lowercases the input before matching.
     """
     out: dict[str, dict] = {}
+    multi_ring: list[str] = []
     if not symbols_root.is_dir():
         return out
     for d in symbols_root.iterdir():
@@ -530,6 +652,15 @@ def _load_custom_symbols(symbols_root: Path, units: str) -> dict[str, dict]:
         if shape is not None:
             out[d.name] = shape
             out[d.name.lower()] = shape
+            if shape.get("multi_ring"):
+                multi_ring.append(d.name)
+    if multi_ring and warnings is not None:
+        # Tracked so we learn how often multi-island custom pads occur on
+        # real boards — the contour keeps only the largest-area island.
+        warnings.append(
+            f"{len(multi_ring)} custom symbol(s) with multiple boundary islands; "
+            f"using largest island as contour: {', '.join(sorted(multi_ring)[:5])}"
+        )
     return out
 
 
@@ -748,6 +879,7 @@ def _build_features(
                     layer=layer_name,
                     points=[Point(x=x, y=y) for x, y in surface_pts],
                     netName=surface_net,
+                    netSource="attr" if surface_net else "",
                 )
             elif ltype == "SOLDER_MASK":
                 xs = [p[0] for p in surface_pts]
@@ -895,10 +1027,14 @@ def _build_features(
                     continue
                 mid_x = (x1 + x2) / 2
                 mid_y = (y1 + y2) / 2
-                net = _attr_net(raw) or (net_index.lookup(mid_x, mid_y) if net_index else "")
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(mid_x, mid_y)
+                    net_src = "netlist" if net else ""
                 traces.append(Trace(layer=layer_name, widthMM=max(0.01, trace_w),
                                     startX=x1, startY=y1, endX=x2, endY=y2,
-                                    netName=net))
+                                    netName=net, netSource=net_src))
             except (ValueError, IndexError):
                 pass
 
@@ -908,18 +1044,33 @@ def _build_features(
             try:
                 x = _coord_to_mm(float(parts[1]), units)
                 y = _coord_to_mm(float(parts[2]), units)
-                # ODB++ P record: P x y sym_num polarity dcode mirror rotation
-                # parts[7] is rotation in degrees (0/90/180/270). For RECT and
-                # OVAL pads, 90° and 270° rotations swap width and height.
+                # ODB++ P record: P x y sym_num polarity dcode orient [angle].
+                # orient (parts[6]) per spec: 0-3 = CW rotation of 90°×code,
+                # 4-7 = mirrored + 90°×(code-4), 8 = arbitrary CW angle in
+                # parts[7] degrees, 9 = mirrored + arbitrary angle. The old
+                # code only read parts[7], silently treating the short
+                # 0-3/4-7 form (no angle field) as unrotated.
                 rotation = 0.0
-                if len(parts) >= 8:
+                mirrored = False
+                if len(parts) >= 7:
                     try:
-                        rotation = float(parts[7])
+                        orient = int(float(parts[6]))
+                        if orient in (8, 9):
+                            mirrored = orient == 9
+                            if len(parts) >= 8:
+                                rotation = float(parts[7])
+                        elif 0 <= orient <= 7:
+                            mirrored = orient >= 4
+                            rotation = 90.0 * (orient % 4)
                     except ValueError:
-                        rotation = 0.0
+                        pass
                 sym = symbols.get(int(parts[3]), {"w": 0.5, "h": 0.5,
                                                    "shape": "CIRCLE", "inner": 0.0})
-                net = _attr_net(raw) or (net_index.lookup(x, y) if net_index else "")
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(x, y)
+                    net_src = "netlist" if net else ""
                 ref, pkg_class = refdes_index.lookup(x, y, layer_side) if refdes_index else ("", "")
                 if ltype == "DRILL" and drills is not None:
                     plated = "non" not in layer_name.lower() and "npth" not in layer_name.lower()
@@ -975,7 +1126,7 @@ def _build_features(
                                    heightMM=max(0.01, outer),
                                    shape="DONUT",
                                    holeMM=max(0.0, inner),
-                                   netName=net, refDes=ref,
+                                   netName=net, netSource=net_src, refDes=ref,
                                    packageClass=pkg_class,
                                    isViaCatchPad=True))
                     # Populate padstack_outer_mm so the matching drill record
@@ -1010,19 +1161,35 @@ def _build_features(
                                 if val in ("2", "3"):  # g_fiducial or l_fiducial
                                     is_fid = True
                                 break
-                    # Apply rotation: 90° and 270° swap width/height for
-                    # non-symmetric pads (RECT, OVAL). CIRCLE is invariant.
                     pw, ph = sym["w"], sym["h"]
-                    if sym["shape"] in ("RECT", "OVAL") and rotation:
-                        # Normalize to 0-360
+                    pad_x, pad_y = x, y
+                    contour_pts: list[Point] = []
+                    if sym["shape"] == "POLYGON" and sym.get("contour"):
+                        # Exact placement: full mirror + arbitrary-angle
+                        # rotation of the symbol contour. Keep w/h and x/y as
+                        # the placed contour's bbox so every bbox-keyed
+                        # consumer (renderer fallback, sweep windows,
+                        # padstack OD capture) stays consistent.
+                        placed = _place_contour(sym["contour"], x, y,
+                                                mirrored, rotation)
+                        cxs = [p[0] for p in placed]
+                        cys = [p[1] for p in placed]
+                        pw = max(cxs) - min(cxs)
+                        ph = max(cys) - min(cys)
+                        pad_x = (max(cxs) + min(cxs)) / 2
+                        pad_y = (max(cys) + min(cys)) / 2
+                        contour_pts = [Point(x=a, y=b) for a, b in placed]
+                    elif sym["shape"] in ("RECT", "OVAL") and rotation:
+                        # Parametric shapes keep the 90°/270° W/H swap.
                         r = rotation % 360
                         if abs(r - 90) < 1 or abs(r - 270) < 1:
                             pw, ph = ph, pw
-                    pads.append(Pad(layer=layer_name, x=x, y=y,
+                    pads.append(Pad(layer=layer_name, x=pad_x, y=pad_y,
                                    widthMM=max(0.01, pw),
                                    heightMM=max(0.01, ph),
                                    shape=sym["shape"],
-                                   netName=net, refDes=ref,
+                                   contour=contour_pts,
+                                   netName=net, netSource=net_src, refDes=ref,
                                    packageClass=pkg_class,
                                    isFiducial=is_fid))
                     # Capture padstack_id → min outer diameter seen across
@@ -1073,10 +1240,19 @@ def _build_features(
                 if ltype in ("COPPER", "POWER_GROUND") and trace_w < 0.05:
                     continue
                 w = max(0.01, trace_w)
-                net = _attr_net(raw) or (net_index.lookup(xc, yc) if net_index else "")
+                # Net lookup at the arc START point — a point on the copper
+                # path. The circle center (xc, yc) is off the trace entirely
+                # and can sit on another net's copper (e.g. an arc curving
+                # around a GND via), which mislabeled whole arc chains and
+                # surfaced as false different-net overlaps downstream.
+                net = _attr_net(raw)
+                net_src = "attr" if net else ""
+                if not net and net_index:
+                    net = net_index.lookup(x1, y1)
+                    net_src = "netlist" if net else ""
                 segs = _arc_segments(x1, y1, xe, ye, xc, yc, cw)
                 for sx1, sy1, sx2, sy2 in segs:
-                    traces.append(Trace(layer=layer_name, widthMM=w,
+                    traces.append(Trace(layer=layer_name, widthMM=w, netSource=net_src,
                                         startX=sx1, startY=sy1,
                                         endX=sx2, endY=sy2, netName=net))
             except (ValueError, IndexError):
@@ -1422,6 +1598,7 @@ def _infer_polygon_nets(
             tally[p.netName] = tally.get(p.netName, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            poly.netSource = "inferred"
             inferred["pads"] += 1
             continue
 
@@ -1438,6 +1615,7 @@ def _infer_polygon_nets(
             tally[t.netName] = tally.get(t.netName, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            poly.netSource = "inferred"
             inferred["traces"] += 1
             continue
 
@@ -1455,6 +1633,10 @@ def _infer_polygon_nets(
             tally[nname] = tally.get(nname, 0) + 1
         if tally:
             poly.netName = _majority(tally)
+            # Raw netlist points physically inside the pour are direct
+            # evidence, not a vote over other features' (possibly inferred)
+            # labels.
+            poly.netSource = "netlist"
             inferred["netlist"] += 1
             continue
 
@@ -1476,6 +1658,7 @@ def _infer_polygon_nets(
                 best_v_net = v.netName
         if best_v_net:
             poly.netName = best_v_net
+            poly.netSource = "inferred"
             inferred["nearest_via"] += 1
 
     total = sum(inferred.values())
@@ -1648,6 +1831,7 @@ def _propagate_trace_nets(
         for i, net in assigned.items():
             if not traces[i].netName:
                 traces[i].netName = net
+                traces[i].netSource = "inferred"
 
     total = total_seeded + total_propagated
     if total and warnings is not None:
@@ -2270,6 +2454,9 @@ def parse_odb(file_path: str) -> BoardData:
     outline_holes: list[list[Point]] = []
     warnings: list[str] = []
     polygons: list[Polygon] = []
+    # Declared before the try so the post-except materialization below can't
+    # hit UnboundLocalError when parsing aborts early (e.g. no steps dir).
+    components: list = []
 
     try:
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -2287,7 +2474,8 @@ def parse_odb(file_path: str) -> BoardData:
             outline, outline_holes = _parse_profile(step_root / "profile", units)
             logger.info("ODB++ outline: %d points, %d holes", len(outline), len(outline_holes))
 
-            custom_syms = _load_custom_symbols(job_root / "symbols", units)
+            custom_syms = _load_custom_symbols(job_root / "symbols", units,
+                                               warnings=warnings)
             if custom_syms:
                 # Each named symbol is registered twice (case + lowercased), so
                 # the symbol count is half the dict size.
@@ -2304,7 +2492,6 @@ def parse_odb(file_path: str) -> BoardData:
                 eda_pkgs = _parse_eda_packages(eda_data_path, units)
                 logger.info("ODB++ eda/data: %d packages", len(eda_pkgs))
 
-            components: list = []
             # ODB++ components can be at steps/<step>/components/{top,bot}
             # or steps/<step>/layers/comp_+_{top,bot}/components
             comp_search_paths = [
