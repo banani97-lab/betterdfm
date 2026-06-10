@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { AlertCircle, AlertTriangle, FolderOpen, Info, Plus, RefreshCw, Upload, X } from 'lucide-react'
+import { AlertCircle, AlertTriangle, FolderOpen, Info, Loader2, Plus, RefreshCw, Upload, X, XCircle } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
 import { canWrite, isLoggedIn } from '@/lib/auth'
 import { useUsage } from '@/lib/useUsage'
@@ -26,7 +26,7 @@ function formatDate(iso: string) {
 }
 
 interface ViolationCounts { errors: number; warnings: number; infos: number }
-interface OverviewEntry { counts: ViolationCounts; loading: boolean }
+interface OverviewEntry { counts: ViolationCounts; loading: boolean; error?: boolean }
 
 function generateBlurb(counts: ViolationCounts, score: number): string {
   const { errors, warnings, infos } = counts
@@ -70,19 +70,21 @@ export default function DashboardPage() {
   const { usage } = useUsage()
 
   const fetchSubmissions = useCallback(async () => {
-    try {
-      const [subsResult, projResult] = await Promise.allSettled([
-        getSubmissions(),
-        getProjects(undefined, false),
-      ])
-      setSubmissions(subsResult.status === 'fulfilled' ? (subsResult.value ?? []) : [])
-      setProjects(projResult.status === 'fulfilled' ? (projResult.value ?? []) : [])
+    const [subsResult, projResult] = await Promise.allSettled([
+      getSubmissions(),
+      getProjects(undefined, false),
+    ])
+    if (subsResult.status === 'fulfilled') {
+      setSubmissions(subsResult.value ?? [])
       setError(null)
-    } catch (e: unknown) {
-      if (e instanceof Error) setError(e.message)
-    } finally {
-      setLoading(false)
+    } else {
+      // Keep previously loaded submissions; surface the failure instead of
+      // rendering an empty list that reads as "no submissions yet".
+      const reason = subsResult.reason
+      setError(reason instanceof Error ? reason.message : 'Failed to load submissions')
     }
+    if (projResult.status === 'fulfilled') setProjects(projResult.value ?? [])
+    setLoading(false)
   }, [])
 
   useEffect(() => {
@@ -100,6 +102,17 @@ export default function DashboardPage() {
     const t = setInterval(fetchSubmissions, 5000)
     return () => clearInterval(t)
   }, [submissions, fetchSubmissions])
+
+  // Refetch on window focus so statuses are never stale when the user returns
+  // to an already-mounted dashboard (the 5s poll above only runs while a
+  // fetched submission is ANALYZING).
+  useEffect(() => {
+    const onFocus = () => {
+      if (isLoggedIn()) fetchSubmissions()
+    }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [fetchSubmissions])
 
   // Fetch violations when info panel opens for a completed submission
   useEffect(() => {
@@ -123,7 +136,7 @@ export default function DashboardPage() {
         setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts, loading: false } }))
       })
       .catch(() => {
-        setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts: { errors: 0, warnings: 0, infos: 0 }, loading: false } }))
+        setOverviewCache((prev) => ({ ...prev, [infoSubmissionId]: { counts: { errors: 0, warnings: 0, infos: 0 }, loading: false, error: true } }))
       })
   }, [infoSubmissionId, submissions, overviewCache])
 
@@ -132,8 +145,11 @@ export default function DashboardPage() {
     try {
       await startAnalysis(submissionId)
       await fetchSubmissions()
-    } catch {
-      // swallow — submission list will reflect state on next refresh
+    } catch (e: unknown) {
+      // Refresh first so the list shows the real status, then surface the
+      // failure (fetchSubmissions clears the error on success).
+      await fetchSubmissions()
+      setError(e instanceof Error ? `Failed to restart analysis: ${e.message}` : 'Failed to restart analysis')
     } finally {
       setRetrying((prev) => { const n = new Set(prev); n.delete(submissionId); return n })
     }
@@ -247,7 +263,7 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {error && (
+        {error && submissions.length > 0 && (
           <div className="mb-4 p-3 bg-destructive/10 border border-destructive/30 rounded text-sm text-destructive">
             {error}
           </div>
@@ -257,15 +273,30 @@ export default function DashboardPage() {
           <div className="flex items-center justify-center h-48">
             <div className="animate-spin h-6 w-6 border-4 border-blue-600 border-t-transparent rounded-full" />
           </div>
+        ) : submissions.length === 0 && error ? (
+          <div className="flex flex-col items-center justify-center h-64 border border-destructive/30 rounded-2xl bg-destructive/5">
+            <AlertCircle className="h-12 w-12 text-destructive mb-4" />
+            <h3 className="text-lg font-medium text-foreground">Failed to load submissions</h3>
+            <p className="text-sm text-muted-foreground mb-4 max-w-md text-center px-4">{error}</p>
+            <Button variant="outline" onClick={fetchSubmissions}>
+              <RefreshCw className="h-4 w-4 mr-2" /> Try again
+            </Button>
+          </div>
         ) : submissions.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-64 border-2 border-dashed border-border rounded-2xl bg-card/45">
             <Upload className="h-12 w-12 text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium text-foreground">No submissions yet</h3>
-            <p className="text-sm text-muted-foreground mb-4">Upload an ODB++ file to get started</p>
-            {canWrite() && (
-              <Link href="/upload">
-                <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
-              </Link>
+            {canWrite() ? (
+              <>
+                <p className="text-sm text-muted-foreground mb-4">Upload an ODB++ file to get started</p>
+                <Link href="/upload">
+                  <Button><Plus className="h-4 w-4 mr-2" /> Upload your first file</Button>
+                </Link>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground max-w-md text-center px-4">
+                You don&apos;t have permission to upload files. Contact your workspace admin to get access.
+              </p>
             )}
           </div>
         ) : (
@@ -316,13 +347,22 @@ export default function DashboardPage() {
                       variant="outline"
                       size="icon"
                       className={isCompact ? 'h-10 w-10 md:h-9 md:w-9' : 'h-11 w-11'}
-                      onClick={() => setInfoSubmissionId(s.id)}
+                      onClick={() => {
+                        // Drop a previously errored summary so reopening retries the fetch
+                        setOverviewCache((prev) => {
+                          if (!prev[s.id]?.error) return prev
+                          const next = { ...prev }
+                          delete next[s.id]
+                          return next
+                        })
+                        setInfoSubmissionId(s.id)
+                      }}
                       aria-label={`Show details for ${s.filename}`}
                       title="Show details"
                     >
                       <Info className={isCompact ? 'h-4 w-4' : 'h-5 w-5'} />
                     </Button>
-                    {s.status === 'DONE' && canWrite() && (
+                    {(s.status === 'DONE' || s.status === 'FAILED') && canWrite() && (
                       <Button
                         variant="outline"
                         size="icon"
@@ -330,7 +370,7 @@ export default function DashboardPage() {
                         onClick={() => handleRetry(s.id)}
                         disabled={retrying.has(s.id)}
                         aria-label="Retry analysis"
-                        title="Retry analysis with latest capability profile"
+                        title={s.status === 'FAILED' ? 'Retry failed analysis' : 'Retry analysis with latest capability profile'}
                       >
                         <RefreshCw className={cn(isCompact ? 'h-4 w-4' : 'h-5 w-5', retrying.has(s.id) && 'animate-spin')} />
                       </Button>
@@ -345,8 +385,18 @@ export default function DashboardPage() {
                         <Button variant="outline" className={isCompact ? 'h-10 px-3 text-sm md:h-9 md:text-xs' : 'h-11 px-5 text-sm'}>Analyze</Button>
                       </Link>
                     )}
-                    {s.status !== 'DONE' && s.status !== 'UPLOADED' && (
-                      <Badge variant="info" className={isCompact ? 'text-sm px-2.5 py-1.5 md:text-xs md:py-1' : 'text-sm px-3 py-1.5'}>{s.status}</Badge>
+                    {s.status === 'UPLOADED' && !canWrite() && (
+                      <Badge variant="gray" className={isCompact ? 'text-sm px-2.5 py-1.5 md:text-xs md:py-1' : 'text-sm px-3 py-1.5'}>Uploaded</Badge>
+                    )}
+                    {s.status === 'ANALYZING' && (
+                      <Badge variant="info" className={isCompact ? 'text-sm px-2.5 py-1.5 md:text-xs md:py-1' : 'text-sm px-3 py-1.5'}>
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" /> Analyzing
+                      </Badge>
+                    )}
+                    {s.status === 'FAILED' && (
+                      <Badge variant="destructive" className={isCompact ? 'text-sm px-2.5 py-1.5 md:text-xs md:py-1' : 'text-sm px-3 py-1.5'}>
+                        <XCircle className="h-3.5 w-3.5 mr-1.5" /> Failed
+                      </Badge>
                     )}
                   </div>
                 </li>
@@ -408,6 +458,8 @@ export default function DashboardPage() {
                           <div className="animate-spin h-4 w-4 border-2 border-muted-foreground border-t-transparent rounded-full" />
                           Loading…
                         </div>
+                      ) : entry?.error ? (
+                        <p className="text-sm text-muted-foreground">Couldn&apos;t load violation summary</p>
                       ) : entry ? (
                         <div className="flex items-center gap-4">
                           <span className="flex items-center gap-1.5 text-sm font-medium text-red-500">
@@ -428,6 +480,8 @@ export default function DashboardPage() {
                       <p className="text-xs uppercase tracking-[0.1em] text-muted-foreground mb-2">Overview</p>
                       {entry?.loading ? (
                         <div className="animate-pulse h-4 bg-muted rounded w-3/4" />
+                      ) : entry?.error ? (
+                        <p className="text-sm text-muted-foreground">Couldn&apos;t load violation summary</p>
                       ) : entry ? (
                         <p className="text-sm text-foreground leading-relaxed">
                           {generateBlurb(entry.counts, infoSubmission.mfgScore)}
