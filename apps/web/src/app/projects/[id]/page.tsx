@@ -14,6 +14,8 @@ import {
   type Submission,
 } from '@/lib/api'
 import { isLoggedIn, canWrite } from '@/lib/auth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import { useUsage } from '@/lib/useUsage'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppTaskbar } from '@/components/ui/app-taskbar'
@@ -115,12 +117,12 @@ export default function ProjectDetailPage() {
     setRetrying((prev) => new Set(prev).add(submissionId))
     try {
       await startAnalysis(submissionId)
+      toast.info('Re-analysis started')
       await fetchData()
     } catch (e: unknown) {
-      // Refresh first so the list shows the real status, then surface the
-      // failure (fetchData clears the error on success).
+      // Refresh first so the list shows the real status, then surface the failure.
       await fetchData()
-      setError(e instanceof Error ? `Failed to restart analysis: ${e.message}` : 'Failed to restart analysis')
+      toast.error(`Couldn't restart analysis — ${friendlyReason(e)}`)
     } finally {
       setRetrying((prev) => { const n = new Set(prev); n.delete(submissionId); return n })
     }

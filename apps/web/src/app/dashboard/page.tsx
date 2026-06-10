@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { AlertCircle, AlertTriangle, FolderOpen, Info, Loader2, Plus, RefreshCw, Upload, X, XCircle } from 'lucide-react'
 import { getSubmissions, getViolations, startAnalysis, getProjects, type Submission, type Project } from '@/lib/api'
 import { canWrite, isLoggedIn } from '@/lib/auth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import { useUsage } from '@/lib/useUsage'
 import { useUiSettings } from '@/lib/useUiSettings'
 import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
@@ -144,12 +146,12 @@ export default function DashboardPage() {
     setRetrying((prev) => new Set(prev).add(submissionId))
     try {
       await startAnalysis(submissionId)
+      toast.info('Re-analysis started')
       await fetchSubmissions()
     } catch (e: unknown) {
-      // Refresh first so the list shows the real status, then surface the
-      // failure (fetchSubmissions clears the error on success).
+      // Refresh first so the list shows the real status, then surface the failure.
       await fetchSubmissions()
-      setError(e instanceof Error ? `Failed to restart analysis: ${e.message}` : 'Failed to restart analysis')
+      toast.error(`Couldn't restart analysis — ${friendlyReason(e)}`)
     } finally {
       setRetrying((prev) => { const n = new Set(prev); n.delete(submissionId); return n })
     }

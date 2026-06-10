@@ -15,6 +15,7 @@ import { RapidDFMLogo } from '@/components/ui/rapiddfm-logo'
 import { AppTaskbar } from '@/components/ui/app-taskbar'
 import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
+import { toast } from '@/lib/toast'
 
 function scoreColor(n: number): string {
   if (n >= 90) return '#16a34a'
@@ -43,7 +44,6 @@ export default function ResultsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [boardError, setBoardError] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
   const [hiddenLayers, setHiddenLayers] = useState<Set<string>>(new Set())
   const [severityFilter, setSeverityFilter] = useState<SeverityFilter>('ERROR')
   const [ruleFilter, setRuleFilter] = useState<Set<string>>(new Set())
@@ -63,7 +63,6 @@ export default function ResultsPage() {
   }
 
   const handleIgnore = useCallback(async (v: Violation, ignored: boolean) => {
-    setActionError(null)
     // Optimistic update — reverted below if the API call fails.
     setViolations((prev) => prev.map((x) => x.id === v.id ? { ...x, ignored } : x))
     try {
@@ -71,13 +70,12 @@ export default function ResultsPage() {
       setJob((prev) => prev ? { ...prev, mfgScore: result.mfgScore, mfgGrade: result.mfgGrade } : prev)
     } catch {
       setViolations((prev) => prev.map((x) => x.id === v.id ? { ...x, ignored: v.ignored } : x))
-      setActionError(`Couldn't ${ignored ? 'ignore' : 'restore'} the violation — the change was not saved. Please try again.`)
+      toast.error("Couldn't update violation — the change was not saved")
     }
   }, [])
 
   const handleIgnoreLayer = useCallback(async (layer: string, ignored: boolean, severity?: string) => {
     if (!job) return
-    setActionError(null)
     const affects = (x: Violation) => x.layer === layer && (!severity || x.severity === severity)
     // Snapshot pre-change ignored flags so a failure can restore mixed states.
     const previous = new Map(violations.filter(affects).map((x) => [x.id, x.ignored]))
@@ -88,7 +86,7 @@ export default function ResultsPage() {
       setJob((prev) => prev ? { ...prev, mfgScore: result.mfgScore, mfgGrade: result.mfgGrade } : prev)
     } catch {
       setViolations((prev) => prev.map((x) => previous.has(x.id) ? { ...x, ignored: previous.get(x.id)! } : x))
-      setActionError(`Couldn't update violations on layer "${layer}" — the change was not saved. Please try again.`)
+      toast.error(`Couldn't update violations on layer "${layer}" — the change was not saved`)
     }
   }, [job, violations])
 
@@ -435,21 +433,6 @@ export default function ResultsPage() {
           )}
         </div>
       </header>
-
-      {/* Inline action error — a patch/ignore call failed and was rolled back */}
-      {actionError && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-red-500/10 border-b border-red-500/20 flex-shrink-0">
-          <AlertCircle className="h-4 w-4 text-red-500 shrink-0" />
-          <p className="flex-1 text-sm text-red-600 dark:text-red-400">{actionError}</p>
-          <button
-            type="button"
-            onClick={() => setActionError(null)}
-            className="text-xs text-red-600 dark:text-red-400 underline hover:no-underline shrink-0"
-          >
-            Dismiss
-          </button>
-        </div>
-      )}
 
       {/* Body: board + collapsible issues panel */}
       <div className={cn('flex flex-1 min-h-0 overflow-hidden', collapseToBottom ? 'flex-col' : 'flex-row')}>

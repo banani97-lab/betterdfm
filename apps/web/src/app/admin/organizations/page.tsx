@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Save, Plus, Building2, BarChart3, XCircle, AlertTriangle, Info, CheckCircle, UserPlus, Trash2 } from 'lucide-react'
 import { isAdminLoggedIn, adminApiFetch } from '@/lib/adminAuth'
+import { toast } from '@/lib/toast'
+import { friendlyReason } from '@/lib/errors'
 import type { Organization, User } from '@/lib/api'
 import { AppBackButton } from '@/components/ui/app-back-button'
 import { Button } from '@/components/ui/button'
@@ -35,7 +37,6 @@ export default function AdminOrganizationsPage() {
   const [logoUrl, setLogoUrl] = useState('')
   const [saving, setSaving] = useState(false)
   const [creating, setCreating] = useState(false)
-  const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null)
   const [newName, setNewName] = useState('')
   const [newSlug, setNewSlug] = useState('')
   const [stats, setStats] = useState<OrgStats | null>(null)
@@ -58,7 +59,7 @@ export default function AdminOrganizationsPage() {
       setOrgs(data ?? [])
       if (!selected && data?.length > 0) selectOrg(data[0])
     } catch (e: unknown) {
-      if (e instanceof Error) setMessage({ type: 'error', text: e.message })
+      toast.error(`Couldn't load organizations — ${friendlyReason(e)}`)
     }
   }
 
@@ -94,9 +95,9 @@ export default function AdminOrganizationsPage() {
       })
       await loadUsers(selected.id)
       setNewEmail('')
-      setMessage({ type: 'success', text: `Invited ${newEmail} as ${newRole}.` })
+      toast.success('User invited')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't invite user — ${friendlyReason(e)}`)
     } finally {
       setInviting(false)
     }
@@ -111,7 +112,7 @@ export default function AdminOrganizationsPage() {
       })
       await loadUsers(selected.id)
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't update role — ${friendlyReason(e)}`)
     }
   }
 
@@ -123,9 +124,9 @@ export default function AdminOrganizationsPage() {
         method: 'DELETE',
       })
       await loadUsers(selected.id)
-      setMessage({ type: 'success', text: 'User removed.' })
+      toast.success('User removed')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't remove user — ${friendlyReason(e)}`)
     }
   }
 
@@ -145,7 +146,6 @@ export default function AdminOrganizationsPage() {
   const handleSave = async () => {
     if (!selected) return
     setSaving(true)
-    setMessage(null)
     try {
       const updated = await adminApiFetch<Organization>(`/admin/organizations/${selected.id}`, {
         method: 'PUT',
@@ -153,9 +153,9 @@ export default function AdminOrganizationsPage() {
       })
       setSelected(updated)
       await loadOrgs()
-      setMessage({ type: 'success', text: 'Organization saved.' })
+      toast.success('Organization saved')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't save organization — ${friendlyReason(e)}`)
     } finally {
       setSaving(false)
     }
@@ -173,9 +173,9 @@ export default function AdminOrganizationsPage() {
       selectOrg(org)
       setNewName('')
       setNewSlug('')
-      setMessage({ type: 'success', text: 'Organization created.' })
+      toast.success('Organization created')
     } catch (e: unknown) {
-      setMessage({ type: 'error', text: e instanceof Error ? e.message : String(e) })
+      toast.error(`Couldn't create organization — ${friendlyReason(e)}`)
     } finally {
       setCreating(false)
     }
@@ -299,12 +299,6 @@ export default function AdminOrganizationsPage() {
                     <p className="text-sm text-slate-400 font-mono bg-slate-800 px-3 py-2 rounded border border-slate-700 h-10 flex items-center">{selected.id}</p>
                   </div>
                 </div>
-
-                {message && (
-                  <div className={`mt-4 p-3 rounded text-sm ${message.type === 'success' ? 'bg-green-900/30 text-green-400 border border-green-800' : 'bg-red-900/30 text-red-400 border border-red-800'}`}>
-                    {message.text}
-                  </div>
-                )}
 
                 <div className="mt-4 flex items-center justify-between">
                   <p className="text-xs text-slate-500">Created {new Date(selected.createdAt).toLocaleDateString()}</p>

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { ThemeInit } from '@/components/ui/ThemeInit'
 import { AnalyticsPageView } from '@/components/ui/AnalyticsPageView'
+import { Toaster } from '@/components/ui/Toaster'
 import darkFavicon from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
 import lightFavicon from '@/app/dashboard/RapidDFM Light Mode Favicon.png'
 import {
@@ -70,6 +71,7 @@ export default function RootLayout({
         <ThemeInit />
         <AnalyticsPageView />
         {children}
+        <Toaster />
       </body>
     </html>
   )
