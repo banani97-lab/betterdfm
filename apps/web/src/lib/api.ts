@@ -260,6 +260,10 @@ export async function getSubmissions(opts?: { unassigned?: boolean }): Promise<S
   return apiFetch<Submission[]>(`/submissions${qs}`)
 }
 
+export async function getSubmission(id: string): Promise<Submission> {
+  return apiFetch<Submission>(`/submissions/${id}`)
+}
+
 export async function createSubmission(
   filename: string,
   fileType: string,

@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { CheckCircle, XCircle, Upload, File, X, FolderOpen, Clock, AlertTriangle } from 'lucide-react'
 import {
   createSubmission,
+  getSubmission,
   uploadToS3,
   startAnalysis,
   getProfiles,
@@ -15,6 +16,7 @@ import {
   type CapabilityProfile,
   type AnalysisJob,
   type BatchDetail,
+  type Submission,
 } from '@/lib/api'
 import { pollJobUntilDone, pollBatchUntilDone, PollTimeoutError } from '@/lib/poll'
 import { isLoggedIn, canWrite } from '@/lib/auth'
@@ -27,7 +29,7 @@ import { cn } from '@/lib/utils'
 import { track } from '@/lib/analytics'
 import { readDirectoryEntry, packageFilesAsTar } from '@/lib/tarball'
 
-type Step = 'select' | 'packaging' | 'uploading' | 'analyzing' | 'partial' | 'timeout' | 'done' | 'error'
+type Step = 'select' | 'resume' | 'packaging' | 'uploading' | 'analyzing' | 'partial' | 'timeout' | 'done' | 'error'
 
 const STEPS = ['select', 'uploading', 'analyzing', 'done']
 
@@ -65,6 +67,9 @@ function UploadPageInner() {
   const searchParams = useSearchParams()
   const { usage } = useUsage()
   const projectId = searchParams.get('projectId') || undefined
+  // The dashboard's "Analyze" button links here with ?submissionId=… — the
+  // file is already in S3, so we resume at the analyze step, never re-upload.
+  const resumeId = searchParams.get('submissionId')
   const backHref = projectId ? `/projects/${projectId}` : '/dashboard'
   const backLabel = projectId ? 'Project' : 'Dashboard'
   // Single-file state (existing flow)
@@ -87,6 +92,8 @@ function UploadPageInner() {
   // Submission that uploaded successfully but whose analysis didn't finish —
   // lets the error screen offer "Retry analysis" without re-uploading.
   const [uploadedSubmissionId, setUploadedSubmissionId] = useState<string | null>(null)
+  // Already-uploaded submission being resumed via ?submissionId= (the 'resume' step).
+  const [resumeSubmission, setResumeSubmission] = useState<Submission | null>(null)
   // Filenames that failed to upload in a batch (drives the 'partial' step).
   const [failedUploads, setFailedUploads] = useState<string[]>([])
   // Final batch state so the done screen can report partial results honestly.
@@ -103,6 +110,32 @@ function UploadPageInner() {
       if (def) setProfileId(def.id)
     }).catch(() => {})
   }, [router])
+
+  // Resume an existing submission (?submissionId=…): the file is already in
+  // S3, so jump straight to the analyze step instead of the file picker.
+  useEffect(() => {
+    if (!resumeId) return
+    setStep('resume')
+    getSubmission(resumeId)
+      .then((sub) => {
+        if (sub.status === 'ANALYZING' || sub.status === 'DONE') {
+          // Already running or finished — the results page shows progress.
+          router.replace(sub.latestJobId ? `/results/${sub.latestJobId}` : '/dashboard')
+          return
+        }
+        // UPLOADED or FAILED: offer to (re-)run analysis without re-uploading.
+        setResumeSubmission(sub)
+        setUploadedSubmissionId(sub.id)
+      })
+      .catch((e: unknown) => {
+        setSelectError(
+          e instanceof ApiError && e.status === 404
+            ? "Couldn't find that submission — it may have been deleted. Upload the file again to analyze it."
+            : `Couldn't load the submission — ${friendlyError(e)}`
+        )
+        setStep('select')
+      })
+  }, [resumeId, router])
 
   // Warn before closing the tab while an upload/analysis is in flight.
   useEffect(() => {
@@ -415,6 +448,7 @@ function UploadPageInner() {
     setJob(null)
     setBatchId(null)
     setUploadedSubmissionId(null)
+    setResumeSubmission(null)
     setFailedUploads([])
     setFinalBatch(null)
     setStep('select')
@@ -428,6 +462,7 @@ function UploadPageInner() {
     step === 'error' ? 'done' :
     step === 'timeout' ? 'analyzing' :
     step === 'partial' ? 'uploading' :
+    step === 'resume' ? 'select' :
     step
   const stepIndex = STEPS.indexOf(stepForIndicator)
   const hasFiles = file !== null || files.length > 0
@@ -471,6 +506,52 @@ function UploadPageInner() {
             </div>
           ))}
         </div>
+
+        {/* Step: resume an already-uploaded submission (no re-upload) */}
+        {step === 'resume' && (
+          !resumeSubmission ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full" />
+              <p className="text-sm font-medium text-foreground">Loading submission...</p>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              <div className="flex items-center gap-3 px-4 py-4 border border-border rounded-lg bg-muted/40">
+                <File className="h-8 w-8 text-primary flex-shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground truncate">{resumeSubmission.filename}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {resumeSubmission.status === 'FAILED'
+                      ? 'Previous analysis failed — you can run it again.'
+                      : 'Already uploaded — ready to analyze.'}
+                  </p>
+                </div>
+                <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-1">Capability Profile</label>
+                <select
+                  value={profileId}
+                  onChange={(e) => setProfileId(e.target.value)}
+                  className="w-full border border-input bg-background rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                >
+                  <option value="">Default</option>
+                  {profiles.map((p) => (
+                    <option key={p.id} value={p.id}>{p.name}{p.isDefault ? ' (default)' : ''}</option>
+                  ))}
+                </select>
+              </div>
+
+              <Button onClick={() => guard(handleRetryAnalysis)} disabled={submitting} className="w-full">
+                {resumeSubmission.status === 'FAILED' ? 'Re-run Analysis' : 'Start Analysis'}
+              </Button>
+              <Button onClick={resetToSelect} variant="ghost" className="w-full">
+                Upload a different file instead
+              </Button>
+            </div>
+          )
+        )}
 
         {/* Step: packaging folder into tar */}
         {step === 'packaging' && (
