@@ -130,6 +130,35 @@ func padClosestPoint(pad Pad, px, py float64) (float64, float64) {
 			return px, py
 		}
 		return nearX + dx/d*r, nearY + dy/d*r
+	case "POLYGON":
+		if len(pad.Contour) >= 3 {
+			if pointInPolygon(px, py, pad.Contour) {
+				return px, py
+			}
+			bestX, bestY := pad.Contour[0].X, pad.Contour[0].Y
+			bestD := math.MaxFloat64
+			n := len(pad.Contour)
+			for i := 0; i < n; i++ {
+				a := pad.Contour[i]
+				b := pad.Contour[(i+1)%n]
+				cx, cy := closestPointOnSeg(px, py, a.X, a.Y, b.X, b.Y)
+				d := (px-cx)*(px-cx) + (py-cy)*(py-cy)
+				if d < bestD {
+					bestD = d
+					bestX, bestY = cx, cy
+				}
+			}
+			return bestX, bestY
+		}
+		// Fallback if contour not populated: max-dimension circle,
+		// mirroring padEdgeDist.
+		r := math.Max(pad.WidthMM, pad.HeightMM) / 2
+		dx, dy := px-pad.X, py-pad.Y
+		d := math.Sqrt(dx*dx + dy*dy)
+		if d <= r {
+			return px, py
+		}
+		return pad.X + dx/d*r, pad.Y + dy/d*r
 	default:
 		// Fallback: treat as circle with max dimension
 		r := math.Max(pad.WidthMM, pad.HeightMM) / 2
@@ -163,6 +192,20 @@ func padProjection(pad Pad, dx, dy float64) float64 {
 			return math.Abs(ux)*halfLen + r
 		}
 		return math.Abs(uy)*halfLen + r
+	case "POLYGON":
+		if len(pad.Contour) >= 3 {
+			// Support function of the contour: max projection of any vertex
+			// (relative to the pad center) onto the direction. Exact for
+			// convex contours, conservative (over-estimates) for concave.
+			best := 0.0
+			for _, p := range pad.Contour {
+				if d := math.Abs((p.X-pad.X)*ux + (p.Y-pad.Y)*uy); d > best {
+					best = d
+				}
+			}
+			return best
+		}
+		return math.Max(pad.WidthMM, pad.HeightMM) / 2
 	default:
 		return math.Max(pad.WidthMM, pad.HeightMM) / 2
 	}

@@ -39,6 +39,11 @@ type Trace struct {
 	EndX    float64 `json:"endX"`
 	EndY    float64 `json:"endY"`
 	NetName string  `json:"netName"`
+	// NetSource is the provenance of NetName: "attr" (.net= attribute on the
+	// record), "netlist" (netlist point at the feature), "inferred" (BFS
+	// propagation / majority vote), "" (unknown — older parser output or no
+	// net). Short detection only trusts attr/netlist labels.
+	NetSource string `json:"netSource,omitempty"`
 }
 
 type Pad struct {
@@ -53,6 +58,7 @@ type Pad struct {
 	PackageClass  string  `json:"packageClass,omitempty"` // e.g. "0201", "0402", "0603"
 	Contour       []Point `json:"contour,omitempty"`      // polygon contour points when Shape == "POLYGON"
 	HoleMM        float64 `json:"holeMM,omitempty"`       // inner diameter when Shape == "DONUT" (via catch-pad ring)
+	NetSource     string  `json:"netSource,omitempty"`    // provenance of NetName — see Trace.NetSource
 	IsFiducial    bool    `json:"isFiducial,omitempty"`
 	IsViaCatchPad bool    `json:"isViaCatchPad,omitempty"` // set by parser when pad sits on a drill hit
 }
@@ -75,10 +81,11 @@ type Drill struct {
 }
 
 type Polygon struct {
-	Layer   string    `json:"layer"`
-	Points  []Point   `json:"points"`
-	Holes   [][]Point `json:"holes,omitempty"`
-	NetName string    `json:"netName,omitempty"`
+	Layer     string    `json:"layer"`
+	Points    []Point   `json:"points"`
+	Holes     [][]Point `json:"holes,omitempty"`
+	NetName   string    `json:"netName,omitempty"`
+	NetSource string    `json:"netSource,omitempty"` // provenance of NetName — see Trace.NetSource
 }
 
 // Component is a single placed part from the ODB++ CMP records.
