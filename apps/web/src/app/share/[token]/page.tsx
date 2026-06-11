@@ -633,6 +633,7 @@ export default function SharedPage() {
               <ViolationList
                 violations={visibleViolations}
                 allViolations={layerFiltered}
+                totalCount={violations.length}
                 selectedId={selectedId}
                 onSelect={(v) => setSelectedId(prev => prev === v.id ? undefined : v.id)}
                 filter={severityFilter}
