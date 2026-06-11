@@ -43,6 +43,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={violations}
         allViolations={violations}
+        totalCount={violations.length}
         {...defaultProps}
       />
     )
@@ -60,6 +61,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={errorOnly}
         allViolations={allViols}
+        totalCount={allViols.length}
         filter="ERROR"
         onFilterChange={vi.fn()}
       />
@@ -76,6 +78,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={[activeViol]}
         allViolations={all}
+        totalCount={all.length}
         {...defaultProps}
       />
     )
@@ -89,6 +92,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={all}
         allViolations={all}
+        totalCount={all.length}
         {...defaultProps}
       />
     )
@@ -108,6 +112,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={violations}
         allViolations={violations}
+        totalCount={violations.length}
         {...defaultProps}
       />
     )
@@ -125,12 +130,27 @@ describe('ViolationList', () => {
       <ViolationList
         violations={[]}
         allViolations={[]}
+        totalCount={0}
         {...defaultProps}
       />
     )
     expect(screen.getByText('No issues found')).toBeInTheDocument()
     expect(screen.getByText('This board passed all DFM checks.')).toBeInTheDocument()
     expect(screen.queryByText(/No violations match this filter/i)).not.toBeInTheDocument()
+  })
+
+  it('does NOT claim a clean board when violations are merely hidden by the layer selection', () => {
+    render(
+      <ViolationList
+        violations={[]}
+        allViolations={[]} // caller layer-filters this; all layers hidden
+        totalCount={3}     // but the job has violations
+        {...defaultProps}
+      />
+    )
+    expect(screen.queryByText('No issues found')).not.toBeInTheDocument()
+    expect(screen.getByText('No violations on the visible layers')).toBeInTheDocument()
+    expect(screen.getByText(/3 hidden by the layer selection/i)).toBeInTheDocument()
   })
 
   it('shows the empty-filter state when violations exist but none match the active tab', () => {
@@ -141,6 +161,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={[]} // ERROR tab active, but only WARNINGs exist
         allViolations={allViols}
+        totalCount={allViols.length}
         filter="ERROR"
         onFilterChange={vi.fn()}
       />
@@ -161,6 +182,7 @@ describe('ViolationList', () => {
       <ViolationList
         violations={errorOnly}
         allViolations={allViols}
+        totalCount={allViols.length}
         filter="ERROR"
         onFilterChange={vi.fn()}
       />

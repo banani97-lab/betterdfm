@@ -24,6 +24,10 @@ const RULE_LABELS: Record<string, string> = {
 interface ViolationListProps {
   violations: Violation[]
   allViolations: Violation[]  // used for tab counts — not affected by severity filter
+  // Total violations on the job before ANY filtering (layers included). The
+  // positive "passed all checks" state keys off this, not allViolations,
+  // which is already layer-filtered by the caller.
+  totalCount: number
   selectedId?: string
   onSelect?: (v: Violation) => void
   filter: SeverityFilter
@@ -45,7 +49,7 @@ const severityBadgeVariant: Record<string, 'destructive' | 'warning' | 'info'> =
   INFO: 'info',
 }
 
-export function ViolationList({ violations, allViolations, selectedId, onSelect, filter, onFilterChange, onIgnore, ruleFilter: externalRuleFilter, onRuleFilterChange }: ViolationListProps) {
+export function ViolationList({ violations, allViolations, totalCount, selectedId, onSelect, filter, onFilterChange, onIgnore, ruleFilter: externalRuleFilter, onRuleFilterChange }: ViolationListProps) {
   const listRef = useRef<HTMLDivElement>(null)
   const [showIgnored, setShowIgnored] = useState(false)
   const [internalRuleFilter, setInternalRuleFilter] = useState<Set<string>>(new Set())
@@ -185,12 +189,19 @@ export function ViolationList({ violations, allViolations, selectedId, onSelect,
             <p className="text-sm">Violations hidden</p>
           </div>
         ) : displayViolations.length === 0 ? (
-          allViolations.length === 0 ? (
+          totalCount === 0 ? (
             // Truly clean board — distinct positive state, not an empty filter result
             <div className="flex flex-col items-center justify-center h-40">
               <CheckCircle className="h-8 w-8 mb-2 text-green-600 dark:text-green-500" />
               <p className="text-sm font-medium text-foreground">No issues found</p>
               <p className="text-xs text-muted-foreground mt-1">This board passed all DFM checks.</p>
+            </div>
+          ) : allViolations.length === 0 ? (
+            // Violations exist on the job but none are on the visible layers
+            <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
+              <Info className="h-8 w-8 mb-2" />
+              <p className="text-sm">No violations on the visible layers</p>
+              <p className="text-xs mt-1">{totalCount} hidden by the layer selection</p>
             </div>
           ) : (
             <div className="flex flex-col items-center justify-center h-40 text-muted-foreground">
