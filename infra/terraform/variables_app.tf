@@ -44,8 +44,8 @@ variable "service_cpu" {
   default = {
     web       = 512
     api       = 512
-    worker    = 512
-    gerbonara = 1024
+    worker    = 1024 # 1 vCPU: engine run over large boards
+    gerbonara = 2048 # 2 vCPU: parsing large (200MB+) ODB++ archives
   }
 }
 
@@ -55,8 +55,8 @@ variable "service_memory" {
   default = {
     web       = 1024
     api       = 1024
-    worker    = 1024
-    gerbonara = 2048
+    worker    = 4096 # holds full board JSON (unmarshal + re-marshal) + spatial grids
+    gerbonara = 8192 # peak parse memory for 200MB+ ODB++ (verbose text -> Python objects)
   }
 }
 

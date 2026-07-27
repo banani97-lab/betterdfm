@@ -306,7 +306,9 @@ export function uploadToS3(
     }
     const xhr = new XMLHttpRequest()
     xhr.open('PUT', presignedUrl)
-    xhr.timeout = 120_000
+    // Large ODB++ archives (200MB+) over a slow link need a wide window. Kept
+    // under the presigned URL's 30-min expiry (see PresignPutURL in aws.go).
+    xhr.timeout = 20 * 60_000
     if (onProgress) {
       xhr.upload.addEventListener('progress', (e) => {
         if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100))

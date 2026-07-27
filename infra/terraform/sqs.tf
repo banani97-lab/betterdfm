@@ -13,7 +13,7 @@ resource "aws_sqs_queue" "jobs_dlq" {
 resource "aws_sqs_queue" "jobs" {
   name                       = "${var.name_prefix}-jobs"
   kms_master_key_id          = aws_kms_key.main.arn
-  visibility_timeout_seconds = 900 # >= worst-case analysis time
+  visibility_timeout_seconds = 1800 # >= worst-case analysis time (large-board parse + engine)
   message_retention_seconds  = 345600
 
   redrive_policy = jsonencode({

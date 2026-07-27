@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import gzip
-import io
 import logging
 import math
 import re
@@ -2376,6 +2375,16 @@ def _refdes_lookup(x: float, y: float, components: list, tol: float = 1.0) -> tu
 
 # ── Archive extraction ────────────────────────────────────────────────────────
 
+def _safe_extract_tar(tf: tarfile.TarFile, tmpdir: str) -> None:
+    """extractall with the 'data' filter, which blocks path traversal and
+    device/special files in untrusted archives (customer-supplied ODB++). The
+    filter arg exists on Python 3.11.4+/3.12; fall back if it is unavailable."""
+    try:
+        tf.extractall(tmpdir, filter="data")
+    except TypeError:
+        tf.extractall(tmpdir)
+
+
 def _extract_odb_archive(file_path: str, tmpdir: str) -> None:
     """Extract ODB++ archive to tmpdir. Supports .zip, .tgz, and double-gzip variants."""
     if zipfile.is_zipfile(file_path):
@@ -2385,15 +2394,17 @@ def _extract_odb_archive(file_path: str, tmpdir: str) -> None:
 
     try:
         with tarfile.open(file_path, "r:*") as tf:
-            tf.extractall(tmpdir)
+            _safe_extract_tar(tf, tmpdir)
         return
     except Exception:
         pass
 
+    # Double-gzip / gzip-wrapped tar. Stream through gzip straight into tarfile
+    # (mode "r|*") rather than buffering the whole decompressed tar in memory —
+    # a 200MB archive can decompress to well over a gigabyte.
     with gzip.open(file_path, "rb") as gz:
-        inner = io.BytesIO(gz.read())
-    with tarfile.open(fileobj=inner, mode="r:*") as tf:
-        tf.extractall(tmpdir)
+        with tarfile.open(fileobj=gz, mode="r|*") as tf:
+            _safe_extract_tar(tf, tmpdir)
 
 
 def _find_job_root(tmp: Path) -> Path:

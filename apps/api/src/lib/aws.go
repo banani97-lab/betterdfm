@@ -73,13 +73,15 @@ func NewAWSClients(ctx context.Context, bucket, queueURL, userPoolID string) (*A
 	}, nil
 }
 
-// PresignPutURL generates a presigned S3 PUT URL valid for 15 minutes.
+// PresignPutURL generates a presigned S3 PUT URL valid for 30 minutes. The
+// window must cover a large-file upload (200MB+ over a slow link), so it is
+// kept in sync with the client-side upload timeout in api.ts (uploadToS3).
 func (a *AWSClients) PresignPutURL(ctx context.Context, key, contentType string) (string, error) {
 	req, err := a.S3Presign.PresignPutObject(ctx, &s3.PutObjectInput{
 		Bucket:      aws.String(a.Bucket),
 		Key:         aws.String(key),
 		ContentType: aws.String(contentType),
-	}, s3.WithPresignExpires(15*time.Minute))
+	}, s3.WithPresignExpires(30*time.Minute))
 	if err != nil {
 		return "", fmt.Errorf("presign put: %w", err)
 	}
