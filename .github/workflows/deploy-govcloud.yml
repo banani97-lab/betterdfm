@@ -46,6 +46,10 @@ jobs:
           ECR: ${{ vars.GOVCLOUD_ECR_REGISTRY }}
           SHA: ${{ github.sha }}
           SERVICES: ${{ github.event.inputs.services }}
+          GOVCLOUD_API_URL: ${{ vars.GOVCLOUD_API_URL }}
+          GOVCLOUD_COGNITO_REGION: ${{ vars.GOVCLOUD_COGNITO_REGION }}
+          GOVCLOUD_COGNITO_CLIENT_ID: ${{ vars.GOVCLOUD_COGNITO_CLIENT_ID }}
+          GOVCLOUD_ADMIN_COGNITO_CLIENT_ID: ${{ vars.GOVCLOUD_ADMIN_COGNITO_CLIENT_ID }}
         run: |
           set -euo pipefail
           build_push() { # name, dockerfile, context, extra build args
@@ -60,14 +64,32 @@ jobs:
             echo "::endgroup::"
           }
 
+          # Fail fast on missing web build args. An empty client id here bakes a
+          # broken bundle: the frontend falls into "dev mode", skips login, gets a
+          # 401 from the prod API, and hard-reloads /admin forever. Better to stop
+          # the deploy with a clear message than to ship the reload loop.
+          require_web_vars() {
+            local missing=""
+            for v in GOVCLOUD_API_URL GOVCLOUD_COGNITO_REGION \
+                     GOVCLOUD_COGNITO_CLIENT_ID GOVCLOUD_ADMIN_COGNITO_CLIENT_ID; do
+              [ -n "${!v:-}" ] || missing="$missing $v"
+            done
+            if [ -n "$missing" ]; then
+              echo "::error::Missing required repo variable(s) for the web build:$missing" \
+                   "— set them from 'terraform output' (see the header of this workflow)."
+              exit 1
+            fi
+          }
+
           for svc in $SERVICES; do
             case "$svc" in
               web)
+                require_web_vars
                 build_push web apps/web/Dockerfile apps/web \
-                  --build-arg "NEXT_PUBLIC_API_URL=${{ vars.GOVCLOUD_API_URL }}" \
-                  --build-arg "NEXT_PUBLIC_COGNITO_REGION=${{ vars.GOVCLOUD_COGNITO_REGION }}" \
-                  --build-arg "NEXT_PUBLIC_COGNITO_CLIENT_ID=${{ vars.GOVCLOUD_COGNITO_CLIENT_ID }}" \
-                  --build-arg "NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID=${{ vars.GOVCLOUD_ADMIN_COGNITO_CLIENT_ID }}"
+                  --build-arg "NEXT_PUBLIC_API_URL=$GOVCLOUD_API_URL" \
+                  --build-arg "NEXT_PUBLIC_COGNITO_REGION=$GOVCLOUD_COGNITO_REGION" \
+                  --build-arg "NEXT_PUBLIC_COGNITO_CLIENT_ID=$GOVCLOUD_COGNITO_CLIENT_ID" \
+                  --build-arg "NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID=$GOVCLOUD_ADMIN_COGNITO_CLIENT_ID"
                 ;;
               api)       build_push api apps/api/Dockerfile . ;;
               worker)    build_push worker workers/dfm-worker/Dockerfile . ;;

@@ -10,6 +10,14 @@ import {
 const ADMIN_CLIENT_ID = process.env.NEXT_PUBLIC_ADMIN_COGNITO_CLIENT_ID || ''
 
 export function isAdminDevMode(): boolean {
+  // Never enter the admin auth bypass in a production build, even if the admin
+  // Cognito client ID is missing. In production a missing client ID is a
+  // misconfiguration, not an invitation to skip auth (the API is the
+  // authoritative gate and fails closed). Mirrors isDevMode() in auth.ts.
+  // Without this guard, a govcloud build with no admin client ID treats the
+  // user as logged in, hits a 401 from the API, hard-redirects to /admin/login,
+  // which bounces straight back to /admin — an endless reload loop.
+  if (process.env.NODE_ENV === 'production') return false
   return !ADMIN_CLIENT_ID
 }
 
