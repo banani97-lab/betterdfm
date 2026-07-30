@@ -86,9 +86,6 @@ function UploadPageInner() {
   const [job, setJob] = useState<AnalysisJob | null>(null)
   const [errorMsg, setErrorMsg] = useState<string>('')
   const [batchId, setBatchId] = useState<string | null>(null)
-  // Non-CUI alpha guardrail: uploads are blocked until the user affirms the
-  // design is not ITAR-controlled or CUI / export-controlled technical data.
-  const [nonCuiAck, setNonCuiAck] = useState(false)
   // Inline messages on the select step (size rejections, batch-cap truncation).
   const [selectError, setSelectError] = useState<string>('')
   const [capWarning, setCapWarning] = useState<string>('')
@@ -308,7 +305,7 @@ function UploadPageInner() {
     setProgress(0)
     setUploadedSubmissionId(null)
     try {
-      const { submissionId, presignedUrl } = await createSubmission(file.name, fileType, projectId, nonCuiAck)
+      const { submissionId, presignedUrl } = await createSubmission(file.name, fileType, projectId)
       await uploadToS3(presignedUrl, file, setProgress)
       // The file is in S3 now — remember the submission so an analysis
       // failure can be retried without re-uploading.
@@ -367,7 +364,7 @@ function UploadPageInner() {
         filename: f.file.name,
         fileType: f.fileType,
       }))
-      const batchResp = await createBatch(batchFiles, undefined, profileId || undefined, nonCuiAck)
+      const batchResp = await createBatch(batchFiles, undefined, profileId || undefined)
       setBatchId(batchResp.batchId)
 
       // 2. Upload all files in parallel, collecting failures
@@ -678,26 +675,7 @@ function UploadPageInner() {
               </div>
             </div>
 
-            {/* Non-CUI alpha guardrail */}
-            <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 space-y-3">
-              <p className="text-xs font-medium text-amber-800 dark:text-amber-300">
-                Alpha access: this environment is not authorized for export-controlled data.
-                Do not upload ITAR-controlled or CUI / export-controlled technical data.
-              </p>
-              <label className="flex items-start gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={nonCuiAck}
-                  onChange={(e) => setNonCuiAck(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600"
-                />
-                <span className="text-xs text-foreground">
-                  I confirm this design is not ITAR-controlled or CUI / export-controlled technical data.
-                </span>
-              </label>
-            </div>
-
-            <Button onClick={handleUpload} disabled={!hasFiles || !nonCuiAck || submitting} className="w-full">
+            <Button onClick={handleUpload} disabled={!hasFiles || submitting} className="w-full">
               {isBatch ? `Upload & Analyze ${files.length} Files` : 'Upload & Analyze'}
             </Button>
 

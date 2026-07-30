@@ -267,8 +267,7 @@ export async function getSubmission(id: string): Promise<Submission> {
 export async function createSubmission(
   filename: string,
   fileType: string,
-  projectId?: string,
-  nonCuiAcknowledged?: boolean
+  projectId?: string
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return apiFetch('/submissions', {
     method: 'POST',
@@ -276,7 +275,6 @@ export async function createSubmission(
       filename,
       fileType,
       ...(projectId ? { projectId } : {}),
-      nonCuiAcknowledged: !!nonCuiAcknowledged,
     }),
   })
 }
@@ -442,12 +440,11 @@ export interface CreateBatchResponse {
 export async function createBatch(
   files: Array<{ filename: string; fileType: string }>,
   projectId?: string,
-  profileId?: string,
-  nonCuiAcknowledged?: boolean
+  profileId?: string
 ): Promise<CreateBatchResponse> {
   return apiFetch('/batches', {
     method: 'POST',
-    body: JSON.stringify({ files, projectId, profileId, nonCuiAcknowledged: !!nonCuiAcknowledged }),
+    body: JSON.stringify({ files, projectId, profileId }),
   })
 }
 
@@ -665,7 +662,7 @@ export async function getSharedBoardData(token: string, jobId: string): Promise<
 
 export async function sharedUpload(
   token: string,
-  data: { filename: string; fileType: string; uploaderName: string; uploaderEmail: string; nonCuiAcknowledged: boolean }
+  data: { filename: string; fileType: string; uploaderName: string; uploaderEmail: string }
 ): Promise<{ submissionId: string; presignedUrl: string; fileKey: string }> {
   return shareFetch(token, '/upload', { method: 'POST', body: JSON.stringify(data) })
 }

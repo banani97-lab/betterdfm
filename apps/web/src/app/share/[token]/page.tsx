@@ -63,14 +63,11 @@ export default function SharedPage() {
   const uploadFileType = 'ODB_PLUS_PLUS' as const
   const [dragOver, setDragOver] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
-  // Non-CUI alpha guardrail: external portal uploads must affirm the design is
-  // not ITAR-controlled or CUI / export-controlled technical data.
-  const [nonCuiAck, setNonCuiAck] = useState(false)
 
   const trimmedName = uploadName.trim()
   const trimmedEmail = uploadEmail.trim()
   const emailLooksValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)
-  const contactReady = trimmedName.length > 0 && emailLooksValid && nonCuiAck
+  const contactReady = trimmedName.length > 0 && emailLooksValid
 
   const toggleLayer = (name: string) => {
     setHiddenLayers((prev) => {
@@ -190,7 +187,6 @@ export default function SharedPage() {
         fileType: uploadFileType,
         uploaderName: name,
         uploaderEmail: email,
-        nonCuiAcknowledged: nonCuiAck,
       })
       if (result.presignedUrl) {
         await uploadToS3(result.presignedUrl, file, setUploadProgress)
@@ -334,22 +330,6 @@ export default function SharedPage() {
                         className="w-full px-3 py-2 text-sm border border-border rounded-lg bg-background focus:outline-none focus:ring-2 focus:ring-ring transition-shadow"
                       />
                     </div>
-                  </div>
-
-                  {/* Non-CUI alpha guardrail */}
-                  <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 mb-3">
-                    <label className="flex items-start gap-2 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={nonCuiAck}
-                        onChange={(e) => setNonCuiAck(e.target.checked)}
-                        className="mt-0.5 h-4 w-4 shrink-0 accent-amber-600"
-                      />
-                      <span className="text-xs text-foreground">
-                        This portal does not accept export-controlled data. I confirm this design is
-                        not ITAR-controlled or CUI / export-controlled technical data.
-                      </span>
-                    </label>
                   </div>
 
                   {/* Drop zone */}
@@ -531,20 +511,11 @@ export default function SharedPage() {
             onChange={(e) => setUploadEmail(e.target.value)}
             className="px-2 py-1 text-sm border rounded bg-background w-36"
           />
-          <label className="flex items-center gap-1.5 cursor-pointer" title="This portal does not accept export-controlled data.">
-            <input
-              type="checkbox"
-              checked={nonCuiAck}
-              onChange={(e) => setNonCuiAck(e.target.checked)}
-              className="h-3.5 w-3.5 shrink-0 accent-amber-600"
-            />
-            <span className="text-xs text-muted-foreground whitespace-nowrap">Not export-controlled / CUI</span>
-          </label>
           <input
             type="file"
             accept=".zip,.tgz,.tar.gz"
             disabled={uploading || !contactReady}
-            title={contactReady ? undefined : 'Enter your name and email, and confirm the data notice, to upload'}
+            title={contactReady ? undefined : 'Enter your name and email to upload'}
             onChange={(e) => {
               const file = e.target.files?.[0]
               if (file) handleFileUpload(file)
@@ -552,7 +523,7 @@ export default function SharedPage() {
             className={cn('text-sm', !contactReady && 'opacity-60 cursor-not-allowed')}
           />
           {!contactReady && (
-            <span className="text-xs text-muted-foreground">Name, email &amp; confirmation required</span>
+            <span className="text-xs text-muted-foreground">Name &amp; email required</span>
           )}
           {uploading && (
             <div className="flex-1 max-w-32">

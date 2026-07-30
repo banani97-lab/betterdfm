@@ -127,7 +127,9 @@ resource "aws_ecs_task_definition" "api" {
       { name = "COGNITO_USER_POOL_ID", value = aws_cognito_user_pool.main.id },
       { name = "COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.app.id },
       { name = "ADMIN_COGNITO_CLIENT_ID", value = aws_cognito_user_pool_client.admin.id },
-      { name = "NON_CUI_ALPHA_MODE", value = "true" },
+      # Lifted: the GovCloud boundary is authorized to accept controlled
+      # (ITAR/CUI) data, so the non-CUI alpha acknowledgment gate is off.
+      { name = "NON_CUI_ALPHA_MODE", value = "false" },
     ])
     secrets          = local.db_secret
     logConfiguration = local.log_config["api"]
