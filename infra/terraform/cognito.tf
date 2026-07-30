@@ -28,6 +28,24 @@ resource "aws_cognito_user_pool" "main" {
 
   admin_create_user_config {
     allow_admin_create_user_only = true
+
+    # Invitation email sent by AdminCreateUser. {username} and {####} (the
+    # temporary password) are required placeholders. Spells out the three steps
+    # so an invited user knows what the account is and how to get in.
+    invite_message_template {
+      email_subject = "Your RapidDFM account is ready"
+      email_message = <<-EOT
+        <p>You've been given access to <strong>RapidDFM</strong>, the PCB design-for-manufacturability analysis platform.</p>
+        <p><strong>To get started:</strong></p>
+        <ol>
+          <li>Go to <a href="https://app.gov.rapiddfm.com/login">app.gov.rapiddfm.com/login</a></li>
+          <li>Sign in with your email and this temporary password: <strong>{####}</strong></li>
+          <li>You'll be prompted to create your own password.</li>
+        </ol>
+        <p>Your sign-in username is <strong>{username}</strong>.</p>
+        <p>If you weren't expecting this invitation, you can safely ignore this email.</p>
+      EOT
+    }
   }
 
   account_recovery_setting {
