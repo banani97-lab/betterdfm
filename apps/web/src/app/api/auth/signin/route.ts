@@ -35,6 +35,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ challenge: 'NEW_PASSWORD_REQUIRED', session: res.Session })
     }
 
+    // MFA is enforced pool-wide. A user with no authenticator yet gets
+    // MFA_SETUP; an enrolled user gets SOFTWARE_TOKEN_MFA. Surface both so the
+    // client can drive enrollment / code entry.
+    if (res.ChallengeName === 'MFA_SETUP' || res.ChallengeName === 'SOFTWARE_TOKEN_MFA') {
+      return NextResponse.json({ challenge: res.ChallengeName, session: res.Session })
+    }
+
     const token = res.AuthenticationResult?.IdToken
     if (!token) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })

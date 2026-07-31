@@ -3,10 +3,11 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { signIn, completeNewPassword, forgotPassword, resetPassword, isLoggedIn, isDevMode } from '@/lib/auth'
+import { signIn, completeNewPassword, forgotPassword, resetPassword, isLoggedIn, isDevMode, associateSoftwareToken, verifyMfaSetup, respondMfaChallenge } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MfaPanel } from '@/components/ui/MfaPanel'
 import { COMPANY_NAME, APP_NAME, APP_TITLE } from '@/lib/branding'
 import { track } from '@/lib/analytics'
 import logoMark from '@/app/dashboard/RapidDFM Dark Mode Favicon.png'
@@ -20,6 +21,10 @@ export default function LoginPage() {
   const [newPasswordSession, setNewPasswordSession] = useState<string | null>(null)
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
+  const [mfaSetupSession, setMfaSetupSession] = useState<string | null>(null)
+  const [mfaChallengeSession, setMfaChallengeSession] = useState<string | null>(null)
+  const [mfaSecret, setMfaSecret] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
   const [forgotStep, setForgotStep] = useState<'off' | 'email' | 'code'>('off')
   const [resetCode, setResetCode] = useState('')
   const [resetEmail, setResetEmail] = useState('')
@@ -31,6 +36,13 @@ export default function LoginPage() {
     if (isLoggedIn()) router.replace('/dashboard')
   }, [router])
 
+  // Exchange an MFA_SETUP session for a TOTP secret and show the setup panel.
+  const startMfaSetup = async (session: string) => {
+    const assoc = await associateSoftwareToken(session)
+    setMfaSecret(assoc.secretCode)
+    setMfaSetupSession(assoc.session)
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
@@ -39,6 +51,10 @@ export default function LoginPage() {
       const result = await signIn(email, password)
       if (result.kind === 'new_password_required') {
         setNewPasswordSession(result.session)
+      } else if (result.kind === 'mfa_setup') {
+        await startMfaSetup(result.session)
+      } else if (result.kind === 'mfa_challenge') {
+        setMfaChallengeSession(result.session)
       } else {
         track('Session Created', { email })
         router.replace('/dashboard')
@@ -47,6 +63,36 @@ export default function LoginPage() {
       const message = err instanceof Error ? err.message : 'Sign in failed'
       track('Session Failed', { email, reason: message })
       setError(message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaSetup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await verifyMfaSetup(email, mfaCode, mfaSetupSession!)
+      track('Session Created', { email })
+      router.replace('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to verify authenticator')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaChallenge = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await respondMfaChallenge(email, mfaCode, mfaChallengeSession!)
+      track('Session Created', { email })
+      router.replace('/dashboard')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid authenticator code')
     } finally {
       setLoading(false)
     }
@@ -105,9 +151,17 @@ export default function LoginPage() {
     }
     setLoading(true)
     try {
-      await completeNewPassword(email, newPassword, newPasswordSession!)
+      const result = await completeNewPassword(email, newPassword, newPasswordSession!)
       track('Password Updated', { email })
-      router.replace('/dashboard')
+      if (result.kind === 'mfa_setup') {
+        setNewPasswordSession(null)
+        await startMfaSetup(result.session)
+      } else if (result.kind === 'mfa_challenge') {
+        setNewPasswordSession(null)
+        setMfaChallengeSession(result.session)
+      } else {
+        router.replace('/dashboard')
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to set new password')
     } finally {
@@ -232,6 +286,33 @@ export default function LoginPage() {
                 Back to sign in
               </button>
             </>
+          ) : mfaChallengeSession ? (
+            <MfaPanel
+              mode="challenge"
+              issuer={APP_NAME}
+              account={email}
+              code={mfaCode}
+              onCodeChange={setMfaCode}
+              onSubmit={handleMfaChallenge}
+              loading={loading}
+              error={error}
+              buttonClassName="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1"
+              inputClassName="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+            />
+          ) : mfaSetupSession ? (
+            <MfaPanel
+              mode="setup"
+              issuer={APP_NAME}
+              account={email}
+              secret={mfaSecret}
+              code={mfaCode}
+              onCodeChange={setMfaCode}
+              onSubmit={handleMfaSetup}
+              loading={loading}
+              error={error}
+              buttonClassName="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold h-11 mt-1"
+              inputClassName="bg-white/10 border-white/20 text-white placeholder:text-blue-300/50 focus:border-blue-400"
+            />
           ) : newPasswordSession ? (
             <>
               <h2 className="text-xl font-semibold text-white mb-1">Set your password</h2>

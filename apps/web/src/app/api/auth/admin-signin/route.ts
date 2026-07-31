@@ -43,6 +43,13 @@ export async function POST(req: NextRequest) {
       })
     )
 
+    // MFA is enforced pool-wide, so admin logins get the same challenges.
+    // The admin console is a privileged account, so this is the control that
+    // matters most (NIST 800-171 IA-2).
+    if (res.ChallengeName === 'MFA_SETUP' || res.ChallengeName === 'SOFTWARE_TOKEN_MFA') {
+      return NextResponse.json({ challenge: res.ChallengeName, session: res.Session })
+    }
+
     const token = res.AuthenticationResult?.IdToken
     if (!token) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })

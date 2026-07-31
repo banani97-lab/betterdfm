@@ -148,6 +148,8 @@ export function refreshToken(): Promise<string | null> {
 export type SignInResult =
   | { kind: 'ok' }
   | { kind: 'new_password_required'; session: string }
+  | { kind: 'mfa_setup'; session: string }
+  | { kind: 'mfa_challenge'; session: string }
 
 export async function signIn(email: string, password: string): Promise<SignInResult> {
   if (isDevMode()) {
@@ -170,13 +172,68 @@ export async function signIn(email: string, password: string): Promise<SignInRes
   if (data.challenge === 'NEW_PASSWORD_REQUIRED') {
     return { kind: 'new_password_required', session: data.session }
   }
+  if (data.challenge === 'MFA_SETUP') {
+    return { kind: 'mfa_setup', session: data.session }
+  }
+  if (data.challenge === 'SOFTWARE_TOKEN_MFA') {
+    return { kind: 'mfa_challenge', session: data.session }
+  }
 
-  setStoredToken(data.token)
+  finishSignIn(data.token)
+  return { kind: 'ok' }
+}
+
+/** Store the ID token and fire analytics identify (no-op in gov). */
+function finishSignIn(token: string): void {
+  setStoredToken(token)
   try {
-    const payload = JSON.parse(atob(data.token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+    const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
     identify(payload.sub, { email: payload.email, orgId: payload['custom:orgId'], role: payload['custom:role'] })
   } catch { /* ignore parse errors */ }
-  return { kind: 'ok' }
+}
+
+// ── TOTP MFA ────────────────────────────────────────────────────────────────
+
+/**
+ * Begin TOTP enrollment for an MFA_SETUP challenge. Returns the shared secret
+ * (for manual entry into an authenticator app) and a fresh session to pass to
+ * verifyMfaSetup. Shared by the app and admin flows (client-agnostic).
+ */
+export async function associateSoftwareToken(
+  session: string,
+): Promise<{ secretCode: string; session: string }> {
+  const res = await fetch('/api/auth/mfa/associate', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to start MFA setup')
+  return { secretCode: data.secretCode, session: data.session }
+}
+
+/** Complete TOTP enrollment (app flow); stores the ID token on success. */
+export async function verifyMfaSetup(email: string, code: string, session: string): Promise<void> {
+  const res = await fetch('/api/auth/mfa/verify-setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, session, client: 'app' }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to verify authenticator')
+  finishSignIn(data.token)
+}
+
+/** Answer a returning-user MFA challenge (app flow); stores the token. */
+export async function respondMfaChallenge(email: string, code: string, session: string): Promise<void> {
+  const res = await fetch('/api/auth/mfa/challenge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, session, client: 'app' }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Invalid authenticator code')
+  finishSignIn(data.token)
 }
 
 export async function forgotPassword(email: string): Promise<void> {
@@ -209,11 +266,16 @@ export async function resetPassword(
   }
 }
 
+export type NewPasswordResult =
+  | { kind: 'ok' }
+  | { kind: 'mfa_setup'; session: string }
+  | { kind: 'mfa_challenge'; session: string }
+
 export async function completeNewPassword(
   email: string,
   newPassword: string,
   session: string,
-): Promise<void> {
+): Promise<NewPasswordResult> {
   const res = await fetch('/api/auth/new-password', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -226,5 +288,14 @@ export async function completeNewPassword(
     throw new Error(data.error || 'Failed to set new password')
   }
 
+  // First login can chain straight into MFA enrollment.
+  if (data.challenge === 'MFA_SETUP') {
+    return { kind: 'mfa_setup', session: data.session }
+  }
+  if (data.challenge === 'SOFTWARE_TOKEN_MFA') {
+    return { kind: 'mfa_challenge', session: data.session }
+  }
+
   setStoredToken(data.token)
+  return { kind: 'ok' }
 }

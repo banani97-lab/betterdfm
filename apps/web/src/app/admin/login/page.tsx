@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { adminSignIn, isAdminLoggedIn, isAdminDevMode } from '@/lib/adminAuth'
+import { adminSignIn, isAdminLoggedIn, isAdminDevMode, adminVerifyMfaSetup, adminRespondMfaChallenge } from '@/lib/adminAuth'
+import { associateSoftwareToken } from '@/lib/auth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { MfaPanel } from '@/components/ui/MfaPanel'
 import { ADMIN_APP_NAME, COMPANY_NAME } from '@/lib/branding'
 
 export default function AdminLoginPage() {
@@ -14,20 +16,64 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mfaSetupSession, setMfaSetupSession] = useState<string | null>(null)
+  const [mfaChallengeSession, setMfaChallengeSession] = useState<string | null>(null)
+  const [mfaSecret, setMfaSecret] = useState('')
+  const [mfaCode, setMfaCode] = useState('')
 
   useEffect(() => {
     if (isAdminLoggedIn()) router.replace('/admin')
   }, [router])
+
+  const startMfaSetup = async (session: string) => {
+    const assoc = await associateSoftwareToken(session)
+    setMfaSecret(assoc.secretCode)
+    setMfaSetupSession(assoc.session)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
     setLoading(true)
     try {
-      await adminSignIn(email, password)
-      router.replace('/admin')
+      const result = await adminSignIn(email, password)
+      if (result.kind === 'mfa_setup') {
+        await startMfaSetup(result.session)
+      } else if (result.kind === 'mfa_challenge') {
+        setMfaChallengeSession(result.session)
+      } else {
+        router.replace('/admin')
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Sign in failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaSetup = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await adminVerifyMfaSetup(email, mfaCode, mfaSetupSession!)
+      router.replace('/admin')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to verify authenticator')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleMfaChallenge = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(null)
+    setLoading(true)
+    try {
+      await adminRespondMfaChallenge(email, mfaCode, mfaChallengeSession!)
+      router.replace('/admin')
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Invalid authenticator code')
     } finally {
       setLoading(false)
     }
@@ -47,6 +93,35 @@ export default function AdminLoginPage() {
         </div>
 
         <div className="bg-white/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20">
+          {mfaChallengeSession ? (
+            <MfaPanel
+              mode="challenge"
+              issuer={ADMIN_APP_NAME}
+              account={email}
+              code={mfaCode}
+              onCodeChange={setMfaCode}
+              onSubmit={handleMfaChallenge}
+              loading={loading}
+              error={error}
+              buttonClassName="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold h-11 mt-1"
+              inputClassName="bg-white/10 border-white/20 text-white placeholder:text-slate-400/50 focus:border-orange-400"
+            />
+          ) : mfaSetupSession ? (
+            <MfaPanel
+              mode="setup"
+              issuer={ADMIN_APP_NAME}
+              account={email}
+              secret={mfaSecret}
+              code={mfaCode}
+              onCodeChange={setMfaCode}
+              onSubmit={handleMfaSetup}
+              loading={loading}
+              error={error}
+              buttonClassName="w-full bg-orange-600 hover:bg-orange-500 text-white font-semibold h-11 mt-1"
+              inputClassName="bg-white/10 border-white/20 text-white placeholder:text-slate-400/50 focus:border-orange-400"
+            />
+          ) : (
+          <>
           <h2 className="text-xl font-semibold text-white mb-1">Admin Login</h2>
           <p className="text-slate-300 text-sm mb-6">Sign in with your admin credentials.</p>
 
@@ -99,6 +174,8 @@ export default function AdminLoginPage() {
               {loading ? 'Signing in…' : 'Sign in'}
             </Button>
           </form>
+          </>
+          )}
         </div>
       </div>
     </div>

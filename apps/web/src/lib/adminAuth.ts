@@ -50,10 +50,15 @@ export function isAdminLoggedIn(): boolean {
   return !!getAdminToken() && isAdminTokenValid()
 }
 
-export async function adminSignIn(email: string, password: string): Promise<void> {
+export type AdminSignInResult =
+  | { kind: 'ok' }
+  | { kind: 'mfa_setup'; session: string }
+  | { kind: 'mfa_challenge'; session: string }
+
+export async function adminSignIn(email: string, password: string): Promise<AdminSignInResult> {
   if (isAdminDevMode()) {
     setAdminToken('dev-admin-token')
-    return
+    return { kind: 'ok' }
   }
 
   const res = await fetch('/api/auth/admin-signin', {
@@ -68,6 +73,38 @@ export async function adminSignIn(email: string, password: string): Promise<void
     throw new Error(data.error || 'Admin sign in failed')
   }
 
+  if (data.challenge === 'MFA_SETUP') {
+    return { kind: 'mfa_setup', session: data.session }
+  }
+  if (data.challenge === 'SOFTWARE_TOKEN_MFA') {
+    return { kind: 'mfa_challenge', session: data.session }
+  }
+
+  setAdminToken(data.token)
+  return { kind: 'ok' }
+}
+
+/** Complete admin TOTP enrollment; stores the admin token on success. */
+export async function adminVerifyMfaSetup(email: string, code: string, session: string): Promise<void> {
+  const res = await fetch('/api/auth/mfa/verify-setup', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, session, client: 'admin' }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Failed to verify authenticator')
+  setAdminToken(data.token)
+}
+
+/** Answer a returning admin MFA challenge; stores the admin token. */
+export async function adminRespondMfaChallenge(email: string, code: string, session: string): Promise<void> {
+  const res = await fetch('/api/auth/mfa/challenge', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, code, session, client: 'admin' }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || 'Invalid authenticator code')
   setAdminToken(data.token)
 }
 

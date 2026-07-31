@@ -26,6 +26,12 @@ export async function POST(req: NextRequest) {
       })
     )
 
+    // Setting the password can chain directly into MFA enrollment (an invited
+    // user's first login: NEW_PASSWORD_REQUIRED -> MFA_SETUP). Surface that.
+    if (res.ChallengeName === 'MFA_SETUP' || res.ChallengeName === 'SOFTWARE_TOKEN_MFA') {
+      return NextResponse.json({ challenge: res.ChallengeName, session: res.Session })
+    }
+
     const token = res.AuthenticationResult?.IdToken
     if (!token) {
       return NextResponse.json({ error: 'No token returned from Cognito' }, { status: 502 })
