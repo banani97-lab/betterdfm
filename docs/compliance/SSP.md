@@ -24,7 +24,7 @@
 | Deployment | AWS GovCloud (US), region `us-gov-west-1`, account `665462955903`, partition `aws-us-gov`. |
 | Separation | Physically and logically separate AWS account/partition from the commercial (Vercel/commercial-AWS) edition. No shared data plane. |
 | Access model | Invite-only; US-persons only (see §3, §4 AC/PS). No public self-signup. |
-| System owner | [Owner name] |
+| System owner | Basel Anani |
 | ISSO | [To be designated] |
 
 ### 1.1 Authorization boundary
@@ -221,12 +221,12 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 
 | ID | Gap | Control(s) | Planned action | Owner | Target |
 |---|---|---|---|---|---|
-| POA&M-01 | Internal service-to-service traffic is plaintext HTTP within the VPC | 3.13.8, 3.1.3 | Implement internal encryption (internal ACM/TLS or mTLS/service mesh) between web↔api and worker↔gerbonara | [Owner] | [date] |
-| POA&M-02 | Deploy uses a broad IAM user, not a scoped role | 3.1.5 | Move deploys to the least-privilege OIDC deploy role; retire the standing admin user for routine deploys | [Owner] | [date] |
-| POA&M-03 | Vulnerability scanning, flaw-remediation SLA, upload AV, audit-review procedure not formalized | 3.3.3–3.3.5, 3.11.2–3.11.3, 3.14.1–3.14.5 | Add dependency/image scanning + upload scanning; document remediation SLA and log-review procedure | [Owner] | [date] |
-| POA&M-04 | Awareness training, IR test, formal risk + security self-assessment (SPRS) not yet done | 3.2.x, 3.6.x, 3.11.1, 3.12.1/3.12.3 | Complete awareness training, IR tabletop, risk assessment, and 800-171 self-assessment → SPRS score | [Owner] | [date] |
-| POA&M-05 | Policy set + provisioning-time US-persons attestation + login banner + change-control docs | 3.1.9/3.1.10/3.1.20, 3.4.3/3.4.4, 3.5.6, 3.8.4, 3.9.1 | Author policies (access, retention, change mgmt, media marking); add US-persons attestation at user creation; add login notice | [Owner] | [date] |
-| POA&M-06 | Single-operator limits separation of duties | 3.1.4 | Compensating controls (full audit logging, MFA) documented; revisit as team grows | [Owner] | [date] |
+| POA&M-01 | Internal service-to-service traffic is plaintext HTTP within the VPC | 3.13.8, 3.1.3 | Implement internal encryption (internal ACM/TLS or mTLS/service mesh) between web↔api and worker↔gerbonara | Basel Anani | [date] |
+| POA&M-02 | Deploy uses a broad IAM user, not a scoped role | 3.1.5 | Move deploys to the least-privilege OIDC deploy role; retire the standing admin user for routine deploys | Basel Anani | [date] |
+| POA&M-03 | Vulnerability scanning, flaw-remediation SLA, upload AV, audit-review procedure not formalized | 3.3.3–3.3.5, 3.11.2–3.11.3, 3.14.1–3.14.5 | Add dependency/image scanning + upload scanning; document remediation SLA and log-review procedure | Basel Anani | [date] |
+| POA&M-04 | Awareness training, IR test, formal risk + security self-assessment (SPRS) not yet done | 3.2.x, 3.6.x, 3.11.1, 3.12.1/3.12.3 | Complete awareness training, IR tabletop, risk assessment, and 800-171 self-assessment → SPRS score | Basel Anani | [date] |
+| POA&M-05 | Policy set + provisioning-time US-persons attestation + login banner + change-control docs | 3.1.9/3.1.10/3.1.20, 3.4.3/3.4.4, 3.5.6, 3.8.4, 3.9.1 | Author policies (access, retention, change mgmt, media marking); add US-persons attestation at user creation; add login notice | Basel Anani | [date] |
+| POA&M-06 | Single-operator limits separation of duties | 3.1.4 | Compensating controls (full audit logging, MFA) documented; revisit as team grows | Basel Anani | [date] |
 
 ---
 
