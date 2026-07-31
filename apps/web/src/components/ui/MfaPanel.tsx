@@ -1,5 +1,6 @@
 'use client'
 
+import { QRCodeSVG } from 'qrcode.react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -21,6 +22,14 @@ interface MfaPanelProps {
 /** Insert a space every 4 chars so the TOTP secret is readable for manual entry. */
 function formatSecret(s: string): string {
   return s.replace(/(.{4})/g, '$1 ').trim()
+}
+
+/** Build the otpauth:// URI an authenticator app scans. Rendered to a QR
+ *  entirely client-side (qrcode.react), so the secret never leaves the browser. */
+function otpauthUri(issuer: string, account: string, secret: string): string {
+  const label = `${encodeURIComponent(issuer)}:${encodeURIComponent(account)}`
+  const params = new URLSearchParams({ secret, issuer })
+  return `otpauth://totp/${label}?${params.toString()}`
 }
 
 /**
@@ -60,16 +69,26 @@ export function MfaPanel({
       )}
 
       {mode === 'setup' && secret && (
-        <div className="mb-4 rounded-lg border border-white/20 bg-white/5 p-3">
-          <p className="text-xs text-white/70 mb-1.5">
-            In your authenticator app choose &ldquo;Enter a setup key&rdquo; and enter:
+        <div className="mb-4 rounded-lg border border-white/20 bg-white/5 p-4">
+          <p className="text-xs text-white/70 mb-3">
+            Scan this with your authenticator app (Google Authenticator, 1Password, Authy…):
           </p>
-          <code className="block text-sm font-mono text-white break-all tracking-wide select-all">
-            {formatSecret(secret)}
-          </code>
-          <p className="text-[11px] text-white/50 mt-2">
-            Account: {account} &middot; Issuer: {issuer}
-          </p>
+          <div className="flex justify-center mb-3">
+            <div className="rounded-lg bg-white p-3">
+              <QRCodeSVG value={otpauthUri(issuer, account, secret)} size={160} />
+            </div>
+          </div>
+          <details className="text-xs text-white/60">
+            <summary className="cursor-pointer select-none hover:text-white/90">
+              Can&rsquo;t scan? Enter a setup key instead
+            </summary>
+            <code className="mt-2 block text-sm font-mono text-white break-all tracking-wide select-all">
+              {formatSecret(secret)}
+            </code>
+            <p className="text-[11px] text-white/50 mt-1">
+              Account: {account} &middot; Issuer: {issuer}
+            </p>
+          </details>
         </div>
       )}
 
