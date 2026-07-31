@@ -2,17 +2,16 @@
 # admin-side), with the custom orgId/role attributes the API JWT middleware reads
 # (apps/api/src/lib/auth.go).
 #
-# TEMPORARY (non-CUI alpha): mfa_configuration is OPTIONAL, not ON. The frontend
-# sign-in flow does not yet implement TOTP enrollment (it only handles
-# NEW_PASSWORD_REQUIRED), so mandatory MFA would stall login at MFA_SETUP. This
-# MUST return to "ON" before the environment handles anything real or is
-# assessed, once TOTP enrollment is built into the sign-in flow. Tracked in
-# docs/ITAR-GOVCLOUD-MIGRATION.md. TOTP remains available (software token) so
-# users can opt in now. (IA-2)
+# MFA is enforced pool-wide (mfa_configuration = ON) using TOTP (software
+# token). The app and admin sign-in flows implement the full MFA_SETUP +
+# SOFTWARE_TOKEN_MFA challenge handling, so an invited user enrolls an
+# authenticator on first login. Verified end-to-end on both flows. NIST
+# 800-171 IA-2. (Applied live via set-user-pool-mfa-config; this keeps
+# terraform in sync.)
 resource "aws_cognito_user_pool" "main" {
   name = "${var.name_prefix}-users"
 
-  mfa_configuration = "OPTIONAL"
+  mfa_configuration = "ON"
 
   software_token_mfa_configuration {
     enabled = true
