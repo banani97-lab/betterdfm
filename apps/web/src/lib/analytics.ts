@@ -1,6 +1,11 @@
 import mixpanel from 'mixpanel-browser'
 
-const TOKEN = process.env.NEXT_PUBLIC_MIXPANEL_TOKEN || ''
+// ITAR/CUI boundary: never load analytics in the GovCloud build, regardless of
+// token configuration. Mixpanel's ingestion endpoint is outside the boundary.
+// The gov web bundle bakes a us-gov-* region, so gate on that (fail-safe: even
+// if a token were baked in, IS_GOV forces analytics off).
+const IS_GOV = (process.env.NEXT_PUBLIC_COGNITO_REGION || '').toLowerCase().startsWith('us-gov-')
+const TOKEN = IS_GOV ? '' : (process.env.NEXT_PUBLIC_MIXPANEL_TOKEN || '')
 let initialized = false
 
 function init() {
