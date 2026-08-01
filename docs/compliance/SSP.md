@@ -39,6 +39,9 @@ plan is honest by design: statuses reflect verified reality, not aspiration.
 | `security-awareness-training.md` | Awareness / role-based / insider-threat training + records |
 | `continuous-monitoring-plan.md` | Ongoing monitoring activities + cadence |
 | `separation-of-duties-memo.md` | Compensating controls for the single-operator environment |
+| `ir-tabletop-2026-07.md` | Incident-response tabletop exercise record |
+| `nist-800-171-self-assessment.md` | Scored self-assessment + estimated SPRS score |
+| `scripts/security-scan.sh` | Dependency vulnerability scan (Go/Node/Python) |
 
 ---
 
@@ -150,7 +153,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.3.1 Create/retain audit records | ✅ | CloudTrail (multi-region, all mgmt events) + per-service CloudWatch logs + VPC flow logs; 365-day retention; S3 archive. |
 | 3.3.2 Trace actions to users | ✅ | App logs carry user/org; CloudTrail carries IAM principal; Cognito sub in JWT. |
 | 3.3.3 Review/update logged events | ✅ | Comprehensive event set; monthly audit review + periodic event-definition review per the Audit & Accountability Policy. |
-| 3.3.4 Alert on audit-process failure | 🟡 | CloudTrail delivery monitored; explicit failure alerting to be added — **POA&M-03**. |
+| 3.3.4 Alert on audit-process failure | ✅ | CloudWatch alarm (`audit-delivery-stalled`) fires if CloudTrail stops delivering; plus security alarms (root use, unauthorized API, console-no-MFA) → SNS. |
 | 3.3.5 Correlate audit review | ✅ | Centralized in CloudWatch; monthly + on-alert review procedure documented (Audit Policy / ConMon Plan). |
 | 3.3.6 Audit reduction/reporting | ✅ | CloudWatch Logs Insights over centralized groups. |
 | 3.3.7 Authoritative time | ✅ | AWS-provided NTP; CloudTrail/CloudWatch timestamps UTC. |
@@ -182,7 +185,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 ### 3.6 Incident Response
 | 3.6.1 IR capability | ✅ | Incident Response Plan documents detection→recovery, roles, and records (tabletop test scheduled — POA&M-04). |
 | 3.6.2 Track/report incidents | ✅ | IR Plan defines incident records + external reporting incl. DoD 72-hour (DFARS -7012) and export-counsel escalation. |
-| 3.6.3 Test IR | 📋 | Tabletop test to be scheduled — **POA&M-04**. |
+| 3.6.3 Test IR | ✅ | Tabletop exercise conducted + recorded (`ir-tabletop-2026-07.md`); annual cadence set. |
 
 ### 3.7 Maintenance
 | 3.7.1–3.7.6 | 🏛️/✅ | Hardware maintenance inherited from AWS GovCloud. Software maintenance via IaC + immutable image redeploys; no remote maintenance tools with CUI access. |
@@ -207,11 +210,11 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 
 ### 3.11 Risk Assessment
 | 3.11.1 Assess risk | ✅ | Documented Risk Assessment (risk register + residual-risk analysis); refreshed annually / on material change. |
-| 3.11.2 Scan for vulnerabilities | 🟡 | Base images from maintained upstreams; dependency + image scanning to be formalized — **POA&M-03**. |
+| 3.11.2 Scan for vulnerabilities | ✅ | ECR scan-on-push enabled on all repos (image CVEs); `scripts/security-scan.sh` runs govulncheck / npm audit / pip-audit for dependencies. |
 | 3.11.3 Remediate vulnerabilities | ✅ | Patch-via-redeploy with documented severity-based SLA (Vulnerability Mgmt Policy). Scanning to feed it: POA&M-03. |
 
 ### 3.12 Security Assessment
-| 3.12.1 Assess controls | 🟡 | This SSP is the self-assessment basis; formal 800-171 self-assessment + SPRS score — **POA&M-04**. |
+| 3.12.1 Assess controls | ✅ | Documented 800-171 self-assessment + estimated SPRS score (`nist-800-171-self-assessment.md`). SPRS *submission* is an owner action (POA&M-04). |
 | 3.12.2 Plan of action | ✅ | POA&M maintained (§5). |
 | 3.12.3 Monitor controls | ✅ | Continuous Monitoring Plan defines activities + cadence (monthly review, quarterly access review, etc.). |
 | 3.12.4 System security plan | ✅ | This document. |
@@ -251,8 +254,8 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 |---|---|---|---|---|---|---|
 | POA&M-01 | Open | Internal service-to-service traffic is plaintext HTTP within the VPC | 3.13.8, 3.1.3 | Implement internal encryption (internal ACM/TLS or mTLS/mesh) for web↔api and worker↔gerbonara | Basel Anani | [date] |
 | POA&M-02 | Open | Deploy uses a broad IAM user, not a scoped role | 3.1.5 | Move deploys to a least-privilege OIDC role; retire the standing admin user for routine deploys | Basel Anani | [date] |
-| POA&M-03 | Open (reduced) | Automated dependency/image scanning, upload malware scanning, and audit-failure alerting not yet in place. *(Remediation SLA + audit-review procedure now documented in policy.)* | 3.11.2, 3.14.2, 3.14.4, 3.14.5, 3.3.4 | Add image/dependency scanning + upload AV; add CloudWatch alarm on audit-delivery failure | Basel Anani | [date] |
-| POA&M-04 | Open (reduced) | IR tabletop test + formal 800-171 self-assessment → SPRS submission outstanding. *(Awareness training, risk assessment, and ConMon plan now complete.)* | 3.6.3, 3.12.1 | Run + record IR tabletop; complete self-assessment and submit SPRS score | Basel Anani | [date] |
+| POA&M-03 | Open (reduced) | Real-time upload malware scanning (AV) not yet in place. *(Image scan-on-push, dependency-scan script, and audit-failure alarm now in place.)* | 3.14.2, 3.14.4, 3.14.5 | Add upload AV to the ingest pipeline (e.g. ClamAV scan step; GuardDuty S3 malware protection is unavailable in GovCloud) | Basel Anani | [date] |
+| POA&M-04 | Open (reduced) | SPRS score **submission** outstanding (owner action; CAGE + login). *(IR tabletop conducted; self-assessment + estimated score ≈92/110 computed.)* | 3.12.1 | Submit the computed SPRS score to the DoD SPRS system | Basel Anani | [date] |
 | POA&M-05 | Open (reduced) | Provisioning-time US-persons attestation capture, login use-notification banner, per-object CUI metadata marking. *(Policy set now authored.)* | 3.9.1, 3.1.9, 3.8.4 | Add US-persons attestation field at user creation; add login banner; add CUI object metadata | Basel Anani | [date] |
 | POA&M-06 | ✅ **Closed** 2026-07-31 | Single-operator separation of duties | 3.1.4 | Compensating controls documented (Separation-of-Duties Memo). Revisit on team growth. | Basel Anani | Done |
 
@@ -264,22 +267,23 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 |---|---|---|---|---|
 | 3.1 Access Control | 13 | 3 | 1 | 5 |
 | 3.2 Awareness/Training | 3 | 0 | 0 | 0 |
-| 3.3 Audit | 8 | 1 | 0 | 0 |
+| 3.3 Audit | 9 | 0 | 0 | 0 |
 | 3.4 Config Mgmt | 8 | 0 | 0 | 1 |
 | 3.5 Identification/Auth | 10 | 1 | 0 | 0 |
-| 3.6 Incident Response | 2 | 0 | 1 | 0 |
+| 3.6 Incident Response | 3 | 0 | 0 | 0 |
 | 3.7 Maintenance | — | — | — | 6 |
 | 3.8 Media | 6 | 0 | 0 | 3 |
 | 3.9 Personnel | 1 | 1 | 0 | 0 |
 | 3.10 Physical | — | — | — | 6 |
-| 3.11 Risk Assessment | 2 | 1 | 0 | 0 |
-| 3.12 Security Assessment | 3 | 1 | 0 | 0 |
+| 3.11 Risk Assessment | 3 | 0 | 0 | 0 |
+| 3.12 Security Assessment | 4 | 0 | 0 | 0 |
 | 3.13 System/Comms | 12 | 1 | 0 | 3 |
 | 3.14 System Integrity | 4 | 3 | 0 | 0 |
 
-**Totals: ✅ 72 implemented · 🟡 12 partial · 📋 2 planned · 🏛️/NA 24 inherited-or-N/A.**
-Of 110 controls, **96 are fully addressed** (implemented or inherited/N/A); **14 remain
-open**, now tracked in a 5-item POA&M (POA&M-06 closed).
+**Totals: ✅ 76 implemented · 🟡 9 partial · 📋 1 planned · 🏛️/NA 24 inherited-or-N/A.**
+Of 110 controls, **100 are fully addressed** (implemented or inherited/N/A); **10 remain
+open**, tracked in a 5-item POA&M (POA&M-06 closed). Estimated SPRS score ≈ **92/110**
+(see `nist-800-171-self-assessment.md`).
 
 **Headline:** the core technical controls assessors weight heavily — access control, MFA,
 FIPS cryptography, audit logging, boundary protection, encryption at rest — are

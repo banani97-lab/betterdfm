@@ -60,3 +60,22 @@ resource "aws_cloudwatch_metric_alarm" "security" {
 
   depends_on = [aws_cloudwatch_log_metric_filter.security]
 }
+
+# Audit-process-failure alarm (NIST 800-171 3.3.4): fire if the CloudTrail log
+# stream stops delivering. A metric filter cannot detect stoppage (no events =
+# no match), so alarm on the log group's IncomingLogEvents dropping to zero.
+# treat_missing_data = breaching so an absence of logs trips the alarm.
+resource "aws_cloudwatch_metric_alarm" "audit_delivery_stalled" {
+  alarm_name          = "${var.name_prefix}-audit-delivery-stalled"
+  alarm_description   = "Audit failure: no CloudTrail events delivered to CloudWatch in the last hour"
+  namespace           = "AWS/Logs"
+  metric_name         = "IncomingLogEvents"
+  dimensions          = { LogGroupName = aws_cloudwatch_log_group.cloudtrail.name }
+  statistic           = "Sum"
+  period              = 3600
+  evaluation_periods  = 1
+  threshold           = 1
+  comparison_operator = "LessThanThreshold"
+  treat_missing_data  = "breaching"
+  alarm_actions       = [aws_sns_topic.security_alerts.arn]
+}
