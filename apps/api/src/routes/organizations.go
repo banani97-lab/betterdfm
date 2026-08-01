@@ -322,8 +322,9 @@ func (h *AdminOrgHandler) CreateOrgUser(c echo.Context) error {
 	orgID := c.Param("id")
 
 	var req struct {
-		Email string `json:"email"`
-		Role  string `json:"role"`
+		Email            string `json:"email"`
+		Role             string `json:"role"`
+		USPersonAttested bool   `json:"usPersonAttested"`
 	}
 	if err := c.Bind(&req); err != nil {
 		return echo.NewHTTPError(http.StatusBadRequest, err.Error())
@@ -333,6 +334,11 @@ func (h *AdminOrgHandler) CreateOrgUser(c echo.Context) error {
 	}
 	if req.Role != "ADMIN" && req.Role != "ANALYST" && req.Role != "VIEWER" {
 		return echo.NewHTTPError(http.StatusBadRequest, "role must be ADMIN, ANALYST, or VIEWER")
+	}
+	// ITAR/CUI access control (NIST 800-171 3.9.1): the creating admin must
+	// attest the new user is a U.S. person before the account is provisioned.
+	if !req.USPersonAttested {
+		return echo.NewHTTPError(http.StatusBadRequest, "US-person attestation is required to add a user")
 	}
 
 	// Verify org exists
@@ -364,13 +370,16 @@ func (h *AdminOrgHandler) CreateOrgUser(c echo.Context) error {
 	}
 
 	// Create DB user
+	now := time.Now()
 	user := db.User{
-		ID:         uuid.New().String(),
-		OrgID:      orgID,
-		CognitoSub: cognitoSub,
-		Email:      req.Email,
-		Role:       req.Role,
-		CreatedAt:  time.Now(),
+		ID:                 uuid.New().String(),
+		OrgID:              orgID,
+		CognitoSub:         cognitoSub,
+		Email:              req.Email,
+		Role:               req.Role,
+		CreatedAt:          now,
+		USPersonAttested:   true,
+		USPersonAttestedAt: &now,
 	}
 	if err := h.db.Create(&user).Error; err != nil {
 		// Attempt Cognito rollback

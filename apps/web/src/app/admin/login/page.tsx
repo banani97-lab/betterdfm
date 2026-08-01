@@ -177,6 +177,13 @@ export default function AdminLoginPage() {
           </>
           )}
         </div>
+
+        {/* System-use notification (NIST 800-171 3.1.9) */}
+        <p className="mt-4 text-center text-[11px] leading-relaxed text-slate-400/50">
+          Authorized use only. This system processes export-controlled (ITAR/CUI)
+          technical data and is restricted to authorized U.S. persons. Activity is
+          monitored and logged; unauthorized access is prohibited.
+        </p>
       </div>
     </div>
   )

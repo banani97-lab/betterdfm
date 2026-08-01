@@ -25,6 +25,11 @@ type User struct {
 	Email      string    `json:"email"`
 	Role       string    `json:"role"` // ADMIN | ANALYST | VIEWER
 	CreatedAt  time.Time `json:"createdAt"`
+
+	// USPersonAttested records that the admin creating this user affirmed the
+	// user is a U.S. person (ITAR/CUI access control). Captured at creation.
+	USPersonAttested   bool       `gorm:"column:us_person_attested" json:"usPersonAttested"`
+	USPersonAttestedAt *time.Time `gorm:"column:us_person_attested_at" json:"usPersonAttestedAt,omitempty"`
 }
 
 // CapabilityProfile holds a CM's shop floor constraints

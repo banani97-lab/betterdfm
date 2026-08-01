@@ -46,6 +46,7 @@ export default function AdminOrganizationsPage() {
   const [tier, setTier] = useState('STARTER')
   const [newEmail, setNewEmail] = useState('')
   const [newRole, setNewRole] = useState<string>('ANALYST')
+  const [usAttested, setUsAttested] = useState(false)
   const [inviting, setInviting] = useState(false)
 
   useEffect(() => {
@@ -86,15 +87,16 @@ export default function AdminOrganizationsPage() {
   }
 
   const handleInviteUser = async () => {
-    if (!selected || !newEmail.trim()) return
+    if (!selected || !newEmail.trim() || !usAttested) return
     setInviting(true)
     try {
       await adminApiFetch(`/admin/organizations/${selected.id}/users`, {
         method: 'POST',
-        body: JSON.stringify({ email: newEmail, role: newRole }),
+        body: JSON.stringify({ email: newEmail, role: newRole, usPersonAttested: usAttested }),
       })
       await loadUsers(selected.id)
       setNewEmail('')
+      setUsAttested(false)
       toast.success('User invited')
     } catch (e: unknown) {
       toast.error(`Couldn't invite user — ${friendlyReason(e)}`)
@@ -321,32 +323,48 @@ export default function AdminOrganizationsPage() {
                 </div>
 
                 {/* Invite form */}
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="email@company.com"
-                    type="email"
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    className="flex-1 text-sm h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
-                  />
-                  <select
-                    value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
-                    className="h-9 px-3 rounded-md border border-slate-700 bg-slate-800 text-sm text-white"
-                  >
-                    <option value="ADMIN">Admin</option>
-                    <option value="ANALYST">Analyst</option>
-                    <option value="VIEWER">Viewer</option>
-                  </select>
-                  <Button
-                    size="sm"
-                    onClick={handleInviteUser}
-                    disabled={inviting || !newEmail.trim()}
-                    className="bg-orange-600 hover:bg-orange-500 text-white h-9 px-3"
-                  >
-                    <UserPlus className="h-4 w-4 mr-1" />
-                    {inviting ? 'Inviting...' : 'Invite'}
-                  </Button>
+                <div className="mb-4">
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="email@company.com"
+                      type="email"
+                      value={newEmail}
+                      onChange={(e) => setNewEmail(e.target.value)}
+                      className="flex-1 text-sm h-9 bg-slate-800 border-slate-700 text-white placeholder:text-slate-500"
+                    />
+                    <select
+                      value={newRole}
+                      onChange={(e) => setNewRole(e.target.value)}
+                      className="h-9 px-3 rounded-md border border-slate-700 bg-slate-800 text-sm text-white"
+                    >
+                      <option value="ADMIN">Admin</option>
+                      <option value="ANALYST">Analyst</option>
+                      <option value="VIEWER">Viewer</option>
+                    </select>
+                    <Button
+                      size="sm"
+                      onClick={handleInviteUser}
+                      disabled={inviting || !newEmail.trim() || !usAttested}
+                      className="bg-orange-600 hover:bg-orange-500 text-white h-9 px-3"
+                    >
+                      <UserPlus className="h-4 w-4 mr-1" />
+                      {inviting ? 'Inviting...' : 'Invite'}
+                    </Button>
+                  </div>
+                  {/* US-persons attestation (NIST 800-171 3.9.1) */}
+                  <label className="mt-2 flex items-start gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={usAttested}
+                      onChange={(e) => setUsAttested(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 shrink-0 accent-orange-600"
+                    />
+                    <span className="text-xs text-slate-400">
+                      I attest that this user is a U.S. person (U.S. citizen, lawful permanent
+                      resident, or protected individual) authorized to access export-controlled
+                      (ITAR/CUI) technical data.
+                    </span>
+                  </label>
                 </div>
 
                 {/* User list */}

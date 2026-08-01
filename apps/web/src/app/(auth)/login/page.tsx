@@ -428,6 +428,13 @@ export default function LoginPage() {
           <p className="text-center text-xs text-blue-300/60 mt-5">
             Secured by AWS Cognito
           </p>
+
+          {/* System-use notification (NIST 800-171 3.1.9) */}
+          <p className="mt-3 text-center text-[11px] leading-relaxed text-blue-300/50">
+            Authorized use only. This system processes export-controlled (ITAR/CUI)
+            technical data and is restricted to authorized U.S. persons. Activity is
+            monitored and logged; unauthorized access is prohibited.
+          </p>
         </div>
       </div>
     </div>
