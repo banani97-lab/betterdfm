@@ -130,7 +130,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.1.6 Non-privileged accounts for non-privileged use | ✅ | Admin console is a separate Cognito client + privileged flow; day-to-day app use is non-privileged. |
 | 3.1.7 Prevent non-priv users from privileged functions; audit | ✅ | Admin endpoints gated by `AdminMiddleware`; all API actions logged (CloudTrail + app logs). |
 | 3.1.8 Limit unsuccessful logon attempts | 🏛️/✅ | Cognito enforces adaptive lockout on repeated failures. |
-| 3.1.9 Privacy/security notices | 📋 | Login banner/notice to be added — **POA&M-05**. |
+| 3.1.9 Privacy/security notices | ✅ | System-use notification (authorized-use / export-controlled / monitoring notice) displayed at login on both app and admin sign-in. |
 | 3.1.10 Session lock | 🟡 | Token expiry limits session lifetime; explicit inactivity lock in UI — **POA&M-05**. |
 | 3.1.11 Session termination | ✅ | Sign-out clears tokens + revokes the refresh cookie; JWT expiry bounds sessions. |
 | 3.1.12 Monitor/control remote access | ✅ | All access is via TLS to the ALB; admin/console access authenticated + MFA'd; CloudTrail records control-plane access. |
@@ -202,7 +202,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.8.9 Protect backups | ✅ | RDS automated backups encrypted (CMK); S3 versioned + encrypted. |
 
 ### 3.9 Personnel Security
-| 3.9.1 Screen personnel | 🟡 | US-persons requirement defined + in policy/training; provisioning-time attestation *capture* still to be built — **POA&M-05**. |
+| 3.9.1 Screen personnel | ✅ | US-persons requirement in policy/training; provisioning now requires + records an explicit US-person attestation (enforced server-side in CreateOrgUser; stored per user). |
 | 3.9.2 Protect CUI on personnel actions | ✅ | Admin can immediately disable/delete a user (Cognito + DB); demonstrated. |
 
 ### 3.10 Physical Protection
@@ -256,7 +256,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | POA&M-02 | Open | Deploy uses a broad IAM user, not a scoped role | 3.1.5 | Move deploys to a least-privilege OIDC role; retire the standing admin user for routine deploys | Basel Anani | [date] |
 | POA&M-03 | Open (reduced) | Real-time upload malware scanning (AV) not yet in place. *(Image scan-on-push, dependency-scan script, and audit-failure alarm now in place.)* | 3.14.2, 3.14.4, 3.14.5 | Add upload AV to the ingest pipeline (e.g. ClamAV scan step; GuardDuty S3 malware protection is unavailable in GovCloud) | Basel Anani | [date] |
 | POA&M-04 | Open (reduced) | SPRS score **submission** outstanding (owner action; CAGE + login). *(IR tabletop conducted; self-assessment + estimated score ≈92/110 computed.)* | 3.12.1 | Submit the computed SPRS score to the DoD SPRS system | Basel Anani | [date] |
-| POA&M-05 | Open (reduced) | Provisioning-time US-persons attestation capture, login use-notification banner, per-object CUI metadata marking. *(Policy set now authored.)* | 3.9.1, 3.1.9, 3.8.4 | Add US-persons attestation field at user creation; add login banner; add CUI object metadata | Basel Anani | [date] |
+| POA&M-05 | ✅ **Closed** 2026-07-31 | Login banner + US-persons attestation implemented + deployed. *(Per-object CUI metadata marking is an optional future refinement; 3.8.4 met at system level via the Media Protection Policy.)* | 3.1.9, 3.9.1 | Done | Basel Anani | Done |
 | POA&M-06 | ✅ **Closed** 2026-07-31 | Single-operator separation of duties | 3.1.4 | Compensating controls documented (Separation-of-Duties Memo). Revisit on team growth. | Basel Anani | Done |
 
 ---
@@ -265,7 +265,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 
 | Family | ✅ | 🟡 | 📋 | 🏛️/NA |
 |---|---|---|---|---|
-| 3.1 Access Control | 13 | 3 | 1 | 5 |
+| 3.1 Access Control | 14 | 3 | 0 | 5 |
 | 3.2 Awareness/Training | 3 | 0 | 0 | 0 |
 | 3.3 Audit | 9 | 0 | 0 | 0 |
 | 3.4 Config Mgmt | 8 | 0 | 0 | 1 |
@@ -273,17 +273,17 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.6 Incident Response | 3 | 0 | 0 | 0 |
 | 3.7 Maintenance | — | — | — | 6 |
 | 3.8 Media | 6 | 0 | 0 | 3 |
-| 3.9 Personnel | 1 | 1 | 0 | 0 |
+| 3.9 Personnel | 2 | 0 | 0 | 0 |
 | 3.10 Physical | — | — | — | 6 |
 | 3.11 Risk Assessment | 3 | 0 | 0 | 0 |
 | 3.12 Security Assessment | 4 | 0 | 0 | 0 |
 | 3.13 System/Comms | 12 | 1 | 0 | 3 |
 | 3.14 System Integrity | 4 | 3 | 0 | 0 |
 
-**Totals: ✅ 76 implemented · 🟡 9 partial · 📋 1 planned · 🏛️/NA 24 inherited-or-N/A.**
-Of 110 controls, **100 are fully addressed** (implemented or inherited/N/A); **10 remain
-open**, tracked in a 5-item POA&M (POA&M-06 closed). Estimated SPRS score ≈ **92/110**
-(see `nist-800-171-self-assessment.md`).
+**Totals: ✅ 78 implemented · 🟡 8 partial · 📋 0 planned · 🏛️/NA 24 inherited-or-N/A.**
+Of 110 controls, **102 are fully addressed** (implemented or inherited/N/A); **8 remain
+open**, tracked in the POA&M (POA&M-05 and POA&M-06 now closed). Estimated SPRS score
+≈ **96/110** (see `nist-800-171-self-assessment.md`).
 
 **Headline:** the core technical controls assessors weight heavily — access control, MFA,
 FIPS cryptography, audit logging, boundary protection, encryption at rest — are
