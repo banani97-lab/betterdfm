@@ -105,7 +105,11 @@ resource "aws_ecs_task_definition" "web" {
     # Server-side calls in the web app reach the api internally. NEXT_PUBLIC_*
     # (browser) vars are baked at docker build time in CI, not here.
     environment = [
-      { name = "INTERNAL_API_URL", value = local.internal_api_url },
+      # web -> api goes over HTTPS via the load balancer (valid ACM cert) rather
+      # than plaintext service-discovery HTTP, so no CUI transits in the clear
+      # (NIST 800-171 3.13.8 / POA&M-01). The single caller is the AI-overview
+      # route, which resolves this base first.
+      { name = "INTERNAL_API_URL", value = local.api_url },
     ]
     logConfiguration = local.log_config["web"]
   }])

@@ -124,7 +124,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 |---|---|---|
 | 3.1.1 Authorized access | ✅ | Cognito invite-only pool; every API request requires a valid Cognito JWT validated by the api (signature, issuer, expiry, audience). No anonymous access to CUI. |
 | 3.1.2 Limit to permitted transactions | ✅ | Role claim (`custom:role`: ADMIN/ANALYST/VIEWER) enforced by `RequireRole` middleware; org scoping via `custom:orgId` on every query. |
-| 3.1.3 Control CUI flow | 🟡 | Egress to third parties removed (analytics hard-disabled in gov; OpenAI egress removed). Internal service hops still plaintext within VPC — **POA&M-01**. |
+| 3.1.3 Control CUI flow | ✅ | Egress to third parties removed (analytics hard-disabled in gov; OpenAI egress removed). Internal service-to-service hops now encrypted (worker↔gerbonara TLS; web↔api over HTTPS). |
 | 3.1.4 Separation of duties | ✅ | RBAC separates viewer/analyst/admin. Single-operator ops mitigated by documented compensating controls (tamper-evident audit trail + MFA) — see Separation-of-Duties Memo. |
 | 3.1.5 Least privilege | 🟡 | App RBAC least-privilege. Deploy currently uses a broad IAM user rather than a scoped role — **POA&M-02**. |
 | 3.1.6 Non-privileged accounts for non-privileged use | ✅ | Admin console is a separate Cognito client + privileged flow; day-to-day app use is non-privileged. |
@@ -227,7 +227,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.13.5 Public-access subnetworks | ✅ | Only ALB in public subnets; all compute/data in private subnets. |
 | 3.13.6 Deny-by-default network comms | ✅ | Security groups deny by default; only required flows allowed. |
 | 3.13.7 Prevent split tunneling | N/A | No VPN clients in boundary. |
-| 3.13.8 **Encrypt CUI in transit** | 🟡 | External TLS 1.2/1.3; all AWS API calls FIPS. **Internal service-to-service traffic is plaintext within the VPC** — **POA&M-01**. |
+| 3.13.8 **Encrypt CUI in transit** | ✅ | External TLS 1.2/1.3; all AWS API calls FIPS. Internal service-to-service traffic encrypted: worker→gerbonara over TLS (self-signed cert, SG-isolated); web→api over HTTPS via the load balancer. *(ALB→api backend hop remains within the VPC behind the TLS-terminating ALB — standard posture; HTTPS target-group re-encryption is an optional future hardening.)* |
 | 3.13.9 Terminate network connections | ✅ | Idle connection termination at ALB; session/JWT expiry. |
 | 3.13.10 Key management | ✅ | KMS CMK (FIPS 140-validated); automatic rotation configurable; keys never exposed to the app. |
 | 3.13.11 **FIPS-validated cryptography** | ✅ | FIPS endpoints enforced across all services (Go region-forced; Python boto3 `use_fips_endpoint`; web `AWS_USE_FIPS_ENDPOINT=true`); KMS is FIPS 140-validated. Verified 2026-07-31. |
@@ -252,7 +252,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 
 | ID | Status | Gap (remaining) | Control(s) | Planned action | Owner | Target |
 |---|---|---|---|---|---|---|
-| POA&M-01 | Open | Internal service-to-service traffic is plaintext HTTP within the VPC | 3.13.8, 3.1.3 | Implement internal encryption (internal ACM/TLS or mTLS/mesh) for web↔api and worker↔gerbonara | Basel Anani | [date] |
+| POA&M-01 | ✅ **Closed** 2026-08-03 | Internal service-to-service traffic was plaintext HTTP within the VPC | 3.13.8, 3.1.3 | Done: worker→gerbonara over TLS (self-signed cert from Secrets Manager); web→api over HTTPS via the load balancer. *(Optional future hardening: HTTPS ALB target group to encrypt the ALB→api backend hop.)* | Basel Anani | Done |
 | POA&M-02 | Open | Deploy uses a broad IAM user, not a scoped role | 3.1.5 | Move deploys to a least-privilege OIDC role; retire the standing admin user for routine deploys | Basel Anani | [date] |
 | POA&M-03 | Open (reduced) | Real-time upload malware scanning (AV) not yet in place. *(Image scan-on-push, dependency-scan script, and audit-failure alarm now in place.)* | 3.14.2, 3.14.4, 3.14.5 | Add upload AV to the ingest pipeline (e.g. ClamAV scan step; GuardDuty S3 malware protection is unavailable in GovCloud) | Basel Anani | [date] |
 | POA&M-04 | Open (reduced) | SPRS score **submission** outstanding (owner action; CAGE + login). *(IR tabletop conducted; self-assessment + estimated score ≈92/110 computed.)* | 3.12.1 | Submit the computed SPRS score to the DoD SPRS system | Basel Anani | [date] |
@@ -265,7 +265,7 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 
 | Family | ✅ | 🟡 | 📋 | 🏛️/NA |
 |---|---|---|---|---|
-| 3.1 Access Control | 14 | 3 | 0 | 5 |
+| 3.1 Access Control | 15 | 2 | 0 | 5 |
 | 3.2 Awareness/Training | 3 | 0 | 0 | 0 |
 | 3.3 Audit | 9 | 0 | 0 | 0 |
 | 3.4 Config Mgmt | 8 | 0 | 0 | 1 |
@@ -277,13 +277,13 @@ Uploaded ODB++ (`s3://…-uploads/submissions/`), parsed board + violations
 | 3.10 Physical | — | — | — | 6 |
 | 3.11 Risk Assessment | 3 | 0 | 0 | 0 |
 | 3.12 Security Assessment | 4 | 0 | 0 | 0 |
-| 3.13 System/Comms | 12 | 1 | 0 | 3 |
+| 3.13 System/Comms | 13 | 0 | 0 | 3 |
 | 3.14 System Integrity | 4 | 3 | 0 | 0 |
 
-**Totals: ✅ 78 implemented · 🟡 8 partial · 📋 0 planned · 🏛️/NA 24 inherited-or-N/A.**
-Of 110 controls, **102 are fully addressed** (implemented or inherited/N/A); **8 remain
-open**, tracked in the POA&M (POA&M-05 and POA&M-06 now closed). Estimated SPRS score
-≈ **96/110** (see `nist-800-171-self-assessment.md`).
+**Totals: ✅ 80 implemented · 🟡 6 partial · 📋 0 planned · 🏛️/NA 24 inherited-or-N/A.**
+Of 110 controls, **104 are fully addressed** (implemented or inherited/N/A); **6 remain
+open**, tracked in the POA&M (POA&M-01, -05, and -06 now closed). Estimated SPRS score
+≈ **98/110** (see `nist-800-171-self-assessment.md`).
 
 **Headline:** the core technical controls assessors weight heavily — access control, MFA,
 FIPS cryptography, audit logging, boundary protection, encryption at rest — are

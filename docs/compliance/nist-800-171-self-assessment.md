@@ -23,27 +23,29 @@ all-or-nothing.
 
 ## 2. Result
 
-- **Controls fully implemented or inherited/N/A: 102 of 110**
-- **Open (not yet fully implemented): 8** — all tracked in the SSP POA&M.
-  *(3.1.9 login banner and 3.9.1 US-persons attestation closed 2026-07-31 with POA&M-05.)*
+- **Controls fully implemented or inherited/N/A: 104 of 110**
+- **Open (not yet fully implemented): 6** — all tracked in the SSP POA&M.
+  *(POA&M-05 closed 3.1.9 + 3.9.1 on 2026-07-31; POA&M-01 closed 3.1.3 + 3.13.8 on
+  2026-08-03 via internal service-to-service TLS.)*
 
 ## 3. Deductions (open controls)
 
 | Control | Title | Est. weight | On POA&M | Note |
 |---|---|---|---|---|
-| 3.1.3 | Control CUI flow | 1 | 01 | internal TLS |
+| ~~3.1.3~~ | Control CUI flow | — | ✅ closed | internal TLS done |
 | 3.1.5 | Least privilege | 3 | 02 | scoped deploy role (deferred) |
 | ~~3.1.9~~ | System-use notification | — | ✅ closed | login banner deployed |
 | 3.1.10 | Session lock | 1 | — | UI inactivity lock |
 | 3.5.6 | Disable inactive identifiers | 1 | — | automate disablement |
 | ~~3.9.1~~ | Screen personnel | — | ✅ closed | US-persons attestation deployed |
-| 3.13.8 | Encrypt CUI in transit | 1 | 01 | internal TLS |
+| ~~3.13.8~~ | Encrypt CUI in transit | — | ✅ closed | internal TLS done |
 | 3.14.2 | Malicious-code protection | 5 | 03 | upload AV (extraction hardened; partial) |
 | 3.14.4 | Update malicious-code protection | 1 | 03 | tied to 3.14.2 |
 | 3.14.5 | Periodic + real-time scans | 1 | 03 | dep + image scan in place; upload real-time pending |
 
-**Estimated deduction: ~14 points → estimated SPRS score ≈ 96 / 110** (after POA&M-05
-closed 3.1.9 + 3.9.1; pending official-template verification).
+**Estimated deduction: ~12 points → estimated SPRS score ≈ 98 / 110** (after POA&M-05
+closed 3.1.9 + 3.9.1 and POA&M-01 closed 3.1.3 + 3.13.8; pending official-template
+verification).
 
 ## 4. Interpretation
 
