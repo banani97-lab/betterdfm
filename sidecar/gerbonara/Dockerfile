@@ -7,11 +7,11 @@ WORKDIR /app
 COPY pyproject.toml ./
 RUN pip install --no-cache-dir fastapi "uvicorn[standard]" boto3 "pydantic>=2.7.0"
 
-COPY main.py models.py units.py parser_odb.py storage.py ./
+COPY main.py models.py units.py parser_odb.py storage.py entrypoint.sh ./
+RUN chmod +x entrypoint.sh
 
 EXPOSE 8001
-# --no-access-log drops the per-request stdout line (ECS tasks on Fargate get
-# hit by the ALB health check every few seconds; those lines were a large
-# share of the CloudWatch Logs ingestion bill). App-level logging via
-# logging.basicConfig(INFO) is unaffected.
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001", "--no-access-log"]
+# entrypoint.sh serves HTTPS when TLS_CERT/TLS_KEY are injected (GovCloud
+# internal TLS), else HTTP (dev). --no-access-log drops the per-request stdout
+# line (ALB/health hits were a large share of the CloudWatch ingestion bill).
+CMD ["./entrypoint.sh"]

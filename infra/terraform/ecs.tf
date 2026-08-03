@@ -48,7 +48,7 @@ resource "aws_cloudwatch_log_group" "service" {
 
 locals {
   internal_api_url = "http://api.${var.name_prefix}.local:8080"
-  gerbonara_url    = "http://gerbonara.${var.name_prefix}.local:8001"
+  gerbonara_url    = "https://gerbonara.${var.name_prefix}.local:8001"
 
   image = { for s in local.services : s => "${aws_ecr_repository.service[s].repository_url}:${var.image_tag}" }
 
@@ -61,6 +61,12 @@ locals {
 
   db_secret = [
     { name = "DATABASE_URL", valueFrom = aws_secretsmanager_secret.database_url.arn },
+  ]
+
+  # Internal-TLS cert+key, injected into TLS-serving services (gerbonara, api).
+  tls_secret = [
+    { name = "TLS_CERT", valueFrom = "${aws_secretsmanager_secret.internal_tls.arn}:tls_cert::" },
+    { name = "TLS_KEY", valueFrom = "${aws_secretsmanager_secret.internal_tls.arn}:tls_key::" },
   ]
 }
 
@@ -178,6 +184,7 @@ resource "aws_ecs_task_definition" "gerbonara" {
       { name = "AWS_REGION", value = var.region },
       { name = "S3_BUCKET", value = aws_s3_bucket.uploads.id },
     ]
+    secrets          = local.tls_secret
     logConfiguration = local.log_config["gerbonara"]
   }])
 }

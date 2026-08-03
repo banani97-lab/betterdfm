@@ -29,7 +29,10 @@ data "aws_iam_policy_document" "execution_extra" {
     sid       = "ReadDbSecret"
     effect    = "Allow"
     actions   = ["secretsmanager:GetSecretValue"]
-    resources = [aws_secretsmanager_secret.database_url.arn]
+    resources = [
+      aws_secretsmanager_secret.database_url.arn,
+      aws_secretsmanager_secret.internal_tls.arn,
+    ]
   }
 
   statement {

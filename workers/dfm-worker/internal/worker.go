@@ -41,7 +41,8 @@ func NewWorker(db *gorm.DB, sqsClient *sqs.Client, s3Client *s3.Client, s3Bucket
 		// Large ODB++ archives (200MB+) can take many minutes to parse. Keep
 		// this below the SQS visibility timeout (1800s) so a slow parse fails
 		// the request cleanly rather than letting the message redeliver mid-parse.
-		httpClient: &http.Client{Timeout: 20 * time.Minute},
+		// internalTransport enables TLS to the sidecar in GovCloud.
+		httpClient: &http.Client{Timeout: 20 * time.Minute, Transport: internalTransport()},
 	}
 }
 

@@ -11,7 +11,7 @@ import (
 // pulling SQS jobs before the gerbonara sidecar has finished booting.
 func WaitForSidecar(healthURL string, maxWaitSec int) {
 	deadline := time.Now().Add(time.Duration(maxWaitSec) * time.Second)
-	client := &http.Client{Timeout: 2 * time.Second}
+	client := &http.Client{Timeout: 2 * time.Second, Transport: internalTransport()}
 	for {
 		resp, err := client.Get(healthURL)
 		if err == nil && resp.StatusCode == 200 {
